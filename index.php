@@ -44,7 +44,7 @@ if ($_POST) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - FaroV2</title>
+    <title>Login - Solicitud de Crédito</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -99,7 +99,7 @@ if ($_POST) {
     <div class="login-container">
         <div class="login-header">
             <h2><i class="fas fa-user-lock me-2"></i>Iniciar Sesión</h2>
-            <p class="mb-0">FaroV2 - Gestión de Usuarios</p>
+            <p class="mb-0">Solicitud de Crédito - Gestión de Usuarios</p>
         </div>
         
         <div class="login-body">

@@ -1,16 +1,18 @@
-# Sistema de Gestión de Usuarios
+# Sistema de Solicitud de Crédito
 
-Sistema web completo para la gestión de usuarios con sistema de roles y permisos, desarrollado en PHP, MySQL y Bootstrap.
+Sistema web completo para la gestión de solicitudes de crédito con integración Pipedrive, desarrollado en PHP, MySQL y Bootstrap.
 
 ## Características
 
 - **Sistema de Login Seguro**: Autenticación con hash de contraseñas
-- **Gestión de Usuarios**: CRUD completo de usuarios
-- **Sistema de Roles**: Roles personalizables con permisos
+- **Gestión de Usuarios**: CRUD completo de usuarios con roles
+- **Solicitudes de Crédito**: Gestión completa del proceso de crédito
+- **Integración Pipedrive**: Sincronización de leads (API + CSV)
+- **Muro de Tiempo**: Notas y actualizaciones en tiempo real
 - **Interfaz Moderna**: Diseño responsive con Bootstrap 5
 - **Modales**: Todas las operaciones se realizan sin salir de la pantalla
-- **DataTables**: Tabla de usuarios con paginación, búsqueda y ordenamiento
-- **Validaciones**: Validación en tiempo real de emails únicos
+- **DataTables**: Tablas con paginación, búsqueda y ordenamiento
+- **Validaciones**: Validación en tiempo real de datos
 - **Seguridad**: Control de acceso basado en roles
 
 ## Requisitos del Sistema
@@ -82,11 +84,55 @@ farov2/
 
 ### Sistema de Roles
 - **ROLE_ADMIN**: Acceso completo al sistema
+- **ROLE_GESTOR**: Gestor de crédito (crear solicitudes)
+- **ROLE_BANCO**: Analista bancario (aprobar/rechazar)
 - **ROLE_SUPERVISOR**: Acceso a reportes y gestión
 - **ROLE_USER**: Usuario estándar
 - **ROLE_AM**: Asistente de Marketing
 - **ROLE_VENDEDOR**: Vendedor del sistema
 - **ROLE_COBRADOR**: Cobrador del sistema
+
+## 🔗 Integración con Pipedrive
+
+El sistema incluye integración completa con Pipedrive para sincronización de leads:
+
+### Estado Actual de la Integración
+- **Conexión básica**: ✅ Funcionando
+- **API de leads**: ⚠️ Requiere plan Professional/Premium/Ultimate
+- **Importación CSV**: ✅ Completamente funcional
+- **Sincronización automática**: Disponible con plan actualizado
+
+### Cómo Usar la Integración
+
+#### Opción 1: Importación CSV (Recomendada - Funciona Ahora)
+1. Ve a "Importar CSV" en el menú
+2. Descarga la plantilla CSV
+3. Exporta leads desde Pipedrive en formato CSV
+4. Sube el archivo al sistema
+5. Los leads se importarán automáticamente
+
+#### Opción 2: Sincronización Automática (Requiere Plan Actualizado)
+1. Actualiza tu plan de Pipedrive a Professional/Premium/Ultimate
+2. La sincronización automática funcionará inmediatamente
+3. Los leads se importarán automáticamente sin intervención manual
+
+### Campos de Solicitud de Crédito
+
+#### Campos del Gestor
+- **Datos Generales**: Nombre, cédula, edad, género, dirección
+- **Perfil Financiero**: Tipo (Asalariado/Jubilado/Independiente), ingreso, empresa
+- **Datos del Auto**: Marca, modelo, año, kilometraje, precio
+- **Comentarios**: Análisis del perfil del cliente
+
+#### Campos del Banco
+- **Respuesta**: Aprobado/Pre Aprobado/Rechazado
+- **Términos**: Letra, plazo, abono, promoción
+- **Comentarios**: Condiciones y requerimientos del banco
+
+#### Campos del Cliente
+- **Respuesta**: Acepta/Rechaza
+- **Motivo**: Razón de aceptación o rechazo
+- **Fechas**: Envío proforma, firma, póliza, carta promesa
 
 ### Campos de Usuario
 - Información personal (nombre, apellido, email)

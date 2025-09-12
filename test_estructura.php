@@ -112,8 +112,8 @@ echo "<li><strong>Funcionalidades:</strong> Probar crear, editar y eliminar regi
 echo "</ol>";
 
 echo "<hr>";
-echo "<h3>🎉 ¡FaroV2 Reorganizado Completamente!</h3>";
-echo "<p>FaroV2 ahora tiene una estructura clara y profesional:</p>";
+echo "<h3>🎉 ¡Solicitud de Crédito Reorganizado Completamente!</h3>";
+echo "<p>Solicitud de Crédito ahora tiene una estructura clara y profesional:</p>";
 echo "<ul>";
 echo "<li>🏠 <strong>Dashboard:</strong> Vista general con estadísticas y resumen</li>";
 echo "<li>👥 <strong>Usuarios:</strong> Gestión completa de usuarios del sistema</li>";

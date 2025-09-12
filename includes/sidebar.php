@@ -13,7 +13,7 @@ $isAdmin = in_array('ROLE_ADMIN', $_SESSION['user_roles']);
 <!-- Sidebar -->
 <div class="col-md-3 col-lg-2 px-0 sidebar">
     <div class="text-center py-4">
-        <h4 class="text-white"><i class="fas fa-users me-2"></i>FaroV2</h4>
+        <h4 class="text-white"><i class="fas fa-users me-2"></i>Solicitud de Crédito</h4>
     </div>
     <nav class="nav flex-column">
         <a class="nav-link <?php echo ($current_page == 'dashboard.php') ? 'active' : ''; ?>" href="dashboard.php">
@@ -28,7 +28,19 @@ $isAdmin = in_array('ROLE_ADMIN', $_SESSION['user_roles']);
         <a class="nav-link <?php echo ($current_page == 'roles.php') ? 'active' : ''; ?>" href="roles.php">
             <i class="fas fa-user-shield me-2"></i>Gestión de Roles
         </a>
+
+        <a class="nav-link <?php echo ($current_page == 'solicitudes.php') ? 'active' : ''; ?>" href="solicitudes.php">
+            <i class="fas fa-file-alt me-2"></i>Solicitudes de Crédito
+        </a>
         <?php endif; ?>
+        
+        <a class="nav-link <?php echo ($current_page == 'pipedrive.php') ? 'active' : ''; ?>" href="pipedrive.php">
+            <i class="fas fa-plug me-2"></i>Integración Pipedrive
+        </a>
+        
+        <a class="nav-link <?php echo ($current_page == 'importar_csv.php') ? 'active' : ''; ?>" href="importar_csv.php">
+            <i class="fas fa-file-csv me-2"></i>Importar CSV
+        </a>
         
         <a class="nav-link" href="logout.php">
             <i class="fas fa-sign-out-alt me-2"></i>Cerrar Sesión

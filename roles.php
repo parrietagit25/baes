@@ -25,7 +25,7 @@ $roles = $stmt->fetchAll();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestión de Roles - FaroV2</title>
+    <title>Gestión de Roles - Solicitud de Crédito</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css" rel="stylesheet">
@@ -97,7 +97,7 @@ $roles = $stmt->fetchAll();
                     <div class="d-flex justify-content-between align-items-center mb-4">
                         <div>
                             <h2 class="mb-1">Gestión de Roles</h2>
-                            <p class="text-muted mb-0">Administrar roles y permisos de FaroV2</p>
+                            <p class="text-muted mb-0">Administrar roles y permisos de Solicitud de Crédito</p>
                         </div>
                         <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#rolModal" onclick="limpiarFormularioRol()">
                             <i class="fas fa-plus me-2"></i>Nuevo Rol

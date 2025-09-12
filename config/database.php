@@ -1,7 +1,7 @@
 <?php
 // Configuración de la base de datos
 $host = 'localhost';
-$dbname = 'sistema_usuarios';
+$dbname = 'solicitud_credito';
 $username = 'root';
 $password = '';
 $charset = 'utf8mb4';

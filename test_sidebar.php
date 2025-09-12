@@ -18,7 +18,7 @@ $isAdmin = in_array('ROLE_ADMIN', $_SESSION['user_roles']);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Test de Sidebar - FaroV2</title>
+    <title>Test de Sidebar - Solicitud de Crédito</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
