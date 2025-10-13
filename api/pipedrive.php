@@ -16,8 +16,8 @@ if (!isset($_SESSION['user_id'])) {
 require_once '../config/database.php';
 
 // Configuración de Pipedrive
-define('PIPEDRIVE_API_KEY', '0aabc590a7654fa313f2b195c2fb8657f0a4c098');
-define('PIPEDRIVE_BASE_URL', 'https://api.pipedrive.com/v1');
+define('PIPEDRIVE_API_KEY', '9c8606b29310e29b3880066aad0426b59a555cfc');
+define('PIPEDRIVE_BASE_URL', 'https://grupopcr.pipedrive.com/api/v1');
 
 $method = $_SERVER['REQUEST_METHOD'];
 
@@ -87,15 +87,29 @@ function probarConexion() {
 }
 
 function obtenerLeads() {
-    // Usar la API correcta de leads según la documentación oficial
-    $url = PIPEDRIVE_BASE_URL . '/leads?api_token=' . PIPEDRIVE_API_KEY . '&limit=50';
+    // Obtener leads recientes y activos (no archivados)
+    $url = PIPEDRIVE_BASE_URL . '/leads?api_token=' . PIPEDRIVE_API_KEY . '&limit=50&sort=add_time&sort_direction=desc';
     
     $response = hacerPeticionPipedrive($url);
     
     if ($response && isset($response['success']) && $response['success']) {
+        // Filtrar solo leads activos (no archivados)
+        $leadsActivos = array_filter($response['data'], function($lead) {
+            return !isset($lead['is_archived']) || !$lead['is_archived'];
+        });
+        
+        // Reindexar el array
+        $leadsActivos = array_values($leadsActivos);
+        
         echo json_encode([
             'success' => true,
-            'data' => $response['data']
+            'data' => $leadsActivos,
+            'filtros_aplicados' => [
+                'solo_activos' => true,
+                'ordenado_por_fecha' => 'descendente',
+                'total_encontrados' => count($leadsActivos),
+                'total_original' => count($response['data'])
+            ]
         ]);
     } else {
         // Verificar si es error 402 (Payment Required)
@@ -119,8 +133,8 @@ function sincronizarLeads() {
     global $pdo;
     
     try {
-        // Obtener leads de Pipedrive usando la API correcta
-        $url = PIPEDRIVE_BASE_URL . '/leads?api_token=' . PIPEDRIVE_API_KEY . '&limit=100';
+        // Obtener leads recientes y activos de Pipedrive
+        $url = PIPEDRIVE_BASE_URL . '/leads?api_token=' . PIPEDRIVE_API_KEY . '&limit=100&sort=add_time&sort_direction=desc';
         $response = hacerPeticionPipedrive($url);
         
         if (!$response || !isset($response['success']) || !$response['success']) {
@@ -128,9 +142,15 @@ function sincronizarLeads() {
             return;
         }
         
-        $leads = $response['data'];
+        // Filtrar solo leads activos (no archivados)
+        $leads = array_filter($response['data'], function($lead) {
+            return !isset($lead['is_archived']) || !$lead['is_archived'];
+        });
+        
+        $leads = array_values($leads); // Reindexar
         $importados = 0;
         $errores = [];
+        $saltados = 0;
         
         foreach ($leads as $lead) {
             try {
@@ -143,14 +163,18 @@ function sincronizarLeads() {
                 }
                 
                 // Verificar si el lead ya existe (por email)
-                if (empty($personaInfo['email'])) continue;
+                if (empty($personaInfo['email'])) {
+                    $saltados++;
+                    continue;
+                }
                 
                 $email = $personaInfo['email'];
                 $stmt = $pdo->prepare("SELECT id FROM solicitudes_credito WHERE email = ?");
                 $stmt->execute([$email]);
                 
                 if ($stmt->fetch()) {
-                    continue; // Ya existe, saltar
+                    $saltados++; // Ya existe, saltar
+                    continue;
                 }
                 
                 // Crear solicitud desde el lead
@@ -197,10 +221,17 @@ function sincronizarLeads() {
         
         echo json_encode([
             'success' => true,
-            'message' => "Sincronización completada",
+            'message' => "Sincronización completada - Solo leads recientes y activos",
             'data' => [
                 'importados' => $importados,
-                'errores' => $errores
+                'saltados' => $saltados,
+                'errores' => $errores,
+                'total_procesados' => count($leads),
+                'filtros_aplicados' => [
+                    'solo_activos' => true,
+                    'ordenado_por_fecha' => 'descendente',
+                    'leads_archivados_excluidos' => true
+                ]
             ]
         ]);
         

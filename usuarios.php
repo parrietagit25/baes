@@ -8,6 +8,7 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 require_once 'config/database.php';
+require_once 'includes/validar_acceso.php';
 
 // Verificar si el usuario es administrador
 if (!in_array('ROLE_ADMIN', $_SESSION['user_roles'])) {
@@ -17,10 +18,11 @@ if (!in_array('ROLE_ADMIN', $_SESSION['user_roles'])) {
 
 // Obtener lista de usuarios
 $stmt = $pdo->query("
-    SELECT u.*, GROUP_CONCAT(r.nombre SEPARATOR ', ') as roles
+    SELECT u.*, GROUP_CONCAT(r.nombre SEPARATOR ', ') as roles, b.nombre as banco_nombre
     FROM usuarios u
     LEFT JOIN usuario_roles ur ON u.id = ur.usuario_id
     LEFT JOIN roles r ON ur.rol_id = r.id
+    LEFT JOIN bancos b ON u.banco_id = b.id
     GROUP BY u.id
     ORDER BY u.fecha_creacion DESC
 ");
@@ -161,6 +163,7 @@ $roles = $stmt->fetchAll();
                                             <th>Email</th>
                                             <th>Cargo</th>
                                             <th>Roles</th>
+                                            <th>Banco</th>
                                             <th>Estado</th>
                                             <th>Acciones</th>
                                         </tr>
@@ -174,6 +177,13 @@ $roles = $stmt->fetchAll();
                                             <td><?php echo htmlspecialchars($usuario['cargo'] ?? '-'); ?></td>
                                             <td>
                                                 <span class="badge bg-info"><?php echo htmlspecialchars($usuario['roles'] ?? 'Sin roles'); ?></span>
+                                            </td>
+                                            <td>
+                                                <?php if ($usuario['banco_nombre']): ?>
+                                                    <span class="badge bg-primary"><?php echo htmlspecialchars($usuario['banco_nombre']); ?></span>
+                                                <?php else: ?>
+                                                    <span class="text-muted">-</span>
+                                                <?php endif; ?>
                                             </td>
                                             <td>
                                                 <?php if ($usuario['activo']): ?>
@@ -301,6 +311,16 @@ $roles = $stmt->fetchAll();
                                 </div>
                                 <?php endforeach; ?>
                             </div>
+                        </div>
+
+                        <!-- Select de Banco (solo para usuarios tipo banco) -->
+                        <div class="mb-3" id="bancoSection" style="display: none;">
+                            <label for="banco_id" class="form-label">Banco Asignado</label>
+                            <select class="form-select" id="banco_id" name="banco_id">
+                                <option value="">Seleccionar banco...</option>
+                                <!-- Se llenará via JavaScript -->
+                            </select>
+                            <div class="form-text">Solo aplica para usuarios con rol de banco</div>
                         </div>
                     </div>
                     <div class="modal-footer">

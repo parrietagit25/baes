@@ -19,6 +19,8 @@ switch ($method) {
             obtenerUsuario($_GET['id']);
         } elseif (isset($_GET['validar_email'])) {
             validarEmail($_GET['validar_email'], $_GET['excluir_id'] ?? null);
+        } elseif (isset($_GET['bancos'])) {
+            obtenerBancos();
         } else {
             obtenerUsuarios();
         }
@@ -81,10 +83,11 @@ function obtenerUsuarios() {
     
     try {
         $stmt = $pdo->query("
-            SELECT u.*, GROUP_CONCAT(r.nombre SEPARATOR ', ') as roles
+            SELECT u.*, GROUP_CONCAT(r.nombre SEPARATOR ', ') as roles, b.nombre as banco_nombre
             FROM usuarios u
             LEFT JOIN usuario_roles ur ON u.id = ur.usuario_id
             LEFT JOIN roles r ON ur.rol_id = r.id
+            LEFT JOIN bancos b ON u.banco_id = b.id
             GROUP BY u.id
             ORDER BY u.fecha_creacion DESC
         ");
@@ -146,9 +149,9 @@ function crearUsuario() {
         
         // Insertar usuario
         $stmt = $pdo->prepare("
-            INSERT INTO usuarios (nombre, apellido, email, password, pais, cargo, telefono, 
+            INSERT INTO usuarios (nombre, apellido, email, password, pais, cargo, telefono, banco_id,
                                 id_cobrador, id_vendedor, activo, primer_acceso)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         
         $stmt->execute([
@@ -159,8 +162,9 @@ function crearUsuario() {
             $_POST['pais'] ?? null,
             $_POST['cargo'] ?? null,
             $_POST['telefono'] ?? null,
-            $_POST['id_cobrador'] ?? null,
-            $_POST['id_vendedor'] ?? null,
+            (!empty($_POST['banco_id'])) ? $_POST['banco_id'] : null,
+            (!empty($_POST['id_cobrador'])) ? $_POST['id_cobrador'] : null,
+            (!empty($_POST['id_vendedor'])) ? $_POST['id_vendedor'] : null,
             isset($_POST['activo']) ? 1 : 0,
             isset($_POST['primer_acceso']) ? 1 : 0
         ]);
@@ -188,7 +192,19 @@ function actualizarUsuario() {
     
     try {
         // Obtener datos del PUT request
-        parse_str(file_get_contents("php://input"), $_PUT);
+        $input = file_get_contents("php://input");
+        parse_str($input, $_PUT);
+        
+        // Manejar arrays que no se parsean correctamente con parse_str
+        if (strpos($input, 'roles%5B%5D') !== false || strpos($input, 'roles[]') !== false) {
+            // Extraer roles manualmente
+            $roles = [];
+            preg_match_all('/roles(?:%5B%5D|\[\])=(\d+)/', $input, $matches);
+            if (!empty($matches[1])) {
+                $roles = $matches[1];
+            }
+            $_PUT['roles'] = $roles;
+        }
         
         if (empty($_PUT['id'])) {
             echo json_encode(['success' => false, 'message' => 'ID de usuario requerido']);
@@ -217,13 +233,18 @@ function actualizarUsuario() {
         $campos = [];
         $valores = [];
         
-        $camposPermitidos = ['nombre', 'apellido', 'email', 'pais', 'cargo', 'telefono', 
+        $camposPermitidos = ['nombre', 'apellido', 'email', 'pais', 'cargo', 'telefono', 'banco_id',
                              'id_cobrador', 'id_vendedor', 'activo', 'primer_acceso'];
         
         foreach ($camposPermitidos as $campo) {
             if (isset($_PUT[$campo])) {
                 $campos[] = "$campo = ?";
-                $valores[] = $_PUT[$campo];
+                // Convertir strings vacíos a NULL para campos de clave foránea
+                $valor = $_PUT[$campo];
+                if (($campo === 'banco_id' || $campo === 'id_cobrador' || $campo === 'id_vendedor') && $valor === '') {
+                    $valor = null;
+                }
+                $valores[] = $valor;
             }
         }
         
@@ -265,7 +286,8 @@ function actualizarUsuario() {
         
     } catch (PDOException $e) {
         http_response_code(500);
-        echo json_encode(['success' => false, 'message' => 'Error al actualizar usuario']);
+        error_log("Error en actualizarUsuario: " . $e->getMessage());
+        echo json_encode(['success' => false, 'message' => 'Error al actualizar usuario: ' . $e->getMessage()]);
     }
 }
 
@@ -300,6 +322,20 @@ function eliminarUsuario() {
     } catch (PDOException $e) {
         http_response_code(500);
         echo json_encode(['success' => false, 'message' => 'Error al eliminar usuario']);
+    }
+}
+
+function obtenerBancos() {
+    global $pdo;
+    
+    try {
+        $stmt = $pdo->query("SELECT id, nombre, codigo FROM bancos WHERE activo = 1 ORDER BY nombre ASC");
+        $bancos = $stmt->fetchAll();
+        
+        echo json_encode(['success' => true, 'data' => $bancos]);
+    } catch (PDOException $e) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Error de base de datos']);
     }
 }
 ?>

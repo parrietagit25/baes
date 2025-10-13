@@ -23,7 +23,16 @@ switch ($method) {
         break;
         
     case 'POST':
-        crearSolicitud();
+        // Verificar si es una actualización basada en el parámetro _method
+        if (isset($_POST['_method']) && $_POST['_method'] === 'PUT') {
+            actualizarSolicitud();
+        } elseif (isset($_POST['action']) && $_POST['action'] === 'aprobar_solicitud') {
+            aprobarSolicitud();
+        } elseif (isset($_POST['nuevo_estado']) && isset($_POST['nota_cambio_estado'])) {
+            cambiarEstadoSolicitud();
+        } else {
+            crearSolicitud();
+        }
         break;
         
     case 'PUT':
@@ -50,9 +59,14 @@ function obtenerSolicitudes() {
         // Construir query según el rol del usuario
         $sql = "
             SELECT s.*, u.nombre as gestor_nombre, u.apellido as gestor_apellido,
-                   COUNT(n.id) as total_notas
+                   ub.nombre as banco_nombre, ub.apellido as banco_apellido,
+                   b.nombre as banco_institucion,
+                   COUNT(DISTINCT n.id) as total_notas
             FROM solicitudes_credito s
             LEFT JOIN usuarios u ON s.gestor_id = u.id
+            LEFT JOIN usuarios_banco_solicitudes ubs ON s.id = ubs.solicitud_id AND ubs.estado = 'activo'
+            LEFT JOIN usuarios ub ON ubs.usuario_banco_id = ub.id
+            LEFT JOIN bancos b ON ub.banco_id = b.id
             LEFT JOIN notas_solicitud n ON s.id = n.solicitud_id
         ";
         
@@ -63,7 +77,13 @@ function obtenerSolicitudes() {
             $whereClause = " WHERE s.gestor_id = ?";
             $params[] = $usuarioId;
         } elseif (in_array('ROLE_BANCO', $userRoles)) {
-            $whereClause = " WHERE s.respuesta_banco IN ('Pendiente', 'Pre Aprobado')";
+            // Usuarios banco solo ven solicitudes asignadas a ellos
+            $whereClause = " WHERE ubs.usuario_banco_id = ?";
+            $params[] = $usuarioId;
+        } elseif (in_array('ROLE_VENDEDOR', $userRoles)) {
+            // Usuarios vendedor solo ven solicitudes asignadas a ellos
+            $whereClause = " WHERE s.vendedor_id = ?";
+            $params[] = $usuarioId;
         } elseif (in_array('ROLE_ADMIN', $userRoles)) {
             // Los administradores ven todas las solicitudes
         } else {
@@ -72,7 +92,7 @@ function obtenerSolicitudes() {
             return;
         }
         
-        $sql .= $whereClause . " GROUP BY s.id ORDER BY s.fecha_creacion DESC";
+        $sql .= $whereClause . " GROUP BY s.id, u.nombre, u.apellido, ub.nombre, ub.apellido, b.nombre ORDER BY s.fecha_creacion DESC";
         
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
@@ -156,17 +176,18 @@ function crearSolicitud() {
         // Insertar solicitud
         $stmt = $pdo->prepare("
             INSERT INTO solicitudes_credito (
-                gestor_id, tipo_persona, nombre_cliente, cedula, edad, genero,
+                gestor_id, banco_id, tipo_persona, nombre_cliente, cedula, edad, genero,
                 direccion, provincia, distrito, corregimiento, barriada, casa_edif,
                 numero_casa_apto, telefono, email, casado, hijos, perfil_financiero,
                 ingreso, tiempo_laborar, nombre_empresa_negocio, estabilidad_laboral,
                 fecha_constitucion, marca_auto, modelo_auto, año_auto, kilometraje,
                 precio_especial, abono_porcentaje, abono_monto, comentarios_gestor
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         
         $stmt->execute([
             $_SESSION['user_id'],
+            $_POST['banco_id'] ?? null,
             $_POST['tipo_persona'],
             $_POST['nombre_cliente'],
             $_POST['cedula'],
@@ -208,7 +229,11 @@ function crearSolicitud() {
         ");
         $stmt->execute([$solicitudId, $_SESSION['user_id']]);
         
-        echo json_encode(['success' => true, 'message' => 'Solicitud creada correctamente', 'id' => $solicitudId]);
+        echo json_encode([
+            'success' => true, 
+            'message' => 'Solicitud creada correctamente', 
+            'data' => ['id' => $solicitudId]
+        ]);
         
     } catch (PDOException $e) {
         http_response_code(500);
@@ -220,17 +245,20 @@ function actualizarSolicitud() {
     global $pdo;
     
     try {
-        // Obtener datos del PUT request
-        parse_str(file_get_contents("php://input"), $_PUT);
+        // Log de depuración
+        error_log("=== ACTUALIZAR SOLICITUD DEBUG ===");
+        error_log("POST data: " . print_r($_POST, true));
+        error_log("Session user_id: " . ($_SESSION['user_id'] ?? 'NO SET'));
+        error_log("Session user_roles: " . print_r($_SESSION['user_roles'] ?? 'NO SET', true));
         
-        if (empty($_PUT['id'])) {
+        if (empty($_POST['id'])) {
             echo json_encode(['success' => false, 'message' => 'ID de solicitud requerido']);
             return;
         }
         
         // Verificar que la solicitud existe
         $stmt = $pdo->prepare("SELECT * FROM solicitudes_credito WHERE id = ?");
-        $stmt->execute([$_PUT['id']]);
+        $stmt->execute([$_POST['id']]);
         $solicitud = $stmt->fetch();
         
         if (!$solicitud) {
@@ -248,6 +276,8 @@ function actualizarSolicitud() {
             $puedeEditar = true;
         } elseif (in_array('ROLE_BANCO', $userRoles)) {
             $puedeEditar = true;
+        } elseif (in_array('ROLE_VENDEDOR', $userRoles) && $solicitud['vendedor_id'] == $_SESSION['user_id']) {
+            $puedeEditar = true;
         }
         
         if (!$puedeEditar) {
@@ -256,12 +286,20 @@ function actualizarSolicitud() {
             return;
         }
         
+        // Manejar claves foráneas: convertir strings vacíos a NULL
+        if (isset($_POST['banco_id']) && $_POST['banco_id'] === '') {
+            $_POST['banco_id'] = null;
+        }
+        if (isset($_POST['vendedor_id']) && $_POST['vendedor_id'] === '') {
+            $_POST['vendedor_id'] = null;
+        }
+        
         // Construir query de actualización
         $campos = [];
         $valores = [];
         
         $camposPermitidos = [
-            'tipo_persona', 'nombre_cliente', 'cedula', 'edad', 'genero',
+            'banco_id', 'vendedor_id', 'tipo_persona', 'nombre_cliente', 'cedula', 'edad', 'genero',
             'direccion', 'provincia', 'distrito', 'corregimiento', 'barriada',
             'casa_edif', 'numero_casa_apto', 'telefono', 'email', 'casado',
             'hijos', 'perfil_financiero', 'ingreso', 'tiempo_laborar',
@@ -276,31 +314,73 @@ function actualizarSolicitud() {
         ];
         
         foreach ($camposPermitidos as $campo) {
-            if (isset($_PUT[$campo])) {
+            if (isset($_POST[$campo])) {
                 $campos[] = "$campo = ?";
-                $valores[] = $_PUT[$campo];
+                $valores[] = $_POST[$campo];
             }
         }
         
+        // Lógica especial para cambio de banco_id
+        $bancoIdAnterior = $solicitud['banco_id'];
+        $bancoIdNuevo = !empty($_POST['banco_id']) ? $_POST['banco_id'] : null;
+        $esAsignacionBanco = false;
+        
+        error_log("Banco anterior: " . ($bancoIdAnterior ?? 'NULL'));
+        error_log("Banco nuevo: " . ($bancoIdNuevo ?? 'NULL'));
+        
+        // Si se está asignando un banco por primera vez o cambiando de banco
+        if ($bancoIdNuevo && $bancoIdAnterior != $bancoIdNuevo) {
+            error_log("Asignando banco - cambiando estado a 'En Revisión Banco'");
+            $campos[] = "estado = ?";
+            $valores[] = 'En Revisión Banco';
+            $esAsignacionBanco = true;
+        }
+        
         if (!empty($campos)) {
-            $valores[] = $_PUT['id'];
+            $valores[] = $_POST['id'];
             $sql = "UPDATE solicitudes_credito SET " . implode(', ', $campos) . " WHERE id = ?";
+            error_log("SQL: " . $sql);
+            error_log("Valores: " . print_r($valores, true));
+            
             $stmt = $pdo->prepare($sql);
             $stmt->execute($valores);
             
-            // Crear nota de actualización
-            $stmt = $pdo->prepare("
-                INSERT INTO notas_solicitud (solicitud_id, usuario_id, tipo_nota, titulo, contenido)
-                VALUES (?, ?, 'Actualización', 'Solicitud Actualizada', 'La solicitud ha sido actualizada')
-            ");
-            $stmt->execute([$_PUT['id'], $_SESSION['user_id']]);
+            error_log("Update ejecutado exitosamente. Filas afectadas: " . $stmt->rowCount());
+            
+            // Crear nota según el tipo de actualización
+            try {
+                if ($esAsignacionBanco) {
+                    // Crear nota específica de asignación
+                    $stmt = $pdo->prepare("
+                        INSERT INTO notas_solicitud (solicitud_id, usuario_id, tipo_nota, titulo, contenido)
+                        VALUES (?, ?, 'Actualización', 'Asignada al Banco', 'Solicitud asignada al banco para revisión')
+                    ");
+                    $stmt->execute([$_POST['id'], $_SESSION['user_id']]);
+                } else {
+                    // Crear nota de actualización general
+                    $stmt = $pdo->prepare("
+                        INSERT INTO notas_solicitud (solicitud_id, usuario_id, tipo_nota, titulo, contenido)
+                        VALUES (?, ?, 'Actualización', 'Solicitud Actualizada', 'La solicitud ha sido actualizada')
+                    ");
+                    $stmt->execute([$_POST['id'], $_SESSION['user_id']]);
+                }
+            } catch (PDOException $e) {
+                // Si hay error al crear la nota, loguearlo pero no fallar la actualización
+                error_log("Error al crear nota: " . $e->getMessage());
+                // Continuar con la actualización aunque falle la nota
+            }
         }
         
         echo json_encode(['success' => true, 'message' => 'Solicitud actualizada correctamente']);
         
     } catch (PDOException $e) {
+        error_log("Error en actualizarSolicitud: " . $e->getMessage());
         http_response_code(500);
-        echo json_encode(['success' => false, 'message' => 'Error al actualizar solicitud']);
+        echo json_encode(['success' => false, 'message' => 'Error al actualizar solicitud: ' . $e->getMessage()]);
+    } catch (Exception $e) {
+        error_log("Error general en actualizarSolicitud: " . $e->getMessage());
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Error general: ' . $e->getMessage()]);
     }
 }
 
@@ -316,26 +396,266 @@ function eliminarSolicitud() {
             return;
         }
         
-        // Solo administradores pueden eliminar
+        $solicitudId = $_DELETE['id'];
+        
+        // Verificar permisos: Solo administradores pueden eliminar solicitudes
         if (!in_array('ROLE_ADMIN', $_SESSION['user_roles'])) {
             http_response_code(403);
-            echo json_encode(['success' => false, 'message' => 'Solo administradores pueden eliminar solicitudes']);
+            echo json_encode(['success' => false, 'message' => 'Solo los administradores pueden eliminar solicitudes']);
             return;
         }
         
-        // Eliminar solicitud (las notas y documentos se eliminan por CASCADE)
+        // Obtener adjuntos para eliminar archivos físicos
+        $stmt = $pdo->prepare("SELECT ruta_archivo FROM adjuntos_solicitud WHERE solicitud_id = ?");
+        $stmt->execute([$solicitudId]);
+        $adjuntos = $stmt->fetchAll();
+        
+        // Eliminar archivos físicos de adjuntos
+        foreach ($adjuntos as $adjunto) {
+            $rutaArchivo = '../' . $adjunto['ruta_archivo'];
+            if (file_exists($rutaArchivo)) {
+                unlink($rutaArchivo);
+            }
+        }
+        
+        // Eliminar solicitud (las notas y adjuntos se eliminan por CASCADE)
         $stmt = $pdo->prepare("DELETE FROM solicitudes_credito WHERE id = ?");
-        $stmt->execute([$_DELETE['id']]);
+        $stmt->execute([$solicitudId]);
         
         if ($stmt->rowCount() > 0) {
-            echo json_encode(['success' => true, 'message' => 'Solicitud eliminada correctamente']);
+            echo json_encode(['success' => true, 'message' => 'Solicitud eliminada correctamente junto con sus notas y adjuntos']);
         } else {
             echo json_encode(['success' => false, 'message' => 'Solicitud no encontrada']);
         }
         
     } catch (PDOException $e) {
+        error_log("Error al eliminar solicitud: " . $e->getMessage());
         http_response_code(500);
         echo json_encode(['success' => false, 'message' => 'Error al eliminar solicitud']);
+    }
+}
+
+function aprobarSolicitud() {
+    global $pdo;
+    
+    try {
+        // Verificar que el usuario sea banco
+        if (!in_array('ROLE_BANCO', $_SESSION['user_roles'])) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Solo los usuarios banco pueden aprobar solicitudes']);
+            return;
+        }
+        
+        // Validar datos requeridos
+        if (empty($_POST['id'])) {
+            echo json_encode(['success' => false, 'message' => 'ID de solicitud requerido']);
+            return;
+        }
+        
+        if (empty($_POST['accion'])) {
+            echo json_encode(['success' => false, 'message' => 'Acción requerida (aprobar/rechazar)']);
+            return;
+        }
+        
+        $solicitudId = $_POST['id'];
+        $accion = $_POST['accion']; // 'aprobar' o 'rechazar'
+        $usuarioId = $_SESSION['user_id'];
+        
+        // Verificar que la solicitud existe y está asignada al usuario banco
+        $stmt = $pdo->prepare("SELECT * FROM solicitudes_credito WHERE id = ? AND banco_id = ?");
+        $stmt->execute([$solicitudId, $usuarioId]);
+        $solicitud = $stmt->fetch();
+        
+        if (!$solicitud) {
+            echo json_encode(['success' => false, 'message' => 'Solicitud no encontrada o no asignada a usted']);
+            return;
+        }
+        
+        // Verificar que la solicitud esté en estado correcto
+        if ($solicitud['estado'] !== 'En Revisión Banco') {
+            echo json_encode(['success' => false, 'message' => 'La solicitud no está en estado de revisión']);
+            return;
+        }
+        
+        // Preparar datos según la acción
+        if ($accion === 'aprobar') {
+            $respuestaBanco = 'Aprobado';
+            $nuevoEstado = 'Aprobada';
+            $tituloNota = 'Solicitud Aprobada';
+            $contenidoNota = 'La solicitud ha sido aprobada por el banco';
+            
+            // Validar campos requeridos para aprobación
+            if (empty($_POST['letra']) || empty($_POST['plazo'])) {
+                echo json_encode(['success' => false, 'message' => 'Letra y plazo son requeridos para aprobar']);
+                return;
+            }
+            
+        } elseif ($accion === 'rechazar') {
+            $respuestaBanco = 'Rechazado';
+            $nuevoEstado = 'Rechazada';
+            $tituloNota = 'Solicitud Rechazada';
+            $contenidoNota = 'La solicitud ha sido rechazada por el banco';
+            
+            if (empty($_POST['comentarios_ejecutivo_banco'])) {
+                echo json_encode(['success' => false, 'message' => 'Comentarios son requeridos para rechazar']);
+                return;
+            }
+            
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Acción no válida']);
+            return;
+        }
+        
+        // Actualizar la solicitud
+        $stmt = $pdo->prepare("
+            UPDATE solicitudes_credito 
+            SET estado = ?, respuesta_banco = ?, 
+                ejecutivo_banco = ?, letra = ?, plazo = ?, abono_banco = ?, 
+                promocion = ?, comentarios_ejecutivo_banco = ?,
+                fecha_actualizacion = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ");
+        
+        $stmt->execute([
+            $nuevoEstado,
+            $respuestaBanco,
+            $_POST['ejecutivo_banco'] ?? null,
+            $_POST['letra'] ?? null,
+            $_POST['plazo'] ?? null,
+            $_POST['abono_banco'] ?? null,
+            $_POST['promocion'] ?? null,
+            $_POST['comentarios_ejecutivo_banco'] ?? null,
+            $solicitudId
+        ]);
+        
+        // Crear nota de la decisión
+        $stmt = $pdo->prepare("
+            INSERT INTO notas_solicitud (solicitud_id, usuario_id, tipo_nota, titulo, contenido)
+            VALUES (?, ?, 'Respuesta Banco', ?, ?)
+        ");
+        $stmt->execute([$solicitudId, $usuarioId, $tituloNota, $contenidoNota]);
+        
+        echo json_encode([
+            'success' => true, 
+            'message' => 'Solicitud ' . ($accion === 'aprobar' ? 'aprobada' : 'rechazada') . ' correctamente',
+            'data' => [
+                'estado' => $nuevoEstado,
+                'respuesta_banco' => $respuestaBanco
+            ]
+        ]);
+        
+    } catch (PDOException $e) {
+        error_log("Error al aprobar/rechazar solicitud: " . $e->getMessage());
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Error al procesar la solicitud']);
+    }
+}
+
+function cambiarEstadoSolicitud() {
+    global $pdo;
+    
+    try {
+        // Verificar permisos: Admin puede cambiar cualquier estado, Vendedor solo de solicitudes asignadas
+        $userRoles = $_SESSION['user_roles'];
+        $puedeCambiarEstado = false;
+        
+        if (in_array('ROLE_ADMIN', $userRoles)) {
+            $puedeCambiarEstado = true;
+        } elseif (in_array('ROLE_VENDEDOR', $userRoles)) {
+            // Verificar que el vendedor tenga la solicitud asignada
+            $stmt = $pdo->prepare("SELECT vendedor_id FROM solicitudes_credito WHERE id = ?");
+            $stmt->execute([$_POST['solicitud_id']]);
+            $solicitud = $stmt->fetch();
+            
+            if ($solicitud && $solicitud['vendedor_id'] == $_SESSION['user_id']) {
+                $puedeCambiarEstado = true;
+            }
+        }
+        
+        if (!$puedeCambiarEstado) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'No tiene permisos para cambiar el estado de esta solicitud']);
+            return;
+        }
+        
+        // Validar datos requeridos
+        $solicitud_id = $_POST['solicitud_id'] ?? null;
+        $nuevo_estado = $_POST['nuevo_estado'] ?? null;
+        $nota = $_POST['nota_cambio_estado'] ?? null;
+        
+        if (!$solicitud_id || !$nuevo_estado || !$nota) {
+            echo json_encode(['success' => false, 'message' => 'Datos requeridos faltantes']);
+            return;
+        }
+        
+        // Validar que el estado sea válido
+        $estados_validos = ['Aprobada', 'Rechazada', 'Completada', 'Desistimiento'];
+        if (!in_array($nuevo_estado, $estados_validos)) {
+            echo json_encode(['success' => false, 'message' => 'Estado no válido']);
+            return;
+        }
+        
+        // Verificar que la solicitud existe
+        $stmt = $pdo->prepare("SELECT id, estado, nombre_cliente FROM solicitudes_credito WHERE id = ?");
+        $stmt->execute([$solicitud_id]);
+        $solicitud = $stmt->fetch();
+        
+        if (!$solicitud) {
+            echo json_encode(['success' => false, 'message' => 'Solicitud no encontrada']);
+            return;
+        }
+        
+        $estado_anterior = $solicitud['estado'];
+        
+        // Iniciar transacción
+        $pdo->beginTransaction();
+        
+        try {
+            // Actualizar estado de la solicitud
+            $stmt = $pdo->prepare("
+                UPDATE solicitudes_credito 
+                SET estado = ?, fecha_actualizacion = NOW()
+                WHERE id = ?
+            ");
+            $stmt->execute([$nuevo_estado, $solicitud_id]);
+            
+            // Crear nota en el muro
+            $rol_usuario = in_array('ROLE_ADMIN', $userRoles) ? 'administrador' : 'vendedor';
+            $titulo_nota = "Estado cambiado por {$rol_usuario}";
+            $contenido_nota = "Estado cambiado de '{$estado_anterior}' a '{$nuevo_estado}'. Motivo: {$nota}";
+            
+            $stmt = $pdo->prepare("
+                INSERT INTO notas_solicitud (solicitud_id, usuario_id, tipo_nota, titulo, contenido)
+                VALUES (?, ?, 'Actualización', ?, ?)
+            ");
+            $stmt->execute([$solicitud_id, $_SESSION['user_id'], $titulo_nota, $contenido_nota]);
+            
+            // Si el estado es Desistimiento, también actualizar respuesta_cliente
+            if ($nuevo_estado === 'Desistimiento') {
+                $stmt = $pdo->prepare("
+                    UPDATE solicitudes_credito 
+                    SET respuesta_cliente = 'Rechaza', motivo_respuesta = ?
+                    WHERE id = ?
+                ");
+                $stmt->execute([$nota, $solicitud_id]);
+            }
+            
+            $pdo->commit();
+            
+            echo json_encode([
+                'success' => true, 
+                'message' => "Estado de la solicitud de {$solicitud['nombre_cliente']} cambiado exitosamente de '{$estado_anterior}' a '{$nuevo_estado}'"
+            ]);
+            
+        } catch (Exception $e) {
+            $pdo->rollback();
+            throw $e;
+        }
+        
+    } catch (PDOException $e) {
+        error_log("Error al cambiar estado de solicitud: " . $e->getMessage());
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Error al cambiar el estado de la solicitud']);
     }
 }
 ?>

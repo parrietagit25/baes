@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  # Servicio de MySQL
+  motus_db:
+    image: mysql:8.0
+    container_name: motus_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-motus_root_2024}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-motus_baes}
+      MYSQL_USER: ${MYSQL_USER:-motus_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-motus_pass_2024}
+    ports:
+      - "3312:3306"  # Puerto diferente para evitar conflictos
+    volumes:
+      - motus_db_data:/var/lib/mysql
+      - ./database:/docker-entrypoint-initdb.d
+    networks:
+      - motus_network
+    command: --default-authentication-plugin=mysql_native_password
+
+  # Servicio de PHPMyAdmin
+  motus_phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: motus_phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOST: motus_db
+      PMA_PORT: 3306
+      PMA_USER: ${MYSQL_USER:-motus_user}
+      PMA_PASSWORD: ${MYSQL_PASSWORD:-motus_pass_2024}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-motus_root_2024}
+    ports:
+      - "8089:80"  # Puerto diferente para evitar conflictos
+    depends_on:
+      - motus_db
+    networks:
+      - motus_network
+
+  # Servicio de PHP/Apache
+  motus_php:
+    build: .
+    container_name: motus_php
+    restart: unless-stopped
+    ports:
+      - "8086:80"  # Puerto diferente para evitar conflictos
+      - "4446:443" # Puerto HTTPS diferente
+    volumes:
+      - ./:/var/www/html
+      - motus_uploads:/var/www/html/adjuntos
+      - motus_logs:/var/www/html/logs
+    depends_on:
+      - motus_db
+    networks:
+      - motus_network
+    environment:
+      - DB_HOST=motus_db
+      - DB_PORT=3306
+      - DB_NAME=${MYSQL_DATABASE:-motus_baes}
+      - DB_USER=${MYSQL_USER:-motus_user}
+      - DB_PASS=${MYSQL_PASSWORD:-motus_pass_2024}
+
+volumes:
+  motus_db_data:
+    driver: local
+  motus_uploads:
+    driver: local
+  motus_logs:
+    driver: local
+
+networks:
+  motus_network:
+    driver: bridge

@@ -8,6 +8,7 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 require_once 'config/database.php';
+require_once 'includes/validar_acceso.php';
 
 // Verificar si el usuario es administrador
 if (!in_array('ROLE_ADMIN', $_SESSION['user_roles'])) {

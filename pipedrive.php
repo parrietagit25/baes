@@ -8,17 +8,7 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 require_once 'config/database.php';
-
-// Verificar que el usuario tenga permisos para ver solicitudes
-$userRoles = $_SESSION['user_roles'];
-$puedeVerPipedrive = in_array('ROLE_GESTOR', $userRoles) || 
-                     in_array('ROLE_BANCO', $userRoles) || 
-                     in_array('ROLE_ADMIN', $userRoles);
-
-if (!$puedeVerPipedrive) {
-    header('Location: dashboard.php');
-    exit();
-}
+require_once 'includes/validar_acceso.php';
 ?>
 
 <!DOCTYPE html>
@@ -105,9 +95,6 @@ if (!$puedeVerPipedrive) {
                             <button class="btn btn-success" onclick="sincronizarLeads()">
                                 <i class="fas fa-sync me-2"></i>Sincronizar Leads
                             </button>
-                            <a href="importar_csv.php" class="btn btn-warning">
-                                <i class="fas fa-file-csv me-2"></i>Importar CSV
-                            </a>
                         </div>
                     </div>
 
@@ -224,9 +211,15 @@ if (!$puedeVerPipedrive) {
                     <!-- Lista de Leads -->
                     <div class="card">
                         <div class="card-header">
-                            <h5 class="mb-0">
-                                <i class="fas fa-list me-2"></i>Leads de Pipedrive
-                            </h5>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-list me-2"></i>Leads de Pipedrive
+                                </h5>
+                                <div id="filtrosInfo" class="text-muted small" style="display: none;">
+                                    <i class="fas fa-filter me-1"></i>
+                                    <span id="filtrosTexto">Filtros aplicados</span>
+                                </div>
+                            </div>
                         </div>
                         <div class="card-body">
                             <div class="table-responsive">
@@ -353,6 +346,17 @@ if (!$puedeVerPipedrive) {
                         $('#leadsImportados').text('-');
                         $('#ultimaSincronizacion').text('Ahora');
                         $('#tasaConversion').text('-');
+                        
+                        // Mostrar información de filtros si está disponible
+                        if (response.filtros_aplicados) {
+                            const filtros = response.filtros_aplicados;
+                            let textoFiltros = `Solo activos: ${filtros.total_encontrados}/${filtros.total_original}`;
+                            if (filtros.ordenado_por_fecha) {
+                                textoFiltros += ` | Ordenado por fecha`;
+                            }
+                            $('#filtrosTexto').text(textoFiltros);
+                            $('#filtrosInfo').show();
+                        }
                     } else if (response.error_code === 'PAYMENT_REQUIRED') {
                         mostrarMensajeSuscripcion();
                     } else {
@@ -391,9 +395,6 @@ if (!$puedeVerPipedrive) {
                                 <button class="btn btn-warning" onclick="mostrarAlternativas()">
                                     <i class="fas fa-lightbulb me-2"></i>Ver Alternativas
                                 </button>
-                                <a href="importar_csv.php" class="btn btn-success">
-                                    <i class="fas fa-file-csv me-2"></i>Importar CSV
-                                </a>
                             </div>
                         </div>
                     </td>
@@ -515,7 +516,17 @@ if (!$puedeVerPipedrive) {
                     dataType: 'json',
                     success: function(response) {
                         if (response.success) {
-                            mostrarAlerta(`Sincronización completada. ${response.data.importados} leads importados.`, 'success');
+                            const data = response.data;
+                            let mensaje = `Sincronización completada - Solo leads recientes y activos:\n`;
+                            mensaje += `✅ Importados: ${data.importados}\n`;
+                            mensaje += `⏭️ Saltados: ${data.saltados}\n`;
+                            mensaje += `📊 Total procesados: ${data.total_procesados}`;
+                            
+                            if (data.errores && data.errores.length > 0) {
+                                mensaje += `\n⚠️ Errores: ${data.errores.length}`;
+                            }
+                            
+                            mostrarAlerta(mensaje, 'success');
                             cargarLeads();
                         } else {
                             mostrarAlerta('Error en sincronización: ' + response.message, 'danger');

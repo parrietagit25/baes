@@ -1,0 +1,34 @@
+# Archivos de configuración sensibles
+Petro.pem
+user.txt
+.env
+*.env
+
+# Archivos temporales de desarrollo
+debug_*.php
+test_*.php
+verificar_*.php
+ejecutar_*.php
+migrar_*.php
+
+# Logs
+*.log
+logs/
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
+
+# Archivos de IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Archivos de PHP
+*.tmp
+*.temp
+
+# Archivos de backup
+*_backup.php
+*.bak

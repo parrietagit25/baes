@@ -9,7 +9,7 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
-require_once '../config/database.php';
+require_once __DIR__ . '/../config/database.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 
@@ -177,6 +177,8 @@ function crearNota() {
             $tieneAcceso = true;
         } elseif (in_array('ROLE_BANCO', $userRoles)) {
             $tieneAcceso = true;
+        } elseif (in_array('ROLE_VENDEDOR', $userRoles) && $solicitud['vendedor_id'] == $_SESSION['user_id']) {
+            $tieneAcceso = true;
         }
         
         if (!$tieneAcceso) {
@@ -187,8 +189,8 @@ function crearNota() {
         
         // Crear nota
         $stmt = $pdo->prepare("
-            INSERT INTO notas_solicitud (solicitud_id, usuario_id, tipo_nota, titulo, contenido, archivo_adjunto)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO notas_solicitud (solicitud_id, usuario_id, tipo_nota, titulo, contenido)
+            VALUES (?, ?, ?, ?, ?)
         ");
         
         $stmt->execute([
@@ -196,8 +198,7 @@ function crearNota() {
             $_SESSION['user_id'],
             $_POST['tipo_nota'] ?? 'Comentario',
             $_POST['titulo'] ?? '',
-            $_POST['contenido'],
-            $_POST['archivo_adjunto'] ?? null
+            $_POST['contenido']
         ]);
         
         $notaId = $pdo->lastInsertId();
@@ -206,7 +207,7 @@ function crearNota() {
         
     } catch (PDOException $e) {
         http_response_code(500);
-        echo json_encode(['success' => false, 'message' => 'Error al crear nota']);
+        echo json_encode(['success' => false, 'message' => 'Error al crear nota: ' . $e->getMessage()]);
     }
 }
 
@@ -257,7 +258,7 @@ function actualizarNota() {
         $campos = [];
         $valores = [];
         
-        $camposPermitidos = ['titulo', 'contenido', 'archivo_adjunto'];
+        $camposPermitidos = ['titulo', 'contenido'];
         
         foreach ($camposPermitidos as $campo) {
             if (isset($_PUT[$campo])) {
