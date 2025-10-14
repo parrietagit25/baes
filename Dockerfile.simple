@@ -1,7 +1,7 @@
 # Usar imagen base de PHP con Apache
 FROM php:8.1-apache
 
-# Instalar extensiones de PHP necesarias
+# Instalar extensiones básicas de PHP
 RUN apt-get update && apt-get install -y \
     libzip-dev \
     zip \
@@ -9,20 +9,14 @@ RUN apt-get update && apt-get install -y \
     libpng-dev \
     libjpeg-dev \
     libfreetype6-dev \
-    libonig-dev \
     libxml2-dev \
-    libicu-dev \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-configure intl \
     && docker-php-ext-install -j$(nproc) \
         pdo_mysql \
         mysqli \
         zip \
         gd \
-        mbstring \
-        xml \
-        soap \
-        intl
+        mbstring
 
 # Habilitar mod_rewrite para Apache
 RUN a2enmod rewrite
@@ -31,9 +25,6 @@ RUN a2enmod rewrite
 RUN echo '<Directory /var/www/html>' >> /etc/apache2/apache2.conf \
     && echo '    AllowOverride All' >> /etc/apache2/apache2.conf \
     && echo '</Directory>' >> /etc/apache2/apache2.conf
-
-# Instalar Composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 # Establecer directorio de trabajo
 WORKDIR /var/www/html
@@ -45,11 +36,6 @@ COPY . /var/www/html/
 RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 755 /var/www/html \
     && chmod -R 777 /var/www/html/adjuntos
-
-# Crear directorio para logs si no existe
-RUN mkdir -p /var/www/html/logs \
-    && chown -R www-data:www-data /var/www/html/logs \
-    && chmod -R 755 /var/www/html/logs
 
 # Configurar PHP
 RUN echo "upload_max_filesize = 50M" >> /usr/local/etc/php/conf.d/uploads.ini \
