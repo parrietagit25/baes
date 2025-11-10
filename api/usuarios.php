@@ -171,12 +171,10 @@ function crearUsuario() {
         
         $usuarioId = $pdo->lastInsertId();
         
-        // Asignar roles
-        if (isset($_POST['roles']) && is_array($_POST['roles'])) {
+        // Asignar rol
+        if (!empty($_POST['rol_id'])) {
             $stmt = $pdo->prepare("INSERT INTO usuario_roles (usuario_id, rol_id) VALUES (?, ?)");
-            foreach ($_POST['roles'] as $rolId) {
-                $stmt->execute([$usuarioId, $rolId]);
-            }
+            $stmt->execute([$usuarioId, $_POST['rol_id']]);
         }
         
         echo json_encode(['success' => true, 'message' => 'Usuario creado correctamente', 'id' => $usuarioId]);
@@ -269,16 +267,16 @@ function actualizarUsuario() {
             $stmt->execute($valores);
         }
         
-        // Actualizar roles
-        if (isset($_PUT['roles']) && is_array($_PUT['roles'])) {
+        // Actualizar rol
+        if (isset($_PUT['rol_id'])) {
             // Eliminar roles actuales
             $stmt = $pdo->prepare("DELETE FROM usuario_roles WHERE usuario_id = ?");
             $stmt->execute([$_PUT['id']]);
             
-            // Insertar nuevos roles
-            $stmt = $pdo->prepare("INSERT INTO usuario_roles (usuario_id, rol_id) VALUES (?, ?)");
-            foreach ($_PUT['roles'] as $rolId) {
-                $stmt->execute([$_PUT['id'], $rolId]);
+            // Insertar nuevo rol
+            if (!empty($_PUT['rol_id'])) {
+                $stmt = $pdo->prepare("INSERT INTO usuario_roles (usuario_id, rol_id) VALUES (?, ?)");
+                $stmt->execute([$_PUT['id'], $_PUT['rol_id']]);
             }
         }
         

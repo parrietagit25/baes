@@ -22,74 +22,17 @@ $(document).ready(function() {
     // Cargar bancos al inicializar
     cargarBancos();
 
-    // Configurar evento para mostrar/ocultar select de banco
-    $(document).on('change', 'input[name="roles[]"]', function() {
-        console.log('=== CAMBIO DETECTADO EN ROLES ===');
-        console.log('Checkbox cambiado:', this);
-        console.log('Valor:', $(this).val());
-        console.log('Checked:', $(this).is(':checked'));
-        console.log('Label text:', $(this).next('label').text());
-        
-        // Ejecutar inmediatamente y también con delay
+    // Configurar evento para mostrar/ocultar select de banco cuando cambia el rol
+    $(document).on('change', '#rol_id', function() {
+        console.log('=== CAMBIO DETECTADO EN ROL ===');
         toggleBancoSelect();
-        
-        setTimeout(function() {
-            console.log('Ejecutando toggleBancoSelect después del delay');
-            toggleBancoSelect();
-        }, 100);
-    });
-    
-    // También configurar evento click para mayor compatibilidad
-    $(document).on('click', 'input[name="roles[]"]', function() {
-        console.log('=== CLICK DETECTADO EN ROLES ===');
-        setTimeout(function() {
-            toggleBancoSelect();
-        }, 50);
     });
 
     // Evento cuando se abre el modal
     $('#usuarioModal').on('shown.bs.modal', function() {
         console.log('=== MODAL ABIERTO ===');
         cargarBancos();
-        setTimeout(function() {
-            toggleBancoSelect();
-        }, 100);
-    });
-
-    // Evento específico para el checkbox de ROLE_BANCO (ID 8)
-    $(document).on('change', '#rol_8', function() {
-        console.log('=== EVENTO ESPECÍFICO ROLE_BANCO ===');
-        console.log('Checkbox ROLE_BANCO cambiado:', this);
-        console.log('Valor:', $(this).val());
-        console.log('Checked:', $(this).is(':checked'));
-        
-        if ($(this).is(':checked')) {
-            console.log('✅ ROLE_BANCO seleccionado - Mostrando select de banco');
-            $('#bancoSection').show();
-            $('#banco_id').prop('required', true);
-        } else {
-            console.log('❌ ROLE_BANCO deseleccionado - Ocultando select de banco');
-            $('#bancoSection').hide();
-            $('#banco_id').prop('required', false);
-            $('#banco_id').val('');
-        }
-    });
-
-    // Evento específico para el checkbox de ROLE_BANCO con click también
-    $(document).on('click', '#rol_8', function() {
-        console.log('=== CLICK ESPECÍFICO ROLE_BANCO ===');
-        setTimeout(function() {
-            if ($('#rol_8').is(':checked')) {
-                console.log('✅ ROLE_BANCO click - Mostrando select de banco');
-                $('#bancoSection').show();
-                $('#banco_id').prop('required', true);
-            } else {
-                console.log('❌ ROLE_BANCO click - Ocultando select de banco');
-                $('#bancoSection').hide();
-                $('#banco_id').prop('required', false);
-                $('#banco_id').val('');
-            }
-        }, 50);
+        toggleBancoSelect();
     });
 });
 
@@ -101,9 +44,6 @@ function limpiarFormulario() {
     $('#usuarioForm')[0].reset();
     $('#usuarioModalLabel').html('<i class="fas fa-user-plus me-2"></i>Registrar Usuario');
     $('#password').prop('required', true);
-    
-    // Desmarcar todos los roles
-    $('input[name="roles[]"]').prop('checked', false);
     
     // Ocultar select de banco y limpiar valor
     $('#bancoSection').hide();
@@ -139,12 +79,9 @@ function editarUsuario(id) {
                 $('#activo').prop('checked', usuario.activo == 1);
                 $('#primer_acceso').prop('checked', usuario.primer_acceso == 1);
                 
-                // Limpiar y marcar roles
-                $('input[name="roles[]"]').prop('checked', false);
-                if (usuario.roles) {
-                    usuario.roles.forEach(function(rol) {
-                        $(`input[name="roles[]"][value="${rol.rol_id}"]`).prop('checked', true);
-                    });
+                // Configurar rol (tomar el primer rol del usuario)
+                if (usuario.roles && usuario.roles.length > 0) {
+                    $('#rol_id').val(usuario.roles[0].rol_id);
                 }
                 
                 // Configurar banco
@@ -196,48 +133,45 @@ function eliminarUsuario(id) {
 
 // Función para guardar usuario
 function guardarUsuario() {
-    const formData = new FormData($('#usuarioForm')[0]);
     const usuarioId = $('#usuario_id').val();
     
     console.log('=== GUARDANDO USUARIO ===');
     console.log('Usuario ID:', usuarioId);
-    console.log('FormData contents:');
-    for (let [key, value] of formData.entries()) {
-        console.log(key, value);
-    }
     
     // Determinar si es creación o actualización
     const method = usuarioId ? 'PUT' : 'POST';
     
-    // Para PUT, necesitamos enviar los datos como string, no como FormData
-    let dataToSend;
-    if (method === 'PUT') {
-        // Convertir FormData a objeto y luego a string
-        const dataObj = {};
-        for (let [key, value] of formData.entries()) {
-            if (dataObj[key]) {
-                // Si ya existe, convertir a array
-                if (Array.isArray(dataObj[key])) {
-                    dataObj[key].push(value);
-                } else {
-                    dataObj[key] = [dataObj[key], value];
-                }
-            } else {
-                dataObj[key] = value;
-            }
-        }
-        dataToSend = $.param(dataObj);
-        console.log('Datos PUT:', dataToSend);
-    } else {
-        dataToSend = formData;
+    // Construir objeto de datos
+    const dataObj = {
+        id: usuarioId || '',
+        nombre: $('#nombre').val(),
+        apellido: $('#apellido').val(),
+        email: $('#email').val(),
+        pais: $('#pais').val() || '',
+        cargo: $('#cargo').val() || '',
+        telefono: $('#telefono').val() || '',
+        id_cobrador: $('#id_cobrador').val() || '',
+        id_vendedor: $('#id_vendedor').val() || '',
+        activo: $('#activo').is(':checked') ? '1' : '0',
+        primer_acceso: $('#primer_acceso').is(':checked') ? '1' : '0',
+        rol_id: $('#rol_id').val() || '',
+        banco_id: $('#banco_id').val() || ''
+    };
+    
+    // Solo agregar password si está presente
+    const password = $('#password').val();
+    if (password) {
+        dataObj.password = password;
     }
+    
+    console.log('Datos a enviar:', dataObj);
     
     $.ajax({
         url: 'api/usuarios.php',
         type: method,
-        data: dataToSend,
-        processData: method === 'POST',
-        contentType: method === 'POST' ? false : 'application/x-www-form-urlencoded',
+        data: dataObj,
+        processData: true,
+        contentType: 'application/x-www-form-urlencoded',
         dataType: 'json',
         success: function(response) {
             if (response.success) {
@@ -251,7 +185,9 @@ function guardarUsuario() {
                 mostrarAlerta('Error al guardar usuario: ' + response.message, 'danger');
             }
         },
-        error: function() {
+        error: function(xhr, status, error) {
+            console.error('Error al guardar usuario:', error);
+            console.error('Response:', xhr.responseText);
             mostrarAlerta('Error de conexión al guardar usuario', 'danger');
         }
     });
@@ -478,35 +414,12 @@ function toggleBancoSelect() {
     console.log('=== EJECUTANDO TOGGLE BANCO SELECT ===');
     
     const bancoSection = $('#bancoSection');
-    console.log('Banco section encontrado:', bancoSection.length);
+    const rolId = $('#rol_id').val();
     
-    let hasBancoRole = false;
-    let rolesSeleccionados = [];
+    console.log('Rol seleccionado:', rolId);
     
-    // Verificar cada checkbox de rol marcado
-    $('input[name="roles[]"]:checked').each(function() {
-        const rolId = $(this).val();
-        const labelText = $(this).next('label').text().toUpperCase();
-        
-        rolesSeleccionados.push({
-            id: rolId,
-            text: labelText,
-            checked: $(this).is(':checked')
-        });
-        
-        console.log('Rol seleccionado:', rolId, labelText);
-        
-        // Verificar si es ROLE_BANCO (por ID o por texto)
-        if (rolId == '8' || labelText.includes('ROLE_BANCO') || labelText.includes('BANCO')) {
-            hasBancoRole = true;
-            console.log('✅ ROL BANCO DETECTADO!');
-        }
-    });
-    
-    console.log('Roles seleccionados:', rolesSeleccionados);
-    console.log('Tiene rol de banco:', hasBancoRole);
-    
-    if (hasBancoRole) {
+    // Verificar si es ROLE_BANCO (ID 8)
+    if (rolId == '8') {
         bancoSection.show();
         $('#banco_id').prop('required', true);
         console.log('✅ Mostrando select de banco');

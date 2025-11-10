@@ -16,18 +16,56 @@ $isAdmin = in_array('ROLE_ADMIN', $userRoles);
 $isGestor = in_array('ROLE_GESTOR', $userRoles);
 $isBanco = in_array('ROLE_BANCO', $userRoles);
 
-// Obtener estadísticas
-$stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito");
-$totalSolicitudes = $stmt->fetch()['total'];
+// Obtener estadísticas (filtrar por usuario banco si aplica)
+if ($isBanco && !$isAdmin) {
+    // Usuario banco solo ve sus solicitudes asignadas
+    $filtroBanco = "AND EXISTS (
+        SELECT 1 FROM usuarios_banco_solicitudes ubs 
+        WHERE ubs.solicitud_id = solicitudes_credito.id 
+        AND ubs.usuario_banco_id = " . $_SESSION['user_id'] . "
+        AND ubs.estado = 'activo'
+    )";
+    
+    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE 1=1 $filtroBanco");
+    $totalSolicitudes = $stmt->fetch()['total'];
 
-$stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE estado = 'Nueva'");
-$solicitudesNuevas = $stmt->fetch()['total'];
+    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE estado = 'Nueva' $filtroBanco");
+    $solicitudesNuevas = $stmt->fetch()['total'];
 
-$stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE respuesta_banco = 'Aprobado'");
-$solicitudesAprobadas = $stmt->fetch()['total'];
+    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE respuesta_banco = 'Aprobado' $filtroBanco");
+    $solicitudesAprobadas = $stmt->fetch()['total'];
 
-$stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE respuesta_banco = 'Rechazado'");
-$solicitudesRechazadas = $stmt->fetch()['total'];
+    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE respuesta_banco = 'Rechazado' $filtroBanco");
+    $solicitudesRechazadas = $stmt->fetch()['total'];
+} elseif ($isGestor && !$isAdmin) {
+    // Gestor solo ve sus solicitudes asignadas
+    $filtroGestor = "AND gestor_id = " . $_SESSION['user_id'];
+    
+    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE 1=1 $filtroGestor");
+    $totalSolicitudes = $stmt->fetch()['total'];
+
+    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE estado = 'Nueva' $filtroGestor");
+    $solicitudesNuevas = $stmt->fetch()['total'];
+
+    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE respuesta_banco = 'Aprobado' $filtroGestor");
+    $solicitudesAprobadas = $stmt->fetch()['total'];
+
+    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE respuesta_banco = 'Rechazado' $filtroGestor");
+    $solicitudesRechazadas = $stmt->fetch()['total'];
+} else {
+    // Admin ve todas las solicitudes
+    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito");
+    $totalSolicitudes = $stmt->fetch()['total'];
+
+    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE estado = 'Nueva'");
+    $solicitudesNuevas = $stmt->fetch()['total'];
+
+    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE respuesta_banco = 'Aprobado'");
+    $solicitudesAprobadas = $stmt->fetch()['total'];
+
+    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE respuesta_banco = 'Rechazado'");
+    $solicitudesRechazadas = $stmt->fetch()['total'];
+}
 ?>
 
 <!DOCTYPE html>
@@ -205,10 +243,16 @@ $solicitudesRechazadas = $stmt->fetch()['total'];
                                         <tr>
                                             <th>ID</th>
                                             <th>Cliente</th>
+                                            <?php if ($isBanco): ?>
                                             <th>Cédula</th>
+                                            <?php else: ?>
+                                            <th>Respuestas del Banco</th>
+                                            <?php endif; ?>
                                             <th>Vehículo</th>
                                             <th>Gestor</th>
+                                            <?php if (!$isBanco): ?>
                                             <th>Banco Asignado</th>
+                                            <?php endif; ?>
                                             <th>Estado</th>
                                             <!-- <th>Respuesta Banco</th> -->
                                             <th>Fecha</th>
@@ -217,29 +261,35 @@ $solicitudesRechazadas = $stmt->fetch()['total'];
                                     </thead>
                                     <tbody>
                                         <?php
-                                        // Cargar solicitudes directamente desde PHP
-                                        // Construir consulta con filtro según el rol del usuario
-                                        $sql = "
-                                            SELECT s.*, 
-                                                   u.nombre as gestor_nombre, u.apellido as gestor_apellido,
-                                                   ub.nombre as banco_nombre, ub.apellido as banco_apellido,
-                                                   b.nombre as banco_institucion,
-                                                   COUNT(DISTINCT n.id) as total_notas
-                                            FROM solicitudes_credito s
-                                            LEFT JOIN usuarios u ON s.gestor_id = u.id
-                                            LEFT JOIN usuarios_banco_solicitudes ubs ON s.id = ubs.solicitud_id AND ubs.estado = 'activo'
-                                            LEFT JOIN usuarios ub ON ubs.usuario_banco_id = ub.id
-                                            LEFT JOIN bancos b ON ub.banco_id = b.id
-                                            LEFT JOIN notas_solicitud n ON s.id = n.solicitud_id
-                                        ";
+                                                                                  // Cargar solicitudes directamente desde PHP
+                                          // Construir consulta con filtro según el rol del usuario
+                                          $sql = "
+                                              SELECT s.*, 
+                                                     u.nombre as gestor_nombre, u.apellido as gestor_apellido,
+                                                     (SELECT COUNT(*) FROM usuarios_banco_solicitudes WHERE solicitud_id = s.id AND estado = 'activo') as total_usuarios_banco,
+                                                     s.evaluacion_seleccionada,
+                                                     (SELECT ubs.usuario_banco_id FROM evaluaciones_banco e 
+                                                      INNER JOIN usuarios_banco_solicitudes ubs ON e.usuario_banco_id = ubs.id 
+                                                      WHERE e.id = s.evaluacion_seleccionada) as usuario_banco_id_seleccionado
+                                              FROM solicitudes_credito s
+                                              LEFT JOIN usuarios u ON s.gestor_id = u.id
+                                          ";
                                         
-                                        // Aplicar filtro según el rol del usuario
-                                        if (in_array('ROLE_BANCO', $userRoles) && !in_array('ROLE_ADMIN', $userRoles)) {
-                                            // Usuario banco solo ve sus solicitudes asignadas
-                                            $sql .= " WHERE ubs.usuario_banco_id = " . $_SESSION['user_id'];
-                                        }
+                                                                                  // Aplicar filtro según el rol del usuario
+                                          if (in_array('ROLE_BANCO', $userRoles) && !in_array('ROLE_ADMIN', $userRoles)) {
+                                              // Usuario banco solo ve sus solicitudes asignadas
+                                              $sql .= " WHERE EXISTS (
+                                                  SELECT 1 FROM usuarios_banco_solicitudes ubs 
+                                                  WHERE ubs.solicitud_id = s.id 
+                                                  AND ubs.usuario_banco_id = " . $_SESSION['user_id'] . "
+                                                  AND ubs.estado = 'activo'
+                                              )";
+                                          } elseif (in_array('ROLE_GESTOR', $userRoles) && !in_array('ROLE_ADMIN', $userRoles)) {
+                                              // Gestor solo ve sus solicitudes asignadas
+                                              $sql .= " WHERE s.gestor_id = " . $_SESSION['user_id'];
+                                          }
                                         
-                                        $sql .= " GROUP BY s.id, u.nombre, u.apellido, ub.nombre, ub.apellido, b.nombre ORDER BY s.fecha_creacion DESC";
+                                        $sql .= " ORDER BY s.fecha_creacion DESC";
                                         
                                         $stmt = $pdo->query($sql);
                                         $solicitudes = $stmt->fetchAll();
@@ -265,49 +315,101 @@ $solicitudesRechazadas = $stmt->fetch()['total'];
                                         <tr>
                                             <td><?php echo $solicitud['id']; ?></td>
                                             <td><?php echo htmlspecialchars($solicitud['nombre_cliente']); ?></td>
+                                            <?php if ($isBanco): ?>
                                             <td><?php echo htmlspecialchars($solicitud['cedula']); ?></td>
-                                            <td><?php echo htmlspecialchars($solicitud['marca_auto'] ?? '-'); ?> <?php echo htmlspecialchars($solicitud['modelo_auto'] ?? ''); ?> <?php echo $solicitud['año_auto'] ?? ''; ?></td>
-                                            <td><?php echo htmlspecialchars($solicitud['gestor_nombre'] . ' ' . $solicitud['gestor_apellido']); ?></td>
+                                            <?php else: ?>
                                             <td>
-                                                <?php if ($solicitud['banco_nombre']): ?>
-                                                    <span class="badge bg-info">
-                                                        <?php echo htmlspecialchars($solicitud['banco_nombre'] . ' ' . $solicitud['banco_apellido']); ?>
-                                                        <?php if ($solicitud['banco_institucion']): ?>
-                                                            <br><small>(<?php echo htmlspecialchars($solicitud['banco_institucion']); ?>)</small>
-                                                        <?php endif; ?>
-                                                    </span>
+                                                <button class="btn btn-sm btn-primary" onclick="verRespuestasBancoAdmin(<?php echo $solicitud['id']; ?>)" title="Ver Respuestas del Banco">
+                                                    <i class="fas fa-clipboard-list me-1"></i>Ver Respuestas
+                                                </button>
+                                            </td>
+                                            <?php endif; ?>
+                                            <td><?php echo htmlspecialchars($solicitud['marca_auto'] ?? '-'); ?> <?php echo htmlspecialchars($solicitud['modelo_auto'] ?? ''); ?> <?php echo $solicitud['año_auto'] ?? ''; ?></td>
+                                            <td>
+                                                <?php if ($isAdmin): ?>
+                                                    <?php 
+                                                    $gestorNombre = htmlspecialchars($solicitud['gestor_nombre'] . ' ' . $solicitud['gestor_apellido'], ENT_QUOTES, 'UTF-8');
+                                                    $gestorId = $solicitud['gestor_id'] ?? null;
+                                                    ?>
+                                                    <a href="javascript:void(0);" 
+                                                       class="text-primary text-decoration-underline cambiar-gestor-link" 
+                                                       data-solicitud-id="<?php echo $solicitud['id']; ?>"
+                                                       data-gestor-nombre="<?php echo htmlspecialchars($gestorNombre, ENT_QUOTES, 'UTF-8'); ?>"
+                                                       data-gestor-id="<?php echo $gestorId ? $gestorId : ''; ?>"
+                                                       title="Click para cambiar gestor">
+                                                        <?php echo $gestorNombre ?: 'Sin asignar'; ?>
+                                                    </a>
+                                                <?php else: ?>
+                                                    <?php echo htmlspecialchars($solicitud['gestor_nombre'] . ' ' . $solicitud['gestor_apellido']); ?>
+                                                <?php endif; ?>
+                                            </td>
+                                            <?php if (!$isBanco): ?>
+                                            <td>
+                                                <?php 
+                                                $totalBancos = $solicitud['total_usuarios_banco'] ?? 0;
+                                                if ($totalBancos > 0): ?>
+                                                    <button class="btn btn-sm btn-info" onclick="verUsuariosBanco(<?php echo $solicitud['id']; ?>)" title="Ver Usuarios Banco Asignados">
+                                                        <i class="fas fa-users me-1"></i><?php echo $totalBancos; ?> Usuario<?php echo $totalBancos > 1 ? 's' : ''; ?>
+                                                    </button>
                                                 <?php else: ?>
                                                     <span class="text-muted">Sin asignar</span>
                                                 <?php endif; ?>
                                             </td>
-                                            <td><span class="badge badge-estado <?php echo $estadoClass; ?>"><?php echo $solicitud['estado']; ?></span></td>
-                                            <!-- <td><span class="badge badge-estado <?php echo $respuestaClass; ?>"><?php echo $solicitud['respuesta_banco']; ?></span></td> -->
-                                            <td><?php echo date('d/m/Y H:i', strtotime($solicitud['fecha_creacion'])); ?></td>
-                                            <td>
-                                                <div class="btn-group-vertical btn-group-sm" role="group">
-                                                    <div class="btn-group btn-group-sm mb-1" role="group">
-                                                        <button class="btn btn-info btn-action" onclick="verDetalles(<?php echo $solicitud['id']; ?>)" title="Ver Detalles">
-                                                            <i class="fas fa-eye"></i>
-                                                        </button>
-                                                        <button class="btn btn-primary btn-action" onclick="editarSolicitud(<?php echo $solicitud['id']; ?>)" title="Editar">
-                                                            <i class="fas fa-edit"></i>
-                                                        </button>
-                                                    </div>
-                                                    <div class="btn-group btn-group-sm mb-1" role="group">
-                                                        <button class="btn btn-success btn-action" onclick="verMuro(<?php echo $solicitud['id']; ?>)" title="Ver Muro">
-                                                            <i class="fas fa-comments"></i>
-                                                        </button>
-                                                        <button class="btn btn-warning btn-action" onclick="abrirModalAdjuntosDesdeTabla(<?php echo $solicitud['id']; ?>)" title="Gestionar Adjuntos">
-                                                            <i class="fas fa-paperclip"></i>
-                                                        </button>
-                                                    </div>
-                                                    <?php if (in_array('ROLE_BANCO', $userRoles) && $solicitud['estado'] === 'En Revisión Banco'): ?>
-                                                    <div class="btn-group btn-group-sm" role="group">
-                                                        <button class="btn btn-success btn-action" onclick="abrirModalAprobacion(<?php echo $solicitud['id']; ?>)" title="Aprobar/Rechazar Solicitud">
-                                                            <i class="fas fa-gavel"></i>
-                                                        </button>
-                                                    </div>
-                                                    <?php endif; ?>
+                                                                                          <?php endif; ?>
+                                              <td><span class="badge badge-estado <?php echo $estadoClass; ?>"><?php echo htmlspecialchars($solicitud['estado'] ?? 'N/A'); ?></span></td>
+                                              <td><?php echo date('d/m/Y H:i', strtotime($solicitud['fecha_creacion'])); ?></td>
+                                              <td>
+                                                  <?php
+                                                  // Para usuarios banco: verificar si hay una evaluación seleccionada y si el usuario actual es el dueño
+                                                  $mostrarBotonesAcciones = true;
+                                                  if ($isBanco && !$isAdmin) {
+                                                      $evaluacionSeleccionada = $solicitud['evaluacion_seleccionada'] ?? null;
+                                                      if ($evaluacionSeleccionada) {
+                                                          // Obtener el usuario_banco_id del usuario actual para esta solicitud
+                                                          $stmtUsuarioBanco = $pdo->prepare("
+                                                              SELECT usuario_banco_id 
+                                                              FROM usuarios_banco_solicitudes 
+                                                              WHERE solicitud_id = ? AND usuario_banco_id = ? AND estado = 'activo'
+                                                              LIMIT 1
+                                                          ");
+                                                          $stmtUsuarioBanco->execute([$solicitud['id'], $_SESSION['user_id']]);
+                                                          $asignacionUsuario = $stmtUsuarioBanco->fetch();
+                                                          
+                                                          $usuarioBancoIdActual = $asignacionUsuario['usuario_banco_id'] ?? null;
+                                                          $usuarioBancoIdSeleccionado = $solicitud['usuario_banco_id_seleccionado'] ?? null;
+                                                          
+                                                          // Solo mostrar botones si el usuario actual es el dueño de la evaluación seleccionada
+                                                          if ($usuarioBancoIdActual != $usuarioBancoIdSeleccionado) {
+                                                              $mostrarBotonesAcciones = false;
+                                                          }
+                                                      }
+                                                  }
+                                                  ?>
+                                                  <?php if ($mostrarBotonesAcciones): ?>
+                                                  <div class="btn-group-vertical btn-group-sm" role="group">
+                                                      <div class="btn-group btn-group-sm mb-1" role="group">
+                                                          <button class="btn btn-info btn-action" onclick="verDetalles(<?php echo $solicitud['id']; ?>)" title="Ver Detalles">
+                                                              <i class="fas fa-eye"></i>
+                                                          </button>
+                                                          <button class="btn btn-primary btn-action" onclick="editarSolicitud(<?php echo $solicitud['id']; ?>)" title="Editar">
+                                                              <i class="fas fa-edit"></i>
+                                                          </button>
+                                                      </div>
+                                                      <div class="btn-group btn-group-sm mb-1" role="group">
+                                                          <button class="btn btn-success btn-action" onclick="verMuro(<?php echo $solicitud['id']; ?>)" title="Ver Muro">
+                                                              <i class="fas fa-comments"></i>
+                                                          </button>
+                                                          <button class="btn btn-warning btn-action" onclick="abrirModalAdjuntosDesdeTabla(<?php echo $solicitud['id']; ?>)" title="Gestionar Adjuntos">
+                                                              <i class="fas fa-paperclip"></i>
+                                                          </button>
+                                                      </div>
+                                                      <?php if (in_array('ROLE_BANCO', $userRoles) && $solicitud['estado'] === 'En Revisión Banco'): ?>
+                                                      <div class="btn-group btn-group-sm" role="group">
+                                                          <button class="btn btn-success btn-action" onclick="abrirModalAprobacion(<?php echo $solicitud['id']; ?>)" title="Aprobar/Rechazar Solicitud">
+                                                              <i class="fas fa-gavel"></i>
+                                                          </button>
+                                                      </div>
+                                                      <?php endif; ?>
                                                     <?php if (in_array('ROLE_ADMIN', $userRoles)): ?>
                                                     <div class="btn-group btn-group-sm mb-1" role="group">
                                                         <button class="btn btn-warning btn-action" onclick="abrirModalCambioEstado(<?php echo $solicitud['id']; ?>)" title="Cambiar Estado (Solo Admin)">
@@ -315,15 +417,18 @@ $solicitudesRechazadas = $stmt->fetch()['total'];
                                                         </button>
                                                     </div>
                                                     <?php endif; ?>
-                                                    <?php if (in_array('ROLE_ADMIN', $userRoles)): ?>
-                                                    <div class="btn-group btn-group-sm" role="group">
-                                                        <button class="btn btn-danger btn-action" onclick="eliminarSolicitud(<?php echo $solicitud['id']; ?>)" title="Eliminar Solicitud (Solo Admin)">
-                                                            <i class="fas fa-trash"></i>
-                                                        </button>
-                                                    </div>
-                                                    <?php endif; ?>
-                                                </div>
-                                            </td>
+                                                                                                          <?php if (in_array('ROLE_ADMIN', $userRoles)): ?>
+                                                      <div class="btn-group btn-group-sm" role="group">
+                                                          <button class="btn btn-danger btn-action" onclick="eliminarSolicitud(<?php echo $solicitud['id']; ?>)" title="Eliminar Solicitud (Solo Admin)">
+                                                              <i class="fas fa-trash"></i>
+                                                          </button>
+                                                      </div>
+                                                      <?php endif; ?>
+                                                  </div>
+                                                  <?php else: ?>
+                                                  <span class="text-muted"><small>Propuesta seleccionada</small></span>
+                                                  <?php endif; ?>
+                                              </td>
                                         </tr>
                                         <?php endforeach; ?>
                                     </tbody>
@@ -346,7 +451,7 @@ $solicitudesRechazadas = $stmt->fetch()['total'];
                     </h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <form id="solicitudForm" method="POST" action="api/solicitudes.php">
+                <form id="solicitudForm" method="POST" action="javascript:void(0);">
                     <div class="modal-body">
                         <input type="hidden" id="solicitud_id" name="id">
                         
@@ -384,6 +489,11 @@ $solicitudesRechazadas = $stmt->fetch()['total'];
                                 </button>
                             </li>
                             <?php endif; ?>
+                            <li class="nav-item" role="presentation" id="cita-firma-tab-li" style="display: none;">
+                                <button class="nav-link" id="cita-firma-tab" data-bs-toggle="tab" data-bs-target="#cita-firma" type="button" role="tab">
+                                    <i class="fas fa-calendar-check me-2"></i>Cita y Firma
+                                </button>
+                            </li>
                         </ul>
                         
                         <div class="tab-content" id="solicitudTabContent">
@@ -436,6 +546,10 @@ $solicitudesRechazadas = $stmt->fetch()['total'];
                                             <label for="email" class="form-label">E-mail</label>
                                             <input type="email" class="form-control" id="email" name="email">
                                         </div>
+                                        <div class="mb-3">
+                                            <label for="email_pipedrive" class="form-label">Email PipeDrive</label>
+                                            <input type="email" class="form-control" id="email_pipedrive" name="email_pipedrive">
+                                        </div>
                                         <div class="row">
                                             <div class="col-md-6">
                                                 <div class="form-check">
@@ -449,61 +563,6 @@ $solicitudesRechazadas = $stmt->fetch()['total'];
                                                     <input type="number" class="form-control" id="hijos" name="hijos" value="0">
                                                 </div>
                                             </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <!-- Asignación de Banco -->
-                                <h6 class="mb-3 mt-4">Asignación de Banco</h6>
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <div class="mb-3">
-                                            <label for="banco_id" class="form-label">Usuario Banco Asignado</label>
-                                            <select class="form-select" id="banco_id" name="banco_id">
-                                                <option value="">Seleccionar usuario banco...</option>
-                                                <?php
-                                                // Obtener usuarios con rol ROLE_BANCO
-                                                $stmt = $pdo->query("
-                                                    SELECT u.id, u.nombre, u.apellido, b.nombre as banco_nombre
-                                                    FROM usuarios u
-                                                    LEFT JOIN bancos b ON u.banco_id = b.id
-                                                    INNER JOIN usuario_roles ur ON u.id = ur.usuario_id
-                                                    INNER JOIN roles r ON ur.rol_id = r.id
-                                                    WHERE r.nombre = 'ROLE_BANCO' AND u.activo = 1
-                                                    ORDER BY u.nombre ASC
-                                                ");
-                                                $usuariosBanco = $stmt->fetchAll();
-                                                foreach ($usuariosBanco as $usuario) {
-                                                    $bancoInfo = $usuario['banco_nombre'] ? " ({$usuario['banco_nombre']})" : "";
-                                                    echo "<option value=\"{$usuario['id']}\">{$usuario['nombre']} {$usuario['apellido']}{$bancoInfo}</option>";
-                                                }
-                                                ?>
-                                            </select>
-                                            <div class="form-text">Asignar un usuario banco para revisar esta solicitud</div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <div class="mb-3">
-                                            <label for="vendedor_id" class="form-label">Vendedor Asignado</label>
-                                            <select class="form-select" id="vendedor_id" name="vendedor_id">
-                                                <option value="">Seleccionar vendedor...</option>
-                                                <?php
-                                                // Obtener usuarios con rol ROLE_VENDEDOR
-                                                $stmt = $pdo->query("
-                                                    SELECT u.id, u.nombre, u.apellido
-                                                    FROM usuarios u
-                                                    INNER JOIN usuario_roles ur ON u.id = ur.usuario_id
-                                                    INNER JOIN roles r ON ur.rol_id = r.id
-                                                    WHERE r.nombre = 'ROLE_VENDEDOR' AND u.activo = 1
-                                                    ORDER BY u.nombre ASC
-                                                ");
-                                                $usuariosVendedor = $stmt->fetchAll();
-                                                foreach ($usuariosVendedor as $usuario) {
-                                                    echo "<option value=\"{$usuario['id']}\">{$usuario['nombre']} {$usuario['apellido']}</option>";
-                                                }
-                                                ?>
-                                            </select>
-                                            <div class="form-text">Asignar un vendedor para gestionar esta solicitud</div>
                                         </div>
                                     </div>
                                 </div>
@@ -573,75 +632,54 @@ $solicitudesRechazadas = $stmt->fetch()['total'];
                                             <label for="ingreso" class="form-label">Ingreso $</label>
                                             <input type="number" class="form-control" id="ingreso" name="ingreso" step="0.01">
                                         </div>
-                                        <div class="mb-3">
-                                            <label for="tiempo_laborar" class="form-label">Tiempo de Laborar / Actividad Comercial</label>
-                                            <input type="text" class="form-control" id="tiempo_laborar" name="tiempo_laborar">
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <div class="mb-3">
-                                            <label for="nombre_empresa_negocio" class="form-label">Nombre de la Empresa / Negocio</label>
-                                            <input type="text" class="form-control" id="nombre_empresa_negocio" name="nombre_empresa_negocio">
-                                        </div>
-                                        <div class="mb-3">
-                                            <label for="estabilidad_laboral" class="form-label">Estabilidad Laboral</label>
-                                            <input type="date" class="form-control" id="estabilidad_laboral" name="estabilidad_laboral">
-                                        </div>
-                                        <div class="mb-3">
-                                            <label for="fecha_constitucion" class="form-label">Fecha de Constitución</label>
-                                            <input type="date" class="form-control" id="fecha_constitucion" name="fecha_constitucion">
-                                        </div>
-                                    </div>
+                                                                                  <div class="mb-3">
+                                              <label for="tiempo_laborar" class="form-label">Tiempo de Laborar / Actividad Comercial</label>
+                                              <input type="text" class="form-control" id="tiempo_laborar" name="tiempo_laborar">
+                                          </div>
+                                          <div class="mb-3">
+                                              <label for="profesion" class="form-label">Profesión</label>
+                                              <input type="text" class="form-control" id="profesion" name="profesion">
+                                          </div>
+                                          <div class="mb-3">
+                                              <label for="ocupacion" class="form-label">Ocupación</label>
+                                              <input type="text" class="form-control" id="ocupacion" name="ocupacion">
+                                          </div>
+                                      </div>
+                                      <div class="col-md-6">
+                                          <div class="mb-3">
+                                              <label for="nombre_empresa_negocio" class="form-label">Nombre de la Empresa / Negocio</label>
+                                              <input type="text" class="form-control" id="nombre_empresa_negocio" name="nombre_empresa_negocio">
+                                          </div>
+                                          <div class="mb-3">
+                                              <label for="estabilidad_laboral" class="form-label">Estabilidad Laboral</label>
+                                              <input type="date" class="form-control" id="estabilidad_laboral" name="estabilidad_laboral">
+                                          </div>
+                                          <div class="mb-3">
+                                              <label for="fecha_constitucion" class="form-label">Fecha de Constitución</label>
+                                              <input type="date" class="form-control" id="fecha_constitucion" name="fecha_constitucion">
+                                          </div>
+                                          <div class="mb-3">
+                                              <label for="continuidad_laboral" class="form-label">Continuidad Laboral</label>
+                                              <input type="text" class="form-control" id="continuidad_laboral" name="continuidad_laboral">
+                                          </div>
+                                      </div>
                                 </div>
                             </div>
                             
                             <!-- Datos del Auto -->
                             <div class="tab-pane fade" id="datos-auto" role="tabpanel">
-                                <div class="row mt-3">
-                                    <div class="col-md-6">
-                                        <div class="mb-3">
-                                            <label for="marca_auto" class="form-label">Marca</label>
-                                            <input type="text" class="form-control" id="marca_auto" name="marca_auto">
-                                        </div>
-                                        <div class="mb-3">
-                                            <label for="modelo_auto" class="form-label">Modelo</label>
-                                            <input type="text" class="form-control" id="modelo_auto" name="modelo_auto">
-                                        </div>
-                                        <div class="row">
-                                            <div class="col-md-6">
-                                                <div class="mb-3">
-                                                    <label for="año_auto" class="form-label">Año</label>
-                                                    <input type="number" class="form-control" id="año_auto" name="año_auto">
-                                                </div>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <div class="mb-3">
-                                                    <label for="kilometraje" class="form-label">Kilometraje</label>
-                                                    <input type="number" class="form-control" id="kilometraje" name="kilometraje">
-                                                </div>
-                                            </div>
-                                        </div>
+                                <div class="mt-3">
+                                    <!-- Botón para agregar vehículo (solo para admin y gestor) -->
+                                    <?php if ($isAdmin || $isGestor): ?>
+                                    <div class="mb-3">
+                                        <button type="button" class="btn btn-success" onclick="agregarVehiculo()">
+                                            <i class="fas fa-plus me-2"></i>Agregar Vehículo
+                                        </button>
                                     </div>
-                                    <div class="col-md-6">
-                                        <div class="mb-3">
-                                            <label for="precio_especial" class="form-label">Precio Especial</label>
-                                            <input type="number" class="form-control" id="precio_especial" name="precio_especial" step="0.01">
-                                        </div>
-                                        <div class="row">
-                                            <div class="col-md-6">
-                                                <div class="mb-3">
-                                                    <label for="abono_porcentaje" class="form-label">Abono (%)</label>
-                                                    <input type="number" class="form-control" id="abono_porcentaje" name="abono_porcentaje" step="0.01">
-                                                </div>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <div class="mb-3">
-                                                    <label for="abono_monto" class="form-label">Abono (Monto)</label>
-                                                    <input type="number" class="form-control" id="abono_monto" name="abono_monto" step="0.01">
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
+                                    <?php endif; ?>
+                                    
+                                    <!-- Lista de vehículos -->
+                                    <div id="listaVehiculos"></div>
                                 </div>
                             </div>
                             
@@ -678,42 +716,23 @@ $solicitudesRechazadas = $stmt->fetch()['total'];
                             <?php if (!$isBanco): ?>
                             <div class="tab-pane fade" id="usuarios-banco" role="tabpanel">
                                 <div class="mt-3">
-                                    <div class="row">
-                                        <!-- Agregar Usuario Banco -->
-                                        <div class="col-md-6">
-                                            <div class="card">
-                                                <div class="card-header">
-                                                    <h6 class="mb-0">
-                                                        <i class="fas fa-user-plus me-2"></i>Asignar Usuario Banco
-                                                    </h6>
+                                    <!-- Agregar Usuario Banco -->
+                                    <div class="card">
+                                        <div class="card-header">
+                                            <h6 class="mb-0">
+                                                <i class="fas fa-user-plus me-2"></i>Asignar Usuario Banco
+                                            </h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="row">
+                                                <div class="col-md-8">
+                                                    <label for="buscar_usuario_banco" class="form-label">Buscar Usuario Banco</label>
+                                                    <input type="text" class="form-control" id="buscar_usuario_banco" placeholder="Escriba el nombre del banco o usuario...">
+                                                    <div id="sugerencias_usuarios" class="list-group mt-2" style="display: none;"></div>
                                                 </div>
-                                                <div class="card-body">
-                                                    <div class="mb-3">
-                                                        <label for="buscar_usuario_banco" class="form-label">Buscar Usuario Banco</label>
-                                                        <input type="text" class="form-control" id="buscar_usuario_banco" placeholder="Escriba el nombre del banco o usuario...">
-                                                        <div id="sugerencias_usuarios" class="list-group mt-2" style="display: none;"></div>
-                                                    </div>
+                                                <div class="col-md-4 d-flex align-items-end">
                                                     <button type="button" class="btn btn-success btn-sm" id="agregar_usuario_banco" disabled>
                                                         <i class="fas fa-plus me-1"></i>Agregar Usuario
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        
-                                        <!-- Muro de Información -->
-                                        <div class="col-md-6">
-                                            <div class="card">
-                                                <div class="card-header">
-                                                    <h6 class="mb-0">
-                                                        <i class="fas fa-comments me-2"></i>Muro de Información
-                                                    </h6>
-                                                </div>
-                                                <div class="card-body">
-                                                    <div class="mb-3">
-                                                        <textarea class="form-control" id="mensaje_muro" rows="3" placeholder="Escriba un mensaje para los usuarios banco asignados..."></textarea>
-                                                    </div>
-                                                    <button type="button" class="btn btn-primary btn-sm" id="enviar_mensaje">
-                                                        <i class="fas fa-paper-plane me-1"></i>Enviar Mensaje
                                                     </button>
                                                 </div>
                                             </div>
@@ -749,25 +768,83 @@ $solicitudesRechazadas = $stmt->fetch()['total'];
                                             </div>
                                         </div>
                                     </div>
+                                </div>
+                            </div>
+                            <?php endif; ?>
+                            
+                            <!-- Cita y Firma -->
+                            <div class="tab-pane fade" id="cita-firma" role="tabpanel">
+                                <div class="mt-3">
+                                    <!-- Formulario para crear cita -->
+                                    <div class="card">
+                                        <div class="card-header">
+                                            <h6 class="mb-0">
+                                                <i class="fas fa-calendar-plus me-2"></i>Agendar Cita
+                                            </h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <form id="citaForm">
+                                                <div class="row">
+                                                                                                          <div class="col-md-4">
+                                                          <div class="mb-3">
+                                                             <label for="fecha_cita" class="form-label">Fecha de la Cita *</label>
+                                                             <input type="date" class="form-control" id="fecha_cita" name="fecha_cita">
+                                                          </div>
+                                                      </div>
+                                                      <div class="col-md-4">
+                                                          <div class="mb-3">
+                                                             <label for="hora_cita" class="form-label">Hora de la Cita *</label>
+                                                             <input type="time" class="form-control" id="hora_cita" name="hora_cita">
+                                                          </div>
+                                                      </div>
+                                                    <div class="col-md-4">
+                                                        <div class="mb-3">
+                                                            <label for="comentarios_cita" class="form-label">Comentarios</label>
+                                                            <textarea class="form-control" id="comentarios_cita" name="comentarios" rows="3" placeholder="Ingrese comentarios sobre la cita..."></textarea>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="row">
+                                                    <div class="col-md-12">
+                                                        <button type="button" class="btn btn-success" onclick="guardarCita()">
+                                                            <i class="fas fa-save me-2"></i>Guardar Cita
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
                                     
-                                    <!-- Historial de Mensajes -->
+                                    <!-- Tabla de Citas -->
                                     <div class="mt-4">
                                         <div class="card">
                                             <div class="card-header">
                                                 <h6 class="mb-0">
-                                                    <i class="fas fa-history me-2"></i>Historial de Mensajes
+                                                    <i class="fas fa-list me-2"></i>Registro de Citas
                                                 </h6>
                                             </div>
                                             <div class="card-body">
-                                                <div id="historialMensajes" style="max-height: 300px; overflow-y: auto;">
-                                                    <!-- Se llenará dinámicamente -->
+                                                <div class="table-responsive">
+                                                    <table class="table table-sm" id="citasTable">
+                                                        <thead>
+                                                            <tr>
+                                                                <th>Fecha</th>
+                                                                <th>Hora</th>
+                                                                <th>Comentarios</th>
+                                                                <th>Estado Asistencia</th>
+                                                                <th>Acciones</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody id="citasTableBody">
+                                                            <!-- Se llenará dinámicamente -->
+                                                        </tbody>
+                                                    </table>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                            <?php endif; ?>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -775,11 +852,11 @@ $solicitudesRechazadas = $stmt->fetch()['total'];
                         <button type="button" class="btn btn-info" id="btnCerrarDespuesAdjuntos" style="display: none;" data-bs-dismiss="modal">
                             <i class="fas fa-check me-2"></i>Finalizar
                         </button>
-                        <?php if (!$isBanco): ?>
-                        <button type="submit" class="btn btn-success">
-                            <i class="fas fa-save me-2"></i>Guardar Solicitud
-                        </button>
-                        <?php endif; ?>
+                                                  <?php if (!$isBanco): ?>
+                          <button type="submit" class="btn btn-success" id="btnGuardarSolicitud" onclick="event.preventDefault(); event.stopPropagation(); guardarSolicitud(); return false;">
+                              <i class="fas fa-save me-2"></i>Guardar Solicitud
+                          </button>
+                          <?php endif; ?>
                     </div>
                 </form>
             </div>
@@ -921,57 +998,14 @@ $solicitudesRechazadas = $stmt->fetch()['total'];
                         <!-- Se carga via AJAX -->
                     </div>
                     
-                    <!-- Formulario para nueva nota -->
-                    <div class="card mb-4">
-                        <div class="card-header">
-                            <h6 class="mb-0"><i class="fas fa-plus-circle me-2"></i>Agregar Nota</h6>
-                        </div>
-                        <div class="card-body">
-                            <form id="notaForm">
-                                <input type="hidden" id="nota_solicitud_id" name="solicitud_id">
-                                
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <div class="mb-3">
-                                            <label for="nota_tipo_nota" class="form-label">Tipo de Nota</label>
-                                            <select class="form-select" id="nota_tipo_nota" name="tipo_nota" required>
-                                                <option value="Comentario">Comentario</option>
-                                                <option value="Actualización">Actualización</option>
-                                                <option value="Documento">Documento</option>
-                                                <?php if (in_array('ROLE_BANCO', $userRoles)): ?>
-                                                <option value="Respuesta Banco">Respuesta Banco</option>
-                                                <?php endif; ?>
-                                                <option value="Respuesta Cliente">Respuesta Cliente</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <div class="mb-3">
-                                            <label for="nota_titulo" class="form-label">Título</label>
-                                            <input type="text" class="form-control" id="nota_titulo" name="titulo" placeholder="Título de la nota">
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="mb-3">
-                                    <label for="nota_contenido" class="form-label">Contenido *</label>
-                                    <textarea class="form-control" id="nota_contenido" name="contenido" rows="3" required placeholder="Escriba su nota aquí..."></textarea>
-                                </div>
-                                
-                                <div class="d-flex justify-content-end">
-                                    <button type="submit" class="btn btn-primary">
-                                        <i class="fas fa-paper-plane me-2"></i>Enviar Nota
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-
-                    <!-- Lista de notas -->
-                    <div id="muroNotasContainer">
-                        <div class="text-center">
-                            <i class="fas fa-spinner fa-spin me-2"></i>Cargando notas...
-                        </div>
+                    <!-- Pestañas de Vehículos -->
+                    <ul class="nav nav-tabs" id="vehiculosTabs" role="tablist">
+                        <!-- Se generan dinámicamente -->
+                    </ul>
+                    
+                    <!-- Contenido de las pestañas -->
+                    <div class="tab-content" id="vehiculosTabContent">
+                        <!-- Se generan dinámicamente -->
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -1009,26 +1043,30 @@ $solicitudesRechazadas = $stmt->fetch()['total'];
                                 <input type="hidden" id="adjunto_solicitud_id" name="solicitud_id">
                                 
                                 <div class="row">
-                                    <div class="col-md-6">
+                                    <div class="col-md-12">
                                         <div class="mb-3">
-                                            <label for="archivo_adjunto" class="form-label">Seleccionar Archivo *</label>
-                                            <input type="file" class="form-control" id="archivo_adjunto" name="archivo" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.txt" required>
+                                            <label for="archivo_adjunto" class="form-label">Seleccionar Archivos *</label>
+                                            <input type="file" class="form-control" id="archivo_adjunto" name="archivo[]" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.txt" required>
                                             <div class="form-text">
-                                                Tipos permitidos: PDF, DOC, DOCX, XLS, XLSX, JPG, PNG, GIF, TXT (Máximo 10MB)
+                                                Tipos permitidos: PDF, DOC, DOCX, XLS, XLSX, JPG, PNG, GIF, TXT (Máximo 10MB por archivo)
+                                                <br><strong>Puedes seleccionar múltiples archivos a la vez</strong>
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="col-md-6">
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-12">
                                         <div class="mb-3">
-                                            <label for="descripcion_adjunto" class="form-label">Descripción</label>
-                                            <input type="text" class="form-control" id="descripcion_adjunto" name="descripcion" placeholder="Breve descripción del archivo">
+                                            <label for="descripcion_adjunto" class="form-label">Descripción (aplicará a todos los archivos)</label>
+                                            <input type="text" class="form-control" id="descripcion_adjunto" name="descripcion" placeholder="Breve descripción de los archivos">
                                         </div>
                                     </div>
                                 </div>
                                 
                                 <div class="d-flex justify-content-end">
                                     <button type="button" class="btn btn-primary" onclick="subirAdjunto()">
-                                        <i class="fas fa-upload me-2"></i>Subir Archivo
+                                        <i class="fas fa-upload me-2"></i>Subir Archivos
                                     </button>
                                 </div>
                             </form>
@@ -1070,7 +1108,7 @@ $solicitudesRechazadas = $stmt->fetch()['total'];
                 </div>
                 <form id="aprobacionForm" onsubmit="return false;">
                     <div class="modal-body">
-                        <input type="hidden" id="aprobacion_solicitud_id" name="id">
+                        <input type="hidden" id="aprobacion_solicitud_id" name="solicitud_id">
                         
                         <!-- Información de la Solicitud -->
                         <div class="card mb-4">
@@ -1086,94 +1124,86 @@ $solicitudesRechazadas = $stmt->fetch()['total'];
                             </div>
                         </div>
                         
-                        <!-- Ejecutivo del Banco -->
-                        <div class="mb-3">
-                            <label for="ejecutivo_banco" class="form-label">Ejecutivo del Banco *</label>
-                            <input type="text" class="form-control" id="ejecutivo_banco" name="ejecutivo_banco" required>
+                        <!-- Selección de Vehículo -->
+                        <div class="mb-4">
+                            <label for="vehiculo_evaluacion" class="form-label">Vehículo a Evaluar *</label>
+                            <select class="form-select" id="vehiculo_evaluacion" name="vehiculo_evaluacion" required>
+                                <option value="">Seleccione un vehículo</option>
+                            </select>
                         </div>
                         
                         <!-- Tipo de Decisión -->
                         <div class="mb-4">
-                            <label class="form-label">Decisión *</label>
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="accion" id="aprobar" value="aprobar" required>
-                                        <label class="form-check-label text-success fw-bold" for="aprobar">
-                                            <i class="fas fa-check-circle me-2"></i>Aprobar Solicitud
-                                        </label>
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="accion" id="rechazar" value="rechazar" required>
-                                        <label class="form-check-label text-danger fw-bold" for="rechazar">
-                                            <i class="fas fa-times-circle me-2"></i>Rechazar Solicitud
-                                        </label>
-                                    </div>
-                                </div>
-                            </div>
+                            <label for="decision_banco" class="form-label">Decisión *</label>
+                            <select class="form-select" id="decision_banco" name="decision" required onchange="mostrarCamposDecision(this.value)">
+                                <option value="">Seleccione una opción</option>
+                                <option value="preaprobado">Preaprobado</option>
+                                <option value="aprobado">Aprobado</option>
+                                <option value="aprobado_condicional">Aprobado Condicional</option>
+                                <option value="rechazado">Rechazado</option>
+                            </select>
                         </div>
                         
-                        <!-- Campos para Aprobación -->
-                        <div id="camposAprobacion" style="display: none;">
-                            <div class="card border-success">
-                                <div class="card-header bg-success text-white">
+                        <!-- Campos Condicionales -->
+                        <div id="camposDecision" style="display: none;">
+                            <div class="card">
+                                <div class="card-header">
                                     <h6 class="mb-0">
-                                        <i class="fas fa-check-circle me-2"></i>Términos de Aprobación
+                                        <i class="fas fa-clipboard-list me-2"></i>Detalles de la Evaluación
                                     </h6>
                                 </div>
                                 <div class="card-body">
                                     <div class="row">
                                         <div class="col-md-6">
                                             <div class="mb-3">
-                                                <label for="letra" class="form-label">Letra (Monto) *</label>
+                                                <label for="valor_financiar" class="form-label">Valor a Financiar</label>
                                                 <div class="input-group">
                                                     <span class="input-group-text">$</span>
-                                                    <input type="number" class="form-control" id="letra" name="letra" step="0.01" min="0">
+                                                    <input type="number" class="form-control" id="valor_financiar" name="valor_financiar" step="0.01" min="0" disabled>
                                                 </div>
                                             </div>
                                         </div>
                                         <div class="col-md-6">
                                             <div class="mb-3">
-                                                <label for="plazo" class="form-label">Plazo (Meses) *</label>
-                                                <input type="number" class="form-control" id="plazo" name="plazo" min="1">
+                                                <label for="abono_evaluacion" class="form-label">Abono</label>
+                                                <div class="input-group">
+                                                    <span class="input-group-text">$</span>
+                                                    <input type="number" class="form-control" id="abono_evaluacion" name="abono_evaluacion" step="0.01" min="0" disabled>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
                                     <div class="row">
                                         <div class="col-md-6">
                                             <div class="mb-3">
-                                                <label for="abono_banco" class="form-label">Abono</label>
-                                                <div class="input-group">
-                                                    <span class="input-group-text">$</span>
-                                                    <input type="number" class="form-control" id="abono_banco" name="abono_banco" step="0.01" min="0">
-                                                </div>
+                                                <label for="plazo_evaluacion" class="form-label">Plazo (Meses)</label>
+                                                <input type="number" class="form-control" id="plazo_evaluacion" name="plazo_evaluacion" min="1" disabled>
                                             </div>
                                         </div>
                                         <div class="col-md-6">
                                             <div class="mb-3">
-                                                <label for="promocion" class="form-label">Promoción</label>
-                                                <input type="text" class="form-control" id="promocion" name="promocion" placeholder="Ej: Tasa especial, descuento, etc.">
+                                                <label for="letra_evaluacion" class="form-label">Letra (Monto)</label>
+                                                <div class="input-group">
+                                                    <span class="input-group-text">$</span>
+                                                    <input type="number" class="form-control" id="letra_evaluacion" name="letra_evaluacion" step="0.01" min="0" disabled>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Campos para Rechazo -->
-                        <div id="camposRechazo" style="display: none;">
-                            <div class="card border-danger">
-                                <div class="card-header bg-danger text-white">
-                                    <h6 class="mb-0">
-                                        <i class="fas fa-times-circle me-2"></i>Motivos de Rechazo
-                                    </h6>
-                                </div>
-                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label for="promocion_evaluacion" class="form-label">Promoción</label>
+                                                <input type="text" class="form-control" id="promocion_evaluacion" name="promocion_evaluacion" placeholder="Ej: Tasa especial, descuento, etc." disabled>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <!-- Columna vacía para mantener el layout -->
+                                        </div>
+                                    </div>
                                     <div class="mb-3">
-                                        <label for="comentarios_ejecutivo_banco" class="form-label">Comentarios del Ejecutivo *</label>
-                                        <textarea class="form-control" id="comentarios_ejecutivo_banco" name="comentarios_ejecutivo_banco" rows="4" placeholder="Explicar los motivos del rechazo..."></textarea>
+                                        <label for="comentarios_evaluacion" class="form-label">Comentarios</label>
+                                        <textarea class="form-control" id="comentarios_evaluacion" name="comentarios_evaluacion" rows="3" placeholder="Comentarios adicionales..." disabled></textarea>
                                     </div>
                                 </div>
                             </div>
@@ -1239,6 +1269,16 @@ $solicitudesRechazadas = $stmt->fetch()['total'];
                             <div class="form-text">Seleccione el nuevo estado para esta solicitud</div>
                         </div>
                         
+                        <!-- Nota para estado Completada -->
+                        <div id="nota_completada" class="alert alert-info d-none" role="alert">
+                            <h6 class="alert-heading">
+                                <i class="fas fa-info-circle me-2"></i>Importante
+                            </h6>
+                            <p class="mb-0">
+                                <strong>Los datos viajarán a OCTO para su facturación</strong> y el proceso en MOTUS para esta solicitud será culminado.
+                            </p>
+                        </div>
+                        
                         <!-- Campo de Nota -->
                         <div class="mb-3">
                             <label for="nota_cambio_estado" class="form-label">Nota del Cambio *</label>
@@ -1266,20 +1306,21 @@ $solicitudesRechazadas = $stmt->fetch()['total'];
     <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
-    <script>
-        // Pasar información del rol a JavaScript
-        window.userRoles = {
-            isAdmin: <?php echo $isAdmin ? 'true' : 'false'; ?>,
-            isGestor: <?php echo $isGestor ? 'true' : 'false'; ?>,
-            isBanco: <?php echo $isBanco ? 'true' : 'false'; ?>
-        };
+            <script>
+          // Pasar información del rol a JavaScript
+          window.userRoles = {
+              isAdmin: <?php echo $isAdmin ? 'true' : 'false'; ?>,
+              isGestor: <?php echo $isGestor ? 'true' : 'false'; ?>,
+              isBanco: <?php echo $isBanco ? 'true' : 'false'; ?>
+          };
+          // Pasar ID del usuario a JavaScript
+          window.userId = <?php echo $_SESSION['user_id']; ?>;
 
         // Función para abrir modal de aprobación
         function abrirModalAprobacion(solicitudId) {
             // Limpiar formulario
             $('#aprobacionForm')[0].reset();
-            $('#camposAprobacion').hide();
-            $('#camposRechazo').hide();
+            $('#camposDecision').hide();
             $('#aprobacion_solicitud_id').val(solicitudId);
             
             // Obtener información de la solicitud
@@ -1308,8 +1349,8 @@ $solicitudesRechazadas = $stmt->fetch()['total'];
                             </div>
                         `);
                         
-                        // Mostrar modal
-                        $('#aprobacionModal').modal('show');
+                        // Cargar vehículos
+                        cargarVehiculosParaEvaluacion(solicitudId);
                     } else {
                         alert('Error al cargar la solicitud: ' + response.message);
                     }
@@ -1320,27 +1361,69 @@ $solicitudesRechazadas = $stmt->fetch()['total'];
             });
         }
 
-        // Función para mostrar/ocultar campos según la decisión
-        $(document).ready(function() {
-            $('input[name="accion"]').change(function() {
-                const accion = $(this).val();
-                
-                if (accion === 'aprobar') {
-                    $('#camposAprobacion').show();
-                    $('#camposRechazo').hide();
-                    $('#letra, #plazo').prop('required', true);
-                    $('#comentarios_ejecutivo_banco').prop('required', false);
-                } else if (accion === 'rechazar') {
-                    $('#camposAprobacion').hide();
-                    $('#camposRechazo').show();
-                    $('#letra, #plazo').prop('required', false);
-                    $('#comentarios_ejecutivo_banco').prop('required', true);
-                } else {
-                    $('#camposAprobacion').hide();
-                    $('#camposRechazo').hide();
+        // Función para cargar vehículos para evaluación
+        function cargarVehiculosParaEvaluacion(solicitudId) {
+            $.ajax({
+                url: 'api/vehiculos_solicitud.php',
+                type: 'GET',
+                data: { solicitud_id: solicitudId },
+                dataType: 'json',
+                success: function(response) {
+                    if (response.success) {
+                        const $select = $('#vehiculo_evaluacion');
+                        $select.empty().append('<option value="">Seleccione un vehículo</option>');
+                        
+                        if (response.data && response.data.length > 0) {
+                            response.data.forEach(function(vehiculo) {
+                                const text = `${vehiculo.marca || 'N/A'} ${vehiculo.modelo || ''}`;
+                                $select.append(`<option value="${vehiculo.id}">${text}</option>`);
+                            });
+                        } else {
+                            $select.append('<option value="">No hay vehículos registrados</option>');
+                        }
+                        
+                        // Mostrar modal después de cargar vehículos
+                        $('#aprobacionModal').modal('show');
+                    } else {
+                        $('#vehiculo_evaluacion').empty().append('<option value="">Error al cargar vehículos</option>');
+                        $('#aprobacionModal').modal('show');
+                    }
+                },
+                error: function() {
+                    $('#vehiculo_evaluacion').empty().append('<option value="">Error al cargar vehículos</option>');
+                    $('#aprobacionModal').modal('show');
                 }
             });
-        });
+        }
+
+        // Función para mostrar/ocultar campos según la decisión
+        window.mostrarCamposDecision = function(decision) {
+            // Ocultar todos los campos primero
+            const campos = ['#valor_financiar', '#abono_evaluacion', '#plazo_evaluacion', '#letra_evaluacion', '#promocion_evaluacion', '#comentarios_evaluacion'];
+            campos.forEach(function(campo) {
+                $(campo).prop('disabled', true);
+                $(campo).prop('required', false);
+            });
+            
+            // Mostrar contenedor
+            $('#camposDecision').show();
+            
+            // Habilitar campos según la decisión
+            if (decision === 'rechazado') {
+                // Solo habilitar comentarios
+                $('#comentarios_evaluacion').prop('disabled', false);
+                $('#comentarios_evaluacion').prop('required', true);
+            } else if (decision === 'preaprobado' || decision === 'aprobado' || decision === 'aprobado_condicional') {
+                // Habilitar todos los campos
+                campos.forEach(function(campo) {
+                    $(campo).prop('disabled', false);
+                });
+                $('#comentarios_evaluacion').prop('required', false);
+            } else {
+                // Ocultar contenedor si no hay selección
+                $('#camposDecision').hide();
+            }
+        };
 
         // Función para procesar la aprobación
         function procesarAprobacion() {
@@ -1352,24 +1435,22 @@ $solicitudesRechazadas = $stmt->fetch()['total'];
                 return;
             }
             
-            const accion = $('input[name="accion"]:checked').val();
-            if (!accion) {
-                alert('Por favor seleccione una decisión (Aprobar o Rechazar)');
+            const decision = $('#decision_banco').val();
+            if (!decision) {
+                alert('Por favor seleccione una decisión');
                 return;
             }
             
             // Confirmar acción
-            const mensaje = accion === 'aprobar' ? 
-                '¿Está seguro de que desea APROBAR esta solicitud?' : 
-                '¿Está seguro de que desea RECHAZAR esta solicitud?';
+            const mensaje = '¿Está seguro de procesar esta decisión: "' + decision.replace('_', ' ').toUpperCase() + '"?';
                 
             if (!confirm(mensaje)) {
                 return;
             }
             
-            // Enviar datos
+            // Enviar datos a la API de evaluaciones del banco
             $.ajax({
-                url: 'api/solicitudes.php',
+                url: 'api/evaluaciones_banco.php',
                 type: 'POST',
                 data: formData,
                 processData: false,
@@ -1385,8 +1466,17 @@ $solicitudesRechazadas = $stmt->fetch()['total'];
                         alert('Error: ' + response.message);
                     }
                 },
-                error: function() {
-                    alert('Error al procesar la decisión');
+                error: function(xhr) {
+                    let errorMsg = 'Error al procesar la decisión';
+                    if (xhr.responseText) {
+                        try {
+                            const error = JSON.parse(xhr.responseText);
+                            errorMsg = error.message || errorMsg;
+                        } catch(e) {
+                            errorMsg = xhr.responseText;
+                        }
+                    }
+                    alert(errorMsg);
                 }
             });
         }
@@ -1489,7 +1579,572 @@ $solicitudesRechazadas = $stmt->fetch()['total'];
             });
         }
     </script>
-    <script src="js/solicitudes.js"></script>
-    <script src="js/adjuntos.js"></script>
-</body>
-</html>
+
+    <!-- Modal para ver Usuarios Banco Asignados -->
+    <div class="modal fade" id="modalUsuariosBanco" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-info text-white">
+                    <h5 class="modal-title">
+                        <i class="fas fa-users me-2"></i>Usuarios Banco Asignados
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="usuariosBancoContent">
+                        <div class="text-center">
+                            <div class="spinner-border text-info" role="status">
+                                <span class="visually-hidden">Cargando...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+          </div>
+
+      <!-- Modal para Cambiar Gestor (Solo Admin) -->
+      <div class="modal fade" id="modalCambiarGestor" tabindex="-1">
+          <div class="modal-dialog">
+              <div class="modal-content">
+                  <div class="modal-header bg-primary text-white">
+                      <h5 class="modal-title">
+                          <i class="fas fa-user-edit me-2"></i>Cambiar Gestor
+                      </h5>
+                      <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                  </div>
+                  <div class="modal-body">
+                      <input type="hidden" id="gestor_solicitud_id">
+                      <div class="mb-3">
+                          <label class="form-label">Gestor Actual</label>
+                          <input type="text" class="form-control" id="gestor_actual" readonly>
+                      </div>
+                      <div class="mb-3">
+                          <label for="nuevo_gestor_id" class="form-label">Nuevo Gestor *</label>
+                          <select class="form-select" id="nuevo_gestor_id" required>
+                              <option value="">Seleccionar gestor...</option>
+                          </select>
+                      </div>
+                  </div>
+                  <div class="modal-footer">
+                      <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                          <i class="fas fa-times me-2"></i>Cancelar
+                      </button>
+                      <button type="button" class="btn btn-primary" onclick="guardarCambioGestor()">
+                          <i class="fas fa-save me-2"></i>Guardar Cambio
+                      </button>
+                  </div>
+              </div>
+          </div>
+      </div>
+
+      <script>
+        // Función para ver usuarios banco asignados
+        function verUsuariosBanco(solicitudId) {
+            $('#usuariosBancoContent').html(`
+                <div class="text-center">
+                    <div class="spinner-border text-info" role="status">
+                        <span class="visually-hidden">Cargando...</span>
+                    </div>
+                </div>
+            `);
+            
+            $.ajax({
+                url: 'api/usuarios_banco_solicitudes.php',
+                type: 'GET',
+                data: { solicitud_id: solicitudId },
+                dataType: 'json',
+                success: function(response) {
+                    if (response.success && response.data.length > 0) {
+                        let html = '<div class="table-responsive"><table class="table table-hover"><thead><tr><th>Usuario</th><th>Banco</th><th>Email</th><th>Teléfono</th><th>Estado</th></tr></thead><tbody>';
+                        
+                        response.data.forEach(function(usuario) {
+                            const estadoClass = usuario.estado === 'activo' ? 'success' : 'secondary';
+                            const estadoText = usuario.estado === 'activo' ? 'Activo' : 'Inactivo';
+                            
+                            html += `
+                                <tr>
+                                    <td>${usuario.usuario_nombre} ${usuario.usuario_apellido}</td>
+                                    <td>${usuario.banco_nombre || 'N/A'}</td>
+                                    <td>${usuario.usuario_email || 'N/A'}</td>
+                                    <td>${usuario.usuario_telefono || 'N/A'}</td>
+                                    <td><span class="badge bg-${estadoClass}">${estadoText}</span></td>
+                                </tr>
+                            `;
+                        });
+                        
+                        html += '</tbody></table></div>';
+                        $('#usuariosBancoContent').html(html);
+                    } else {
+                        $('#usuariosBancoContent').html('<div class="alert alert-info">No hay usuarios banco asignados a esta solicitud.</div>');
+                    }
+                    
+                    $('#modalUsuariosBanco').modal('show');
+                },
+                error: function() {
+                    $('#usuariosBancoContent').html('<div class="alert alert-danger">Error al cargar los usuarios banco asignados.</div>');
+                    $('#modalUsuariosBanco').modal('show');
+                }
+                          });
+          }
+
+          // Event delegation para links de cambiar gestor
+          $(document).on('click', '.cambiar-gestor-link', function(e) {
+              e.preventDefault();
+              const solicitudId = $(this).data('solicitud-id');
+              const gestorActual = $(this).data('gestor-nombre') || 'Sin asignar';
+              const gestorIdActual = $(this).data('gestor-id');
+              
+              abrirModalCambiarGestor(solicitudId, gestorActual, gestorIdActual);
+          });
+
+          // Función para abrir modal de cambiar gestor
+          function abrirModalCambiarGestor(solicitudId, gestorActual, gestorIdActual) {
+              // Configurar valores del modal
+              $('#gestor_solicitud_id').val(solicitudId);
+              $('#gestor_actual').val(gestorActual || 'Sin asignar');
+              $('#nuevo_gestor_id').val('').html('<option value="">Seleccionar gestor...</option>');
+              
+              // Cargar lista de gestores
+              $.ajax({
+                  url: 'api/solicitudes.php',
+                  type: 'GET',
+                  data: { gestores: true },
+                  dataType: 'json',
+                  success: function(response) {
+                      if (response.success && response.data.length > 0) {
+                          response.data.forEach(function(gestor) {
+                              const selected = (gestor.id == gestorIdActual) ? 'selected' : '';
+                              const option = `<option value="${gestor.id}" ${selected}>${gestor.nombre} ${gestor.apellido}</option>`;
+                              $('#nuevo_gestor_id').append(option);
+                          });
+                      } else {
+                          $('#nuevo_gestor_id').html('<option value="">No hay gestores disponibles</option>');
+                      }
+                      
+                      // Mostrar modal
+                      $('#modalCambiarGestor').modal('show');
+                  },
+                  error: function() {
+                      alert('Error al cargar la lista de gestores');
+                  }
+              });
+          }
+
+          // Función para guardar el cambio de gestor
+          function guardarCambioGestor() {
+              const solicitudId = $('#gestor_solicitud_id').val();
+              const nuevoGestorId = $('#nuevo_gestor_id').val();
+              
+              if (!nuevoGestorId) {
+                  alert('Por favor seleccione un gestor');
+                  return;
+              }
+              
+              // Mostrar indicador de carga
+              const btnGuardar = $('#modalCambiarGestor').find('button[onclick="guardarCambioGestor()"]');
+              const textoOriginal = btnGuardar.html();
+              btnGuardar.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Guardando...');
+              
+              $.ajax({
+                  url: 'api/solicitudes.php',
+                  type: 'POST',
+                  data: {
+                      action: 'cambiar_gestor',
+                      solicitud_id: solicitudId,
+                      nuevo_gestor_id: nuevoGestorId
+                  },
+                  dataType: 'json',
+                  success: function(response) {
+                      btnGuardar.prop('disabled', false).html(textoOriginal);
+                      
+                      if (response.success) {
+                          $('#modalCambiarGestor').modal('hide');
+                          alert('Gestor actualizado correctamente');
+                          // Recargar la página para actualizar la tabla
+                          location.reload();
+                      } else {
+                          alert('Error: ' + (response.message || 'Error al actualizar el gestor'));
+                      }
+                  },
+                  error: function(xhr) {
+                      btnGuardar.prop('disabled', false).html(textoOriginal);
+                      let mensaje = 'Error de conexión';
+                      try {
+                          const errorResponse = JSON.parse(xhr.responseText);
+                          if (errorResponse.message) {
+                              mensaje = errorResponse.message;
+                          }
+                      } catch (e) {
+                          // Usar mensaje por defecto
+                      }
+                      alert('Error: ' + mensaje);
+                  }
+              });
+          }
+
+          // Función para ver respuestas del banco
+        function verRespuestasBanco(solicitudId) {
+            $('#respuestasBancoContent').html(`
+                <div class="text-center">
+                    <div class="spinner-border text-warning" role="status">
+                        <span class="visually-hidden">Cargando...</span>
+                    </div>
+                </div>
+            `);
+            
+            // Obtener las respuestas del banco
+            $.ajax({
+                url: 'api/evaluaciones_banco.php',
+                type: 'GET',
+                data: {
+                    solicitud_id: solicitudId,
+                    usuario_banco_id: <?php echo $_SESSION['user_id']; ?>
+                },
+                success: function(response) {
+                    if (response.success && response.data.length > 0) {
+                        let html = '<div class="table-responsive"><table class="table table-striped">';
+                        html += '<thead><tr><th>Fecha</th><th>Vehículo</th><th>Decisión</th><th>Valor a Financiar</th><th>Abono</th><th>Plazo</th><th>Letra</th><th>Promoción</th><th>Comentarios</th></tr></thead>';
+                        html += '<tbody>';
+                        
+                        response.data.forEach(function(evaluacion) {
+                            html += '<tr>';
+                            html += '<td>' + new Date(evaluacion.fecha_evaluacion).toLocaleString('es-PA') + '</td>';
+                            html += '<td>' + (evaluacion.vehiculo_marca ? `${evaluacion.vehiculo_marca} ${evaluacion.vehiculo_modelo || ''}`.trim() : '-') + '</td>';
+                            html += '<td><span class="badge badge-estado estado-revision">' + evaluacion.decision.toUpperCase().replace('_', ' ') + '</span></td>';
+                            html += '<td>' + (evaluacion.valor_financiar ? '$' + parseFloat(evaluacion.valor_financiar).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
+                            html += '<td>' + (evaluacion.abono ? '$' + parseFloat(evaluacion.abono).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
+                            html += '<td>' + (evaluacion.plazo ? evaluacion.plazo + ' meses' : '-') + '</td>';
+                            html += '<td>' + (evaluacion.letra ? '$' + parseFloat(evaluacion.letra).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
+                            html += '<td>' + (evaluacion.promocion || '-') + '</td>';
+                            html += '<td>' + (evaluacion.comentarios || '-') + '</td>';
+                            html += '</tr>';
+                        });
+                        
+                        html += '</tbody></table></div>';
+                        $('#respuestasBancoContent').html(html);
+                    } else {
+                        $('#respuestasBancoContent').html('<div class="alert alert-info">No hay respuestas registradas para esta solicitud.</div>');
+                    }
+                    
+                    $('#modalRespuestasBanco').modal('show');
+                },
+                error: function() {
+                    $('#respuestasBancoContent').html('<div class="alert alert-danger">Error al cargar las respuestas del banco.</div>');
+                    $('#modalRespuestasBanco').modal('show');
+                }
+            });
+        }
+
+        // Función para ver respuestas de todos los bancos (para Admin/Gestor)
+        function verRespuestasBancoAdmin(solicitudId) {
+            $('#respuestasBancoAdminContent').html(`
+                <div class="text-center">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Cargando...</span>
+                    </div>
+                </div>
+            `);
+            
+            // Obtener las respuestas de todos los bancos
+            $.ajax({
+                url: 'api/evaluaciones_banco.php',
+                type: 'GET',
+                data: {
+                    solicitud_id: solicitudId
+                },
+                                  success: function(response) {
+                      if (response.success && response.data.length > 0) {
+                          const evaluacionSeleccionada = response.evaluacion_seleccionada;
+                          const mostrarAcciones = !evaluacionSeleccionada; // No mostrar acciones si hay una evaluación seleccionada
+                          
+                          let html = '<div class="table-responsive"><table class="table table-striped">';
+                          html += '<thead><tr><th>Fecha</th><th>Banco</th><th>Vehículo</th><th>Decisión</th><th>Valor a Financiar</th><th>Abono</th><th>Plazo</th><th>Letra</th><th>Promoción</th><th>Comentarios</th>';
+                          if (mostrarAcciones) {
+                              html += '<th>Acciones</th>';
+                          }
+                          html += '</tr></thead>';
+                          html += '<tbody>';
+                          
+                          response.data.forEach(function(evaluacion) {
+                              html += '<tr>';
+                              html += '<td>' + new Date(evaluacion.fecha_evaluacion).toLocaleString('es-PA') + '</td>';
+                              html += '<td>' + (evaluacion.nombre ? `${evaluacion.nombre} ${evaluacion.apellido || ''}`.trim() : '-') + '</td>';
+                              html += '<td>' + (evaluacion.vehiculo_marca ? `${evaluacion.vehiculo_marca} ${evaluacion.vehiculo_modelo || ''}`.trim() : '-') + '</td>';
+                              html += '<td><span class="badge badge-estado estado-revision">' + evaluacion.decision.toUpperCase().replace('_', ' ') + '</span></td>';
+                              html += '<td>' + (evaluacion.valor_financiar ? '$' + parseFloat(evaluacion.valor_financiar).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
+                              html += '<td>' + (evaluacion.abono ? '$' + parseFloat(evaluacion.abono).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
+                              html += '<td>' + (evaluacion.plazo ? evaluacion.plazo + ' meses' : '-') + '</td>';
+                              html += '<td>' + (evaluacion.letra ? '$' + parseFloat(evaluacion.letra).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
+                              html += '<td>' + (evaluacion.promocion || '-') + '</td>';
+                              html += '<td>' + (evaluacion.comentarios || '-') + '</td>';
+                              if (mostrarAcciones) {
+                                  html += '<td><div class="btn-group-vertical btn-group-sm">';
+                                  html += '<button class="btn btn-success btn-sm mb-1" onclick="seleccionarPropuesta(' + evaluacion.id + ', ' + solicitudId + ', \'' + evaluacion.usuario_banco_id + '\')" title="Seleccionar Propuesta"><i class="fas fa-check me-1"></i>Seleccionar</button>';
+                                  html += '<button class="btn btn-warning btn-sm" onclick="solicitarReevaluacion(' + evaluacion.id + ', ' + solicitudId + ', \'' + evaluacion.usuario_banco_id + '\')" title="Solicitar Reevaluación"><i class="fas fa-redo me-1"></i>Reevaluar</button>';
+                                  html += '</div></td>';
+                              } else if (evaluacion.id == evaluacionSeleccionada) {
+                                  html += '<td><span class="badge bg-success"><i class="fas fa-check-circle me-1"></i>Propuesta Seleccionada</span></td>';
+                              }
+                              html += '</tr>';
+                          });
+                          
+                          html += '</tbody></table></div>';
+                          $('#respuestasBancoAdminContent').html(html);
+                    } else {
+                        $('#respuestasBancoAdminContent').html('<div class="alert alert-info">No hay respuestas registradas para esta solicitud.</div>');
+                    }
+                    
+                    $('#modalRespuestasBancoAdmin').modal('show');
+                },
+                error: function() {
+                    $('#respuestasBancoAdminContent').html('<div class="alert alert-danger">Error al cargar las respuestas del banco.</div>');
+                    $('#modalRespuestasBancoAdmin').modal('show');
+                }
+            });
+        }
+
+        // Función para seleccionar una propuesta
+        function seleccionarPropuesta(evaluacionId, solicitudId, usuarioBancoId) {
+            $('#seleccionPropuesta_id').val(evaluacionId);
+            $('#seleccionPropuesta_solicitud_id').val(solicitudId);
+            $('#seleccionPropuesta_usuario_banco_id').val(usuarioBancoId);
+            $('#comentarioSeleccion').val('');
+            $('#modalSeleccionPropuesta').modal('show');
+        }
+
+        // Función para solicitar reevaluación
+        function solicitarReevaluacion(evaluacionId, solicitudId, usuarioBancoId) {
+            $('#reevaluacion_id').val(evaluacionId);
+            $('#reevaluacion_solicitud_id').val(solicitudId);
+            $('#reevaluacion_usuario_banco_id').val(usuarioBancoId);
+            $('#comentarioReevaluacion').val('');
+            $('#modalSolicitarReevaluacion').modal('show');
+        }
+
+        // Función para procesar la selección de propuesta
+        function procesarSeleccionPropuesta() {
+            const evaluacionId = $('#seleccionPropuesta_id').val();
+            const solicitudId = $('#seleccionPropuesta_solicitud_id').val();
+            const comentario = $('#comentarioSeleccion').val();
+
+            if (!comentario.trim()) {
+                alert('Por favor ingrese un comentario');
+                return;
+            }
+
+            $.ajax({
+                url: 'api/evaluaciones_banco.php',
+                type: 'POST',
+                data: {
+                    action: 'seleccionar_propuesta',
+                    evaluacion_id: evaluacionId,
+                    solicitud_id: solicitudId,
+                    comentario: comentario
+                },
+                dataType: 'json',
+                success: function(response) {
+                    if (response.success) {
+                        alert(response.message);
+                        $('#modalSeleccionPropuesta').modal('hide');
+                        // Recargar modal de respuestas
+                        verRespuestasBancoAdmin(solicitudId);
+                    } else {
+                        alert('Error: ' + response.message);
+                    }
+                },
+                error: function() {
+                    alert('Error al procesar la selección de la propuesta');
+                }
+            });
+        }
+
+        // Función para procesar la solicitud de reevaluación
+        function procesarReevaluacion() {
+            const evaluacionId = $('#reevaluacion_id').val();
+            const solicitudId = $('#reevaluacion_solicitud_id').val();
+            const comentario = $('#comentarioReevaluacion').val();
+
+            if (!comentario.trim()) {
+                alert('Por favor ingrese un comentario');
+                return;
+            }
+
+            $.ajax({
+                url: 'api/evaluaciones_banco.php',
+                type: 'POST',
+                data: {
+                    action: 'solicitar_reevaluacion',
+                    evaluacion_id: evaluacionId,
+                    solicitud_id: solicitudId,
+                    comentario: comentario
+                },
+                dataType: 'json',
+                success: function(response) {
+                    if (response.success) {
+                        alert(response.message);
+                        $('#modalSolicitarReevaluacion').modal('hide');
+                        // Recargar modal de respuestas
+                        verRespuestasBancoAdmin(solicitudId);
+                    } else {
+                        alert('Error: ' + response.message);
+                    }
+                },
+                error: function() {
+                    alert('Error al procesar la solicitud de reevaluación');
+                }
+            });
+        }
+    </script>
+
+    <!-- Modal para ver Respuestas del Banco -->
+    <div class="modal fade" id="modalRespuestasBanco" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title">
+                        <i class="fas fa-clipboard-list me-2"></i>Respuestas del Banco
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="respuestasBancoContent">
+                        <div class="text-center">
+                            <div class="spinner-border text-warning" role="status">
+                                <span class="visually-hidden">Cargando...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para ver Respuestas del Banco (Admin/Gestor) -->
+    <div class="modal fade" id="modalRespuestasBancoAdmin" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">
+                        <i class="fas fa-clipboard-list me-2"></i>Respuestas de los Bancos
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="respuestasBancoAdminContent">
+                        <div class="text-center">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Cargando...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para Seleccionar Propuesta -->
+    <div class="modal fade" id="modalSeleccionPropuesta" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title">
+                        <i class="fas fa-check-circle me-2"></i>Seleccionar Propuesta
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="seleccionPropuesta_id">
+                    <input type="hidden" id="seleccionPropuesta_solicitud_id">
+                    <input type="hidden" id="seleccionPropuesta_usuario_banco_id">
+                    
+                    <div class="mb-3">
+                        <label for="comentarioSeleccion" class="form-label">Comentario *</label>
+                        <textarea class="form-control" id="comentarioSeleccion" rows="4" required placeholder="Ingrese un comentario sobre la selección de esta propuesta..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-success" onclick="procesarSeleccionPropuesta()">
+                        <i class="fas fa-check me-2"></i>Confirmar Selección
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para Solicitar Reevaluación -->
+    <div class="modal fade" id="modalSolicitarReevaluacion" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title">
+                        <i class="fas fa-redo me-2"></i>Solicitar Reevaluación
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="reevaluacion_id">
+                    <input type="hidden" id="reevaluacion_solicitud_id">
+                    <input type="hidden" id="reevaluacion_usuario_banco_id">
+                    
+                    <div class="mb-3">
+                        <label for="comentarioReevaluacion" class="form-label">Comentario *</label>
+                        <textarea class="form-control" id="comentarioReevaluacion" rows="4" required placeholder="Ingrese el motivo por el cual solicita la reevaluación..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-warning" onclick="procesarReevaluacion()">
+                        <i class="fas fa-redo me-2"></i>Solicitar Reevaluación
+                    </button>
+                </div>
+            </div>
+        </div>
+          </div>
+  
+      <!-- Modal para Apartar Vehículo -->
+      <div class="modal fade" id="modalApartarVehiculo" tabindex="-1">
+          <div class="modal-dialog">
+              <div class="modal-content">
+                  <div class="modal-header bg-warning text-dark">
+                      <h5 class="modal-title">
+                          <i class="fas fa-bookmark me-2"></i>Apartar Vehículo
+                      </h5>
+                      <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                  </div>
+                  <div class="modal-body">
+                      <input type="hidden" id="vehiculo_index_apartar">
+                      <div class="alert alert-warning">
+                          <i class="fas fa-exclamation-triangle me-2"></i>
+                          ¿Está seguro de apartar el vehículo seleccionado?
+                      </div>
+                      <div class="mb-3">
+                          <strong>Vehículo:</strong> <span id="vehiculo_info_apartar"></span>
+                      </div>
+                  </div>
+                  <div class="modal-footer">
+                      <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                          <i class="fas fa-times me-2"></i>Cancelar
+                      </button>
+                      <button type="button" class="btn btn-warning" data-bs-dismiss="modal">
+                          <i class="fas fa-check me-2"></i>Confirmar
+                      </button>
+                  </div>
+              </div>
+          </div>
+      </div>
+  
+      <script src="js/solicitudes.js"></script>
+      <script src="js/adjuntos.js"></script>
+  </body>
+  </html>

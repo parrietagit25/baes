@@ -55,9 +55,13 @@ try {
 function obtenerUsuariosAsignados($pdo, $solicitud_id) {
     $sql = "
         SELECT ubs.*, 
-               u.nombre, u.apellido, u.email,
+               u.nombre as usuario_nombre, 
+               u.apellido as usuario_apellido, 
+               u.email as usuario_email,
+               u.telefono as usuario_telefono,
                b.nombre as banco_nombre,
-               u_creador.nombre as creado_por_nombre, u_creador.apellido as creado_por_apellido
+               u_creador.nombre as creado_por_nombre, 
+               u_creador.apellido as creado_por_apellido
         FROM usuarios_banco_solicitudes ubs
         JOIN usuarios u ON ubs.usuario_banco_id = u.id
         LEFT JOIN bancos b ON u.banco_id = b.id

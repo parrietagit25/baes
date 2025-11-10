@@ -297,20 +297,13 @@ $roles = $stmt->fetchAll();
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label">Roles *</label>
-                            <div class="row">
+                            <label for="rol_id" class="form-label">Rol *</label>
+                            <select class="form-select" id="rol_id" name="rol_id" required>
+                                <option value="">Seleccionar rol...</option>
                                 <?php foreach ($roles as $rol): ?>
-                                <div class="col-md-4">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" name="roles[]" 
-                                               value="<?php echo $rol['id']; ?>" id="rol_<?php echo $rol['id']; ?>">
-                                        <label class="form-check-label" for="rol_<?php echo $rol['id']; ?>">
-                                            <?php echo htmlspecialchars($rol['nombre']); ?>
-                                        </label>
-                                    </div>
-                                </div>
+                                <option value="<?php echo $rol['id']; ?>"><?php echo htmlspecialchars($rol['nombre']); ?></option>
                                 <?php endforeach; ?>
-                            </div>
+                            </select>
                         </div>
 
                         <!-- Select de Banco (solo para usuarios tipo banco) -->

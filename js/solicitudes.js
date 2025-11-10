@@ -9,14 +9,44 @@ $(document).ready(function() {
     
     cargarSolicitudes();
 
-    // Configurar formulario de solicitudes
-    $('#solicitudForm').on('submit', function(e) {
-        console.log('=== FORMULARIO ENVIADO ===');
+    // Configurar formulario de solicitudes usando delegación de eventos
+    $(document).on('submit', '#solicitudForm', function(e) {
+        console.log('=== FORMULARIO ENVIADO (delegado) ===');
         e.preventDefault();
+        e.stopPropagation();
         guardarSolicitud();
+        return false;
     });
     
-    // Configurar formulario de notas
+    // También agregar event listener directo por si acaso
+    $('#solicitudForm').on('submit', function(e) {
+        console.log('=== FORMULARIO ENVIADO (directo) ===');
+        e.preventDefault();
+        e.stopPropagation();
+        guardarSolicitud();
+        return false;
+    });
+    
+    // Event listener adicional directamente en el botón de guardar (por si el submit no funciona)
+    $(document).on('click', '#solicitudForm button[type="submit"]', function(e) {
+        console.log('=== CLICK EN BOTÓN GUARDAR ===');
+        e.preventDefault();
+        e.stopPropagation();
+        const form = $(this).closest('form');
+        if (form.length > 0 && form.attr('id') === 'solicitudForm') {
+            console.log('Ejecutando guardarSolicitud desde click del botón');
+            guardarSolicitud();
+        }
+        return false;
+    });
+    
+    // Configurar formulario de notas (delegado para formularios dinámicos)
+    $(document).on('submit', '.formNotaMuro', function(e) {
+        e.preventDefault();
+        enviarNotaMuro($(this));
+    });
+    
+    // Configurar formulario de notas antiguo por compatibilidad
     $('#notaForm').on('submit', function(e) {
         e.preventDefault();
         enviarNota();
@@ -40,10 +70,137 @@ $(document).ready(function() {
             $('#contador_comentarios').removeClass('text-danger');
         }
     });
+    
+    // Event listener para mostrar/ocultar nota cuando se selecciona "Completada"
+    $(document).on('change', '#nuevo_estado', function() {
+        const estadoSeleccionado = $(this).val();
+        const notaCompletada = $('#nota_completada');
+        
+        if (estadoSeleccionado === 'Completada') {
+            notaCompletada.removeClass('d-none');
+        } else {
+            notaCompletada.addClass('d-none');
+        }
+    });
+    
+    // Limpiar la nota cuando se cierre el modal
+    $('#cambioEstadoModal').on('hidden.bs.modal', function() {
+        $('#nota_completada').addClass('d-none');
+        $('#nuevo_estado').val('');
+    });
+    
+    // Event listener cuando el modal de solicitud se muestra
+    $('#solicitudModal').on('shown.bs.modal', function() {
+        console.log('=== MODAL DE SOLICITUD ABIERTO ===');
+        
+        // Asegurarse de que el event listener del formulario esté activo
+        const form = $('#solicitudForm');
+        if (form.length > 0) {
+            console.log('Formulario encontrado, configurando event listeners...');
+            
+            // Remover event listeners anteriores para evitar duplicados
+            form.off('submit');
+            
+            // Agregar event listener del submit
+            form.on('submit', function(e) {
+                console.log('=== FORMULARIO ENVIADO (modal abierto) ===');
+                e.preventDefault();
+                e.stopPropagation();
+                guardarSolicitud();
+                return false;
+            });
+            
+            // Event listener en el botón directamente
+            const btnGuardar = $('#btnGuardarSolicitud');
+            if (btnGuardar.length > 0) {
+                console.log('Botón de guardar encontrado');
+                btnGuardar.off('click').on('click', function(e) {
+                    console.log('=== CLICK EN BOTÓN GUARDAR (modal abierto) ===');
+                    e.preventDefault();
+                    e.stopPropagation();
+                    guardarSolicitud();
+                    return false;
+                });
+            }
+        }
+    });
 });
 
-// Función para cargar solicitudes
+// Función para inicializar DataTable de forma segura
+function inicializarDataTable() {
+    try {
+        // Destruir DataTable existente si existe
+        if ($.fn.DataTable.isDataTable('#solicitudesTable')) {
+            console.log('Destruyendo DataTable existente...');
+            $('#solicitudesTable').DataTable().destroy();
+        }
+        
+        // Verificar que las filas estén completamente renderizadas
+        const filas = $('#solicitudesTable tbody tr');
+        console.log('Filas encontradas:', filas.length);
+        
+        if (filas.length === 0) {
+            console.warn('No hay filas para mostrar, reintentando en 100ms...');
+            setTimeout(inicializarDataTable, 100);
+            return;
+        }
+        
+        // Verificar que la primera fila tenga el número correcto de columnas
+        const primeraFila = filas.first();
+        const columnas = primeraFila.find('td').length;
+        const columnasHeader = $('#solicitudesTable thead th').length;
+        
+        console.log('Columnas en fila:', columnas, 'Columnas en header:', columnasHeader);
+        
+        if (columnas !== columnasHeader) {
+            console.error('❌ Desajuste de columnas detectado, reintentando...');
+            setTimeout(inicializarDataTable, 200);
+            return;
+        }
+        
+        console.log('Inicializando DataTable de solicitudes...');
+        
+        // Detectar dinámicamente la última columna (acciones)
+        const ultimaColumna = columnasHeader - 1;
+        
+        $('#solicitudesTable').DataTable({
+            language: {
+                url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json'
+            },
+            responsive: true,
+            order: [[0, 'desc']],
+            pageLength: 10,
+            lengthMenu: [[5, 10, 25, 50], [5, 10, 25, 50]],
+            columnDefs: [
+                { orderable: false, targets: [ultimaColumna] } // Columna de acciones no ordenable (última columna)
+            ],
+            autoWidth: false,
+            processing: true,
+            deferRender: true
+        });
+        
+        console.log('✅ DataTable de solicitudes inicializado correctamente');
+        
+    } catch (error) {
+        console.error('❌ Error al inicializar DataTable de solicitudes:', error);
+        console.error('Detalles del error:', error.message);
+    }
+}
+
+// Función para inicializar DataTable (las solicitudes ya vienen del HTML)
 function cargarSolicitudes() {
+    // Verificar si la tabla tiene filas ya cargadas desde el servidor
+    const filasExistentes = $('#solicitudesTable tbody tr').length;
+    console.log('Filas existentes en el HTML:', filasExistentes);
+    
+    if (filasExistentes > 0) {
+        // Si hay filas en el HTML, simplemente inicializar DataTable sin recargar
+        console.log('Inicializando DataTable con datos existentes del HTML');
+        setTimeout(inicializarDataTable, 300);
+        return;
+    }
+    
+    // Si no hay filas, cargar desde la API (caso normal)
     $.ajax({
         url: 'api/solicitudes.php',
         type: 'GET',
@@ -144,66 +301,6 @@ function cargarSolicitudes() {
                     }
                 }
                 
-                // Función para inicializar DataTable de forma segura
-                function inicializarDataTable() {
-                    try {
-                        // Destruir DataTable existente si existe
-                        if ($.fn.DataTable.isDataTable('#solicitudesTable')) {
-                            console.log('Destruyendo DataTable existente...');
-                            $('#solicitudesTable').DataTable().destroy();
-                        }
-                        
-                        // Verificar que las filas estén completamente renderizadas
-                        const filas = $('#solicitudesTable tbody tr');
-                        console.log('Filas encontradas:', filas.length);
-                        
-                        if (filas.length === 0) {
-                            console.warn('No hay filas para mostrar, reintentando en 100ms...');
-                            setTimeout(inicializarDataTable, 100);
-                            return;
-                        }
-                        
-                        // Verificar que la primera fila tenga el número correcto de columnas
-                        const primeraFila = filas.first();
-                        const columnas = primeraFila.find('td').length;
-                        const columnasHeader = $('#solicitudesTable thead th').length;
-                        
-                        console.log('Columnas en fila:', columnas, 'Columnas en header:', columnasHeader);
-                        
-                        if (columnas !== columnasHeader) {
-                            console.error('❌ Desajuste de columnas detectado, reintentando...');
-                            setTimeout(inicializarDataTable, 200);
-                            return;
-                        }
-                        
-                        console.log('Inicializando DataTable de solicitudes...');
-                        
-                        $('#solicitudesTable').DataTable({
-                            language: {
-                                url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json'
-                            },
-                            responsive: true,
-                            order: [[0, 'desc']],
-                            pageLength: 10,
-                            lengthMenu: [[5, 10, 25, 50], [5, 10, 25, 50]],
-                            columnDefs: [
-                                { orderable: false, targets: [8] } // Columna de acciones no ordenable (actualizado: era [9] cuando había columna "Respuesta Banco")
-                            ],
-                            autoWidth: false,
-                            processing: true,
-                            deferRender: true,
-                            destroy: true
-                        });
-                        
-                        console.log('✅ DataTable de solicitudes inicializado correctamente');
-                        
-                    } catch (error) {
-                        console.error('❌ Error al inicializar DataTable de solicitudes:', error);
-                        console.error('Detalles del error:', error.message);
-                        console.error('Stack trace:', error.stack);
-                    }
-                }
-                
                 // Inicializar DataTable después de un delay
                 setTimeout(inicializarDataTable, 300);
             }
@@ -262,6 +359,9 @@ function limpiarFormularioSolicitud() {
     
     // Activar primera pestaña
     $('#datos-generales-tab').tab('show');
+    
+    // Ocultar pestaña "Cita y Firma" al crear nueva solicitud
+    $('#cita-firma-tab-li').hide();
 }
 
 // Función para abrir modal de adjuntos
@@ -343,7 +443,71 @@ function cargarInfoSolicitudAdjuntos(solicitudId) {
 // Función para guardar solicitud
 function guardarSolicitud() {
     console.log('=== GUARDANDO SOLICITUD ===');
-    const formData = new FormData($('#solicitudForm')[0]);
+    
+    // Verificar que el formulario existe
+    const form = $('#solicitudForm');
+    if (form.length === 0) {
+        console.error('❌ ERROR: El formulario #solicitudForm no existe');
+        mostrarAlerta('Error: El formulario no se encuentra', 'danger');
+        return;
+    }
+    
+    // Validar campos requeridos manualmente
+    const camposRequeridos = {
+        'tipo_persona': 'Tipo de Persona',
+        'nombre_cliente': 'Nombre del Cliente',
+        'cedula': '# de Cédula',
+        'perfil_financiero': 'Perfil Financiero'
+    };
+    
+    let camposFaltantes = [];
+    for (let campo in camposRequeridos) {
+        const valor = $(`#${campo}`).val();
+        if (!valor || valor.trim() === '') {
+            camposFaltantes.push(camposRequeridos[campo]);
+        }
+    }
+    
+    if (camposFaltantes.length > 0) {
+        console.error('❌ ERROR: Campos requeridos faltantes:', camposFaltantes);
+        mostrarAlerta('Por favor, complete los siguientes campos requeridos:\n\n• ' + camposFaltantes.join('\n• '), 'warning');
+        
+        // Resaltar campos faltantes
+        for (let campo in camposRequeridos) {
+            const valor = $(`#${campo}`).val();
+            if (!valor || valor.trim() === '') {
+                $(`#${campo}`).addClass('is-invalid');
+                setTimeout(() => {
+                    $(`#${campo}`).removeClass('is-invalid');
+                }, 3000);
+            }
+        }
+        
+        // Hacer scroll al primer campo faltante
+        if (camposFaltantes.length > 0) {
+            const primerCampo = Object.keys(camposRequeridos).find(campo => {
+                const valor = $(`#${campo}`).val();
+                return !valor || valor.trim() === '';
+            });
+            if (primerCampo) {
+                $(`#${primerCampo}`).focus();
+                $('html, body').animate({
+                    scrollTop: $(`#${primerCampo}`).offset().top - 100
+                }, 500);
+            }
+        }
+        
+        return;
+    }
+    
+    // Validar que el formulario sea válido (HTML5 validation)
+    if (!form[0].checkValidity()) {
+        console.error('❌ ERROR: El formulario no es válido (validación HTML5)');
+        form[0].reportValidity();
+        return;
+    }
+    
+    const formData = new FormData(form[0]);
     const solicitudId = $('#solicitud_id').val();
     
     console.log('Solicitud ID:', solicitudId);
@@ -359,6 +523,11 @@ function guardarSolicitud() {
     }
     console.log('Método:', method);
     
+    // Mostrar indicador de carga
+    const submitButton = form.find('button[type="submit"]');
+    const originalText = submitButton.html();
+    submitButton.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Guardando...');
+    
     $.ajax({
         url: 'api/solicitudes.php',
         type: method,
@@ -367,25 +536,38 @@ function guardarSolicitud() {
         contentType: false,
         dataType: 'json',
         success: function(response) {
+            console.log('✅ Respuesta del servidor:', response);
+            submitButton.prop('disabled', false).html(originalText);
+            
             if (response.success) {
-                const mensaje = solicitudId ? 'Solicitud actualizada correctamente' : 'Solicitud creada correctamente';
-                mostrarAlerta(mensaje, 'success');
+                const nuevaSolicitudId = response.data && response.data.id ? response.data.id : solicitudId;
                 
-                // Si es una nueva solicitud, mostrar mensaje y cerrar modal
-                if (!solicitudId && response.data && response.data.id) {
-                    mostrarAlerta('Solicitud creada correctamente. Puedes gestionar adjuntos desde la tabla de solicitudes.', 'success');
-                    $('#solicitudModal').modal('hide');
+                // Guardar vehículos
+                if (nuevaSolicitudId && vehiculosList.length > 0) {
+                    guardarVehiculos(nuevaSolicitudId);
                 } else {
-                    $('#solicitudModal').modal('hide');
+                    mostrarAlertaFinGuardado(solicitudId, nuevaSolicitudId);
                 }
-                
-                cargarSolicitudes();
             } else {
-                mostrarAlerta('Error al guardar solicitud: ' + response.message, 'danger');
+                mostrarAlerta('Error al guardar solicitud: ' + (response.message || 'Error desconocido'), 'danger');
             }
         },
-        error: function() {
-            mostrarAlerta('Error de conexión al guardar solicitud', 'danger');
+        error: function(xhr, status, error) {
+            console.error('❌ ERROR AJAX:', error);
+            console.error('Status:', status);
+            console.error('Response:', xhr.responseText);
+            submitButton.prop('disabled', false).html(originalText);
+            
+            let mensaje = 'Error de conexión al guardar solicitud';
+            try {
+                const errorResponse = JSON.parse(xhr.responseText);
+                if (errorResponse.message) {
+                    mensaje = errorResponse.message;
+                }
+            } catch (e) {
+                // Si no se puede parsear, usar el mensaje por defecto
+            }
+            mostrarAlerta(mensaje, 'danger');
         }
     });
 }
@@ -482,9 +664,10 @@ function llenarFormularioEdicion(solicitud) {
     $('#cedula').val(solicitud.cedula);
     $('#edad').val(solicitud.edad);
     $('#genero').val(solicitud.genero);
-    $('#telefono').val(solicitud.telefono);
-    $('#email').val(solicitud.email);
-    $('#casado').prop('checked', solicitud.casado == 1);
+          $('#telefono').val(solicitud.telefono);
+      $('#email').val(solicitud.email);
+      $('#email_pipedrive').val(solicitud.email_pipedrive);
+      $('#casado').prop('checked', solicitud.casado == 1);
     $('#hijos').val(solicitud.hijos);
     
     // Dirección
@@ -496,11 +679,13 @@ function llenarFormularioEdicion(solicitud) {
     $('#numero_casa_apto').val(solicitud.numero_casa_apto);
     $('#direccion').val(solicitud.direccion);
     
-    // Perfil financiero
-    $('#perfil_financiero').val(solicitud.perfil_financiero);
-    $('#ingreso').val(solicitud.ingreso);
-    $('#tiempo_laborar').val(solicitud.tiempo_laborar);
-    $('#nombre_empresa_negocio').val(solicitud.nombre_empresa_negocio);
+          // Perfil financiero
+      $('#perfil_financiero').val(solicitud.perfil_financiero);
+      $('#ingreso').val(solicitud.ingreso);
+      $('#tiempo_laborar').val(solicitud.tiempo_laborar);
+      $('#profesion').val(solicitud.profesion);
+      $('#ocupacion').val(solicitud.ocupacion);
+      $('#nombre_empresa_negocio').val(solicitud.nombre_empresa_negocio);
     // Limpiar fechas inválidas
     if (solicitud.estabilidad_laboral && solicitud.estabilidad_laboral !== '0000-00-00' && solicitud.estabilidad_laboral !== '-') {
         $('#estabilidad_laboral').val(solicitud.estabilidad_laboral);
@@ -508,13 +693,15 @@ function llenarFormularioEdicion(solicitud) {
         $('#estabilidad_laboral').val('');
     }
     
-    if (solicitud.fecha_constitucion && solicitud.fecha_constitucion !== '0000-00-00' && solicitud.fecha_constitucion !== '-') {
-        $('#fecha_constitucion').val(solicitud.fecha_constitucion);
-    } else {
-        $('#fecha_constitucion').val('');
-    }
-    
-    // Datos del auto
+          if (solicitud.fecha_constitucion && solicitud.fecha_constitucion !== '0000-00-00' && solicitud.fecha_constitucion !== '-') {
+          $('#fecha_constitucion').val(solicitud.fecha_constitucion);
+      } else {
+          $('#fecha_constitucion').val('');
+      }
+      
+      $('#continuidad_laboral').val(solicitud.continuidad_laboral);
+      
+      // Datos del auto
     $('#marca_auto').val(solicitud.marca_auto);
     $('#modelo_auto').val(solicitud.modelo_auto);
     $('#año_auto').val(solicitud.año_auto);
@@ -540,10 +727,16 @@ function llenarFormularioEdicion(solicitud) {
     // Inicializar usuarios banco
     inicializarUsuariosBanco(solicitud.id);
     
+    // Cargar vehículos
+    cargarVehiculos(solicitud.id);
+    
     // Deshabilitar campos si el usuario es banco
     if (window.userRoles && window.userRoles.isBanco) {
         deshabilitarCamposParaBanco();
     }
+    
+    // Verificar si hay evaluación seleccionada para mostrar/ocultar pestaña "Cita y Firma"
+    verificarEvaluacionSeleccionada(solicitud.id);
     
     // Mostrar modal
     $('#solicitudModal').modal('show');
@@ -554,14 +747,264 @@ function verMuro(id) {
     // Cargar información de la solicitud
     cargarInfoSolicitud(id);
     
-    // Configurar formulario de notas
-    $('#nota_solicitud_id').val(id);
-    
-    // Cargar notas existentes
-    cargarNotasMuro(id);
+    // Cargar vehículos y usuarios banco para crear las pestañas
+    cargarMuroCompleto(id);
     
     // Mostrar modal
     $('#muroModal').modal('show');
+}
+
+// Función para cargar el muro completo con vehículos y usuarios banco
+function cargarMuroCompleto(solicitudId) {
+    // Cargar vehículos
+    $.ajax({
+        url: 'api/vehiculos_solicitud.php',
+        type: 'GET',
+        data: { solicitud_id: solicitudId },
+        dataType: 'json',
+        success: function(responseVehiculos) {
+            const vehiculos = responseVehiculos.success ? responseVehiculos.data : [];
+            
+                          // Cargar usuarios banco
+              $.ajax({
+                  url: 'api/usuarios_banco_solicitudes.php',
+                  type: 'GET',
+                  data: { solicitud_id: solicitudId },
+                  dataType: 'json',
+                  success: function(responseUsuarios) {
+                      let usuariosBanco = responseUsuarios.success ? responseUsuarios.data : [];
+                      
+                      // Si el usuario es tipo banco (y no es admin ni gestor), filtrar solo su propia pestaña
+                      if (window.userRoles && window.userRoles.isBanco && 
+                          !window.userRoles.isAdmin && !window.userRoles.isGestor && 
+                          window.userId) {
+                          usuariosBanco = usuariosBanco.filter(function(usuario) {
+                              // Comparar el usuario_banco_id con el userId del usuario logueado
+                              return usuario.usuario_banco_id == window.userId;
+                          });
+                      }
+                      
+                      // Generar estructura de pestañas
+                      generarPestanasMuro(solicitudId, vehiculos, usuariosBanco);
+                  },
+                error: function() {
+                    console.error('Error al cargar usuarios banco');
+                    generarPestanasMuro(solicitudId, vehiculos, []);
+                }
+            });
+        },
+        error: function() {
+            console.error('Error al cargar vehículos');
+            generarPestanasMuro(solicitudId, [], []);
+        }
+    });
+}
+
+// Función para generar las pestañas del muro
+function generarPestanasMuro(solicitudId, vehiculos, usuariosBanco) {
+    const tabsContainer = $('#vehiculosTabs');
+    const contentContainer = $('#vehiculosTabContent');
+    
+    tabsContainer.empty();
+    contentContainer.empty();
+    
+    // Si no hay vehículos, mostrar un tab general
+    if (vehiculos.length === 0) {
+        const tabHtml = `
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#general" type="button">
+                    <i class="fas fa-car me-2"></i>General
+                </button>
+            </li>
+        `;
+        tabsContainer.html(tabHtml);
+        
+        generarContenidoTab(solicitudId, 'general', null, usuariosBanco, true);
+        
+        // Cargar notas del primer tab
+        cargarNotasPrimerTab();
+        return;
+    }
+    
+    // Generar un tab por cada vehículo
+    vehiculos.forEach((vehiculo, index) => {
+        const activo = index === 0 ? 'active' : '';
+        const vehId = `vehiculo_${vehiculo.id || index}`;
+        
+        const tabHtml = `
+            <li class="nav-item" role="presentation">
+                <button class="nav-link ${activo}" data-bs-toggle="tab" data-bs-target="#${vehId}" type="button">
+                    <i class="fas fa-car me-2"></i>${vehiculo.marca || 'Sin marca'} ${vehiculo.modelo || ''} (${vehiculo.anio || 'N/A'})
+                </button>
+            </li>
+        `;
+        tabsContainer.append(tabHtml);
+        
+        // Generar contenido del tab (pasar si es el primero para la clase activo)
+        generarContenidoTab(solicitudId, vehId, vehiculo, usuariosBanco, index === 0);
+    });
+    
+    // Cargar notas del primer tab
+    cargarNotasPrimerTab();
+}
+
+// Función para generar el contenido de un tab
+function generarContenidoTab(solicitudId, tabId, vehiculo, usuariosBanco, isFirst = false) {
+    const activo = isFirst ? 'show active' : '';
+    
+    let contenidoHTML = `
+        <div class="tab-pane fade ${activo}" id="${tabId}" role="tabpanel">
+            <div class="mt-3">
+                ${vehiculo ? `
+                    <div class="card mb-4">
+                        <div class="card-header bg-success text-white">
+                            <h6 class="mb-0"><i class="fas fa-car me-2"></i>Vehículo</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4"><strong>Marca:</strong> ${vehiculo.marca || '-'}</div>
+                                <div class="col-md-4"><strong>Modelo:</strong> ${vehiculo.modelo || '-'}</div>
+                                <div class="col-md-4"><strong>Año:</strong> ${vehiculo.anio || '-'}</div>
+                                <div class="col-md-4 mt-2"><strong>Precio:</strong> $${vehiculo.precio || '-'}</div>
+                                <div class="col-md-4 mt-2"><strong>Kilometraje:</strong> ${vehiculo.kilometraje || '-'}</div>
+                            </div>
+                        </div>
+                    </div>
+                ` : ''}
+    `;
+    
+    // Si no hay usuarios banco, mostrar solo comentarios generales
+    if (usuariosBanco.length === 0) {
+        contenidoHTML += generarFormularioNota(solicitudId, null, vehiculo ? vehiculo.id : null);
+        contenidoHTML += generarListaNotas(solicitudId, vehiculo ? vehiculo.id : null);
+    } else {
+        // Generar sub-pestañas para cada usuario banco
+        contenidoHTML += `
+                <ul class="nav nav-pills mb-3" id="usuariosTab_${tabId}" role="tablist">
+        `;
+        
+        usuariosBanco.forEach((usuario, index) => {
+            const activoUsuario = index === 0 ? 'active' : '';
+            const usuarioId = `usuario_${usuario.id}`;
+            
+            contenidoHTML += `
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link ${activoUsuario}" data-bs-toggle="tab" data-bs-target="#${tabId}_${usuarioId}" type="button">
+                            ${usuario.usuario_nombre || ''} ${usuario.usuario_apellido || ''}
+                        </button>
+                    </li>
+            `;
+        });
+        
+        contenidoHTML += `
+                </ul>
+                <div class="tab-content" id="usuariosContent_${tabId}">
+        `;
+        
+        usuariosBanco.forEach((usuario, index) => {
+            const activoUsuario = index === 0 ? 'show active' : '';
+            const usuarioId = `usuario_${usuario.id}`;
+            
+            contenidoHTML += `
+                    <div class="tab-pane fade ${activoUsuario}" id="${tabId}_${usuarioId}" role="tabpanel">
+            `;
+            
+            contenidoHTML += generarFormularioNota(solicitudId, usuario.id, vehiculo ? vehiculo.id : null);
+            contenidoHTML += generarListaNotas(solicitudId, vehiculo ? vehiculo.id : null, usuario.id);
+            
+            contenidoHTML += `
+                    </div>
+            `;
+        });
+        
+        contenidoHTML += `
+                </div>
+        `;
+    }
+    
+    contenidoHTML += `
+            </div>
+        </div>
+    `;
+    
+    $('#vehiculosTabContent').append(contenidoHTML);
+}
+
+// Función para cargar las notas del primer tab activo
+function cargarNotasPrimerTab() {
+    setTimeout(function() {
+        // Buscar el primer tab que esté visible (Bootstrap 5 usa .show para visible)
+        const primerContainer = $('.tab-pane.show .notas-container, .tab-pane.active .notas-container').first();
+        
+        if (primerContainer.length > 0) {
+            const containerId = primerContainer.attr('id');
+            const parts = containerId.split('_');
+            if (parts.length >= 3) {
+                const solicitudId = parts[1];
+                const vehiculoId = parts[2] !== 'general' ? parts[2] : null;
+                const usuarioBancoId = parts.length > 3 && parts[3] !== 'general' ? parts[3] : null;
+                cargarNotasMuro(solicitudId, vehiculoId, usuarioBancoId, containerId);
+            }
+        } else {
+            console.log('No se encontró contenedor de notas activo');
+        }
+    }, 300);
+}
+
+// Función para generar formulario de notas
+function generarFormularioNota(solicitudId, usuarioBancoId, vehiculoId) {
+    return `
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="fas fa-plus-circle me-2"></i>Agregar Nota</h6>
+            </div>
+            <div class="card-body">
+                <form class="formNotaMuro" data-solicitud="${solicitudId}" data-usuario-banco="${usuarioBancoId || ''}" data-vehiculo="${vehiculoId || ''}">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Tipo de Nota</label>
+                                <select class="form-select" name="tipo_nota" required>
+                                    <option value="Comentario">Comentario</option>
+                                    <option value="Actualización">Actualización</option>
+                                    <option value="Documento">Documento</option>
+                                    <option value="Respuesta Banco">Respuesta Banco</option>
+                                    <option value="Respuesta Cliente">Respuesta Cliente</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Título</label>
+                                <input type="text" class="form-control" name="titulo" placeholder="Título de la nota">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Contenido *</label>
+                        <textarea class="form-control" name="contenido" rows="3" required placeholder="Escriba su nota aquí..."></textarea>
+                    </div>
+                    <div class="d-flex justify-content-end">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-paper-plane me-2"></i>Enviar Nota
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
+}
+
+// Función para generar lista de notas
+function generarListaNotas(solicitudId, vehiculoId, usuarioBancoId) {
+    const containerId = `notas_${solicitudId}_${vehiculoId || 'general'}_${usuarioBancoId || 'general'}`;
+    return `
+        <div id="${containerId}" class="notas-container">
+            <div class="text-center">
+                <i class="fas fa-spinner fa-spin me-2"></i>Cargando notas...
+            </div>
+        </div>
+    `;
 }
 
 // Función para cargar información de la solicitud en el muro
@@ -610,31 +1053,44 @@ function cargarInfoSolicitud(id) {
 }
 
 // Función para cargar notas del muro
-function cargarNotasMuro(solicitudId) {
+function cargarNotasMuro(solicitudId, vehiculoId, usuarioBancoId, containerId) {
+    const data = { solicitud_id: solicitudId };
+    
+    if (vehiculoId) {
+        data.vehiculo_id = vehiculoId;
+    }
+    if (usuarioBancoId) {
+        data.usuario_banco_id = usuarioBancoId;
+    }
+    
+    const container = containerId ? $('#' + containerId) : $('#muroNotasContainer');
+    
     $.ajax({
         url: 'api/notas.php',
         type: 'GET',
-        data: { solicitud_id: solicitudId },
+        data: data,
         dataType: 'json',
         success: function(response) {
             if (response.success) {
-                mostrarNotasMuro(response.data);
+                mostrarNotasMuro(response.data, container);
             } else {
-                $('#muroNotasContainer').html('<div class="alert alert-danger">Error al cargar notas: ' + response.message + '</div>');
+                container.html('<div class="alert alert-danger">Error al cargar notas: ' + response.message + '</div>');
             }
         },
         error: function() {
-            $('#muroNotasContainer').html('<div class="alert alert-danger">Error de conexión al cargar notas</div>');
+            container.html('<div class="alert alert-danger">Error de conexión al cargar notas</div>');
         }
     });
 }
 
 // Función para mostrar notas en el muro
-function mostrarNotasMuro(notas) {
-    const container = $('#muroNotasContainer');
+function mostrarNotasMuro(notas, container) {
+    if (!container) {
+        container = $('#muroNotasContainer');
+    }
     
     if (notas.length === 0) {
-        container.html('<div class="alert alert-info text-center">No hay notas para esta solicitud</div>');
+        container.html('<div class="alert alert-info text-center">No hay notas para esta sección</div>');
         return;
     }
     
@@ -675,7 +1131,56 @@ function getTipoNotaClass(tipo) {
     return clases[tipo] || 'bg-secondary';
 }
 
-// Función para enviar nota
+// Función para enviar nota desde formulario dinámico del muro
+function enviarNotaMuro($form) {
+    const formData = new FormData($form[0]);
+    
+    // Agregar datos adicionales del formulario
+    const solicitudId = $form.data('solicitud');
+    const usuarioBancoId = $form.data('usuario-banco');
+    const vehiculoId = $form.data('vehiculo');
+    
+    formData.append('solicitud_id', solicitudId);
+    
+    if (usuarioBancoId) {
+        formData.append('usuario_banco_id', usuarioBancoId);
+    }
+    if (vehiculoId) {
+        formData.append('vehiculo_id', vehiculoId);
+    }
+    
+    $.ajax({
+        url: 'api/notas.php',
+        type: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+        dataType: 'json',
+        success: function(response) {
+            if (response.success) {
+                mostrarAlerta('Nota enviada correctamente', 'success');
+                $form[0].reset();
+                
+                // Recargar notas del contenedor correspondiente
+                const containerId = $form.closest('.tab-pane').find('.notas-container:first').attr('id');
+                const parts = containerId.split('_');
+                if (parts.length >= 3) {
+                    const solId = parts[1];
+                    const vehId = parts[2] !== 'general' ? parts[2] : null;
+                    const usrBancoId = parts.length > 3 && parts[3] !== 'general' ? parts[3] : null;
+                    cargarNotasMuro(solId, vehId, usrBancoId, containerId);
+                }
+            } else {
+                mostrarAlerta('Error al enviar nota: ' + response.message, 'danger');
+            }
+        },
+        error: function() {
+            mostrarAlerta('Error de conexión al enviar nota', 'danger');
+        }
+    });
+}
+
+// Función para enviar nota (compatibilidad con formulario antiguo)
 function enviarNota() {
     const formData = new FormData($('#notaForm')[0]);
     
@@ -984,8 +1489,8 @@ function mostrarUsuariosAsignados(usuarios) {
             <tr>
                 <td>
                     <div>
-                        <strong>${usuario.nombre} ${usuario.apellido}</strong><br>
-                        <small class="text-muted">${usuario.email}</small>
+                        <strong>${usuario.usuario_nombre || ''} ${usuario.usuario_apellido || ''}</strong><br>
+                        <small class="text-muted">${usuario.usuario_email || ''}</small>
                     </div>
                 </td>
                 <td>${usuario.banco_nombre || 'Sin banco'}</td>
@@ -1208,5 +1713,483 @@ function deshabilitarCamposParaBanco() {
             }
         `)
         .appendTo('head');
+}
+
+// ==================== GESTIÓN DE VEHÍCULOS ====================
+let vehiculosList = [];
+
+/**
+ * Agregar un nuevo vehículo al formulario
+ */
+function agregarVehiculo() {
+    const index = vehiculosList.length;
+    vehiculosList.push({
+        id: null,
+        marca: '',
+        modelo: '',
+        anio: '',
+        kilometraje: '',
+        precio: '',
+        abono_porcentaje: '',
+        abono_monto: ''
+    });
+    renderizarVehiculos();
+}
+
+  /**
+   * Eliminar un vehículo de la lista
+   */
+  function eliminarVehiculo(index) {
+      vehiculosList.splice(index, 1);
+      renderizarVehiculos();
+  }
+  
+  /**
+   * Abrir modal para confirmar apartar vehículo
+   */
+  function abrirModalApartarVehiculo(index) {
+      if (!vehiculosList[index]) {
+          mostrarAlerta('Vehículo no encontrado', 'danger');
+          return;
+      }
+      
+      const vehiculo = vehiculosList[index];
+      const marcaModelo = vehiculo.marca && vehiculo.modelo 
+          ? `${vehiculo.marca} ${vehiculo.modelo}` 
+          : `Vehículo ${index + 1}`;
+      
+      // Guardar el index del vehículo en un campo oculto
+      $('#vehiculo_index_apartar').val(index);
+      
+      // Mostrar información del vehículo en la modal
+      $('#vehiculo_info_apartar').text(marcaModelo);
+      
+      // Mostrar la modal
+      $('#modalApartarVehiculo').modal('show');
+  }
+
+/**
+ * Actualizar un campo de vehículo
+ */
+function actualizarVehiculo(index, campo, valor) {
+    if (vehiculosList[index]) {
+        vehiculosList[index][campo] = valor;
+    }
+}
+
+/**
+ * Renderizar la lista de vehículos
+ */
+function renderizarVehiculos() {
+    const container = $('#listaVehiculos');
+    container.empty();
+    
+    if (vehiculosList.length === 0) {
+        container.html('<div class="alert alert-info">No hay vehículos agregados</div>');
+        return;
+    }
+    
+    vehiculosList.forEach((vehiculo, index) => {
+        // Verificar si el usuario puede ver los botones (solo admin y gestor)
+        const puedeEditar = window.userRoles && (window.userRoles.isAdmin || window.userRoles.isGestor);
+        const botonesHTML = puedeEditar ? `
+                      <div class="btn-group btn-group-sm">
+                          <button type="button" class="btn btn-warning" onclick="abrirModalApartarVehiculo(${index})" title="Apartar Vehículo">
+                              <i class="fas fa-bookmark"></i> Apartar
+                          </button>
+                          <button type="button" class="btn btn-danger" onclick="eliminarVehiculo(${index})" title="Eliminar Vehículo">
+                              <i class="fas fa-trash"></i>
+                          </button>
+                      </div>` : '';
+        
+        const card = $(`
+                          <div class="card mb-3" data-index="${index}">
+                  <div class="card-header d-flex justify-content-between align-items-center">
+                      <strong>Vehículo ${index + 1}</strong>
+                      ${botonesHTML}
+                  </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Marca</label>
+                                <input type="text" class="form-control" 
+                                       value="${vehiculo.marca || ''}" 
+                                       onchange="actualizarVehiculo(${index}, 'marca', this.value)">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Modelo</label>
+                                <input type="text" class="form-control" 
+                                       value="${vehiculo.modelo || ''}" 
+                                       onchange="actualizarVehiculo(${index}, 'modelo', this.value)">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Año</label>
+                                <input type="number" class="form-control" 
+                                       value="${vehiculo.anio || ''}" 
+                                       onchange="actualizarVehiculo(${index}, 'anio', this.value)">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Kilometraje</label>
+                                <input type="number" class="form-control" 
+                                       value="${vehiculo.kilometraje || ''}" 
+                                       onchange="actualizarVehiculo(${index}, 'kilometraje', this.value)">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Precio</label>
+                                <input type="number" class="form-control" step="0.01"
+                                       value="${vehiculo.precio || ''}" 
+                                       onchange="actualizarVehiculo(${index}, 'precio', this.value)">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Abono (%)</label>
+                                <input type="number" class="form-control" step="0.01"
+                                       value="${vehiculo.abono_porcentaje || ''}" 
+                                       onchange="actualizarVehiculo(${index}, 'abono_porcentaje', this.value)">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `);
+        container.append(card);
+    });
+}
+
+/**
+ * Limpiar lista de vehículos
+ */
+function limpiarVehiculos() {
+    vehiculosList = [];
+    renderizarVehiculos();
+}
+
+/**
+ * Cargar vehículos existentes para una solicitud
+ */
+function cargarVehiculos(solicitudId) {
+    $.ajax({
+        url: 'api/vehiculos_solicitud.php',
+        type: 'GET',
+        data: { solicitud_id: solicitudId },
+        dataType: 'json',
+        success: function(response) {
+            if (response.success) {
+                vehiculosList = response.data || [];
+                renderizarVehiculos();
+            }
+        },
+        error: function() {
+            console.error('Error al cargar vehículos');
+        }
+    });
+}
+
+/**
+ * Guardar vehículos de la solicitud
+ */
+function guardarVehiculos(solicitudId) {
+    $.ajax({
+        url: 'api/vehiculos_solicitud.php',
+        type: 'POST',
+        data: {
+            solicitud_id: solicitudId,
+            vehiculos: JSON.stringify(vehiculosList)
+        },
+        dataType: 'json',
+        success: function(response) {
+            if (response.success) {
+                const solicitudIdAnterior = $('#solicitud_id').val();
+                mostrarAlertaFinGuardado(solicitudIdAnterior, solicitudId);
+            } else {
+                mostrarAlerta('Error al guardar vehículos: ' + response.message, 'danger');
+            }
+        },
+        error: function() {
+            mostrarAlerta('Error de conexión al guardar vehículos', 'danger');
+        }
+    });
+}
+
+/**
+ * Mostrar alerta final después de guardar
+ */
+function mostrarAlertaFinGuardado(solicitudIdAnterior, nuevaSolicitudId) {
+    const mensaje = solicitudIdAnterior ? 'Solicitud actualizada correctamente' : 'Solicitud creada correctamente';
+    mostrarAlerta(mensaje, 'success');
+    
+    // Si es una nueva solicitud, mostrar mensaje
+    if (!solicitudIdAnterior) {
+        mostrarAlerta('Solicitud creada correctamente. Puedes gestionar adjuntos desde la tabla de solicitudes.', 'success');
+    }
+    
+    $('#solicitudModal').modal('hide');
+    limpiarVehiculos();
+    cargarSolicitudes();
+}
+
+// ========== FUNCIONES PARA GESTIÓN DE CITAS Y FIRMA ==========
+
+// Función para verificar si hay una evaluación seleccionada y mostrar/ocultar pestaña "Cita y Firma"
+function verificarEvaluacionSeleccionada(solicitudId) {
+    // La pestaña "Cita y Firma" solo debe aparecer para admin y gestor
+    // Si el usuario NO es admin ni gestor, ocultar la pestaña inmediatamente
+    if (!window.userRoles || (!window.userRoles.isAdmin && !window.userRoles.isGestor)) {
+        $('#cita-firma-tab-li').hide();
+        // Si estaba activa, cambiar a otra pestaña
+        if ($('#cita-firma-tab').hasClass('active')) {
+            $('#datos-generales-tab').tab('show');
+        }
+        return;
+    }
+    
+    // Solo para admin y gestor: verificar si hay una evaluación seleccionada
+    $.ajax({
+        url: 'api/evaluaciones_banco.php',
+        type: 'GET',
+        data: { solicitud_id: solicitudId },
+        dataType: 'json',
+        success: function(response) {
+            // Si hay una evaluación seleccionada, mostrar la pestaña
+            if (response.success && response.evaluacion_seleccionada) {
+                $('#cita-firma-tab-li').show();
+            } else {
+                // No hay evaluación seleccionada, ocultar la pestaña
+                $('#cita-firma-tab-li').hide();
+                // Si estaba activa, cambiar a otra pestaña
+                if ($('#cita-firma-tab').hasClass('active')) {
+                    $('#datos-generales-tab').tab('show');
+                }
+            }
+        },
+        error: function(xhr) {
+            // En caso de error, ocultar la pestaña
+            $('#cita-firma-tab-li').hide();
+            // Si estaba activa, cambiar a otra pestaña
+            if ($('#cita-firma-tab').hasClass('active')) {
+                $('#datos-generales-tab').tab('show');
+            }
+        }
+    });
+}
+
+// Función para cargar citas cuando se abre la pestaña "Cita y Firma"
+$(document).on('shown.bs.tab', '#cita-firma-tab', function() {
+    const solicitudId = $('#solicitud_id').val();
+    if (solicitudId) {
+        cargarCitas(solicitudId);
+    }
+});
+
+// Función para cargar citas
+function cargarCitas(solicitudId) {
+    $('#citasTableBody').html('<tr><td colspan="5" class="text-center"><div class="spinner-border spinner-border-sm" role="status"></div> Cargando citas...</td></tr>');
+    
+    $.ajax({
+        url: 'api/citas_firma.php',
+        type: 'GET',
+        data: { solicitud_id: solicitudId },
+        dataType: 'json',
+        success: function(response) {
+            if (response.success) {
+                mostrarCitas(response.data);
+            } else {
+                $('#citasTableBody').html('<tr><td colspan="5" class="text-center text-muted">' + (response.message || 'No se pudieron cargar las citas') + '</td></tr>');
+            }
+        },
+        error: function() {
+            $('#citasTableBody').html('<tr><td colspan="5" class="text-center text-danger">Error al cargar las citas</td></tr>');
+        }
+    });
+}
+
+// Función para mostrar citas en la tabla
+function mostrarCitas(citas) {
+    const tbody = $('#citasTableBody');
+    tbody.empty();
+    
+    if (citas.length === 0) {
+        tbody.html('<tr><td colspan="5" class="text-center text-muted">No hay citas registradas</td></tr>');
+        return;
+    }
+    
+    citas.forEach(function(cita) {
+        const fecha = new Date(cita.fecha_cita).toLocaleDateString('es-PA');
+        const hora = cita.hora_cita ? cita.hora_cita.substring(0, 5) : '-';
+        const comentarios = cita.comentarios || '-';
+        
+        // Estado de asistencia
+        let estadoBadge = '';
+        switch(cita.asistio) {
+            case 'asistio':
+                estadoBadge = '<span class="badge bg-success">Asistió</span>';
+                break;
+            case 'no_asistio':
+                estadoBadge = '<span class="badge bg-danger">No Asistió</span>';
+                break;
+            default:
+                estadoBadge = '<span class="badge bg-warning">Pendiente</span>';
+        }
+        
+        // Botones de acción
+        let botonesAccion = '';
+        if (cita.asistio !== 'asistio') {
+            botonesAccion += '<button class="btn btn-success btn-sm me-1" onclick="actualizarAsistencia(' + cita.id + ', \'asistio\')" title="Marcar como Asistió"><i class="fas fa-check"></i> Asistió</button>';
+        }
+        if (cita.asistio !== 'no_asistio') {
+            botonesAccion += '<button class="btn btn-danger btn-sm me-1" onclick="actualizarAsistencia(' + cita.id + ', \'no_asistio\')" title="Marcar como No Asistió"><i class="fas fa-times"></i> No Asistió</button>';
+        }
+        // Botón de eliminar
+        botonesAccion += '<button class="btn btn-danger btn-sm" onclick="eliminarCita(' + cita.id + ')" title="Eliminar Cita"><i class="fas fa-trash"></i></button>';
+        
+        const row = `
+            <tr>
+                <td>${fecha}</td>
+                <td>${hora}</td>
+                <td>${comentarios}</td>
+                <td>${estadoBadge}</td>
+                <td>
+                    <div class="btn-group btn-group-sm">
+                        ${botonesAccion}
+                    </div>
+                </td>
+            </tr>
+        `;
+        
+        tbody.append(row);
+    });
+}
+
+// Función para guardar una nueva cita
+function guardarCita() {
+    const solicitudId = $('#solicitud_id').val();
+    const fechaCita = $('#fecha_cita').val();
+    const horaCita = $('#hora_cita').val();
+    const comentarios = $('#comentarios_cita').val();
+    
+    if (!solicitudId) {
+        mostrarAlerta('Debe guardar la solicitud antes de crear una cita', 'warning');
+        return;
+    }
+    
+    if (!fechaCita || !horaCita) {
+        mostrarAlerta('Por favor complete la fecha y hora de la cita', 'warning');
+        return;
+    }
+    
+    $.ajax({
+        url: 'api/citas_firma.php',
+        type: 'POST',
+        data: {
+            solicitud_id: solicitudId,
+            fecha_cita: fechaCita,
+            hora_cita: horaCita,
+            comentarios: comentarios
+        },
+        dataType: 'json',
+                  success: function(response) {
+              if (response.success) {
+                  mostrarAlerta('Cita creada correctamente', 'success');
+                  // Recargar la página después de un breve delay para mostrar el mensaje
+                  setTimeout(function() {
+                      location.reload();
+                  }, 1500);
+              } else {
+                  mostrarAlerta('Error al crear cita: ' + response.message, 'danger');
+              }
+          },
+        error: function() {
+            mostrarAlerta('Error de conexión al crear cita', 'danger');
+        }
+    });
+}
+
+// Función para actualizar la asistencia de una cita
+function actualizarAsistencia(citaId, asistio) {
+    const solicitudId = $('#solicitud_id').val();
+    
+    if (!solicitudId) {
+        mostrarAlerta('Error: No se encontró el ID de la solicitud', 'danger');
+        return;
+    }
+    
+    // Enviar datos como form-urlencoded para PUT request
+    const datos = 'id=' + encodeURIComponent(citaId) + '&asistio=' + encodeURIComponent(asistio);
+    
+    $.ajax({
+        url: 'api/citas_firma.php',
+        type: 'PUT',
+        data: datos,
+        contentType: 'application/x-www-form-urlencoded',
+        dataType: 'json',
+        success: function(response) {
+            if (response.success) {
+                mostrarAlerta('Asistencia actualizada correctamente', 'success');
+                // Recargar citas
+                cargarCitas(solicitudId);
+            } else {
+                mostrarAlerta('Error al actualizar asistencia: ' + response.message, 'danger');
+            }
+        },
+        error: function() {
+            mostrarAlerta('Error de conexión al actualizar asistencia', 'danger');
+        }
+    });
+}
+
+// Función para eliminar una cita
+function eliminarCita(citaId) {
+    if (!confirm('¿Está seguro de que desea eliminar esta cita? Esta acción no se puede deshacer.')) {
+        return;
+    }
+    
+    const solicitudId = $('#solicitud_id').val();
+    
+    if (!solicitudId) {
+        mostrarAlerta('Error: No se encontró el ID de la solicitud', 'danger');
+        return;
+    }
+    
+    // Enviar datos como form-urlencoded para DELETE request
+    const datos = 'id=' + encodeURIComponent(citaId);
+    
+    $.ajax({
+        url: 'api/citas_firma.php',
+        type: 'DELETE',
+        data: datos,
+        contentType: 'application/x-www-form-urlencoded',
+        dataType: 'json',
+        success: function(response) {
+            if (response.success) {
+                mostrarAlerta('Cita eliminada correctamente', 'success');
+                // Recargar citas
+                cargarCitas(solicitudId);
+            } else {
+                mostrarAlerta('Error al eliminar cita: ' + response.message, 'danger');
+            }
+        },
+        error: function(xhr) {
+            let mensaje = 'Error de conexión al eliminar cita';
+            try {
+                const errorResponse = JSON.parse(xhr.responseText);
+                if (errorResponse.message) {
+                    mensaje = errorResponse.message;
+                }
+            } catch (e) {
+                // Usar mensaje por defecto
+            }
+            mostrarAlerta(mensaje, 'danger');
+        }
+    });
 }
 

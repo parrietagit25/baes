@@ -27,34 +27,21 @@ window.mostrarAlerta = function(mensaje, tipo = 'info') {
 
 // Función para subir adjunto (definida globalmente)
 window.subirAdjunto = function() {
-    console.log('=== INICIANDO SUBIDA DE ADJUNTO ===');
+    console.log('=== INICIANDO SUBIDA DE ADJUNTOS ===');
     
     const solicitudId = $('#adjunto_solicitud_id').val();
     
     console.log('Solicitud ID:', solicitudId);
-    console.log('Campo adjunto_solicitud_id existe:', $('#adjunto_solicitud_id').length > 0);
-    console.log('Valor del campo:', $('#adjunto_solicitud_id').val());
     
-    // Validar que se seleccionó un archivo
-    const archivo = $('#archivo_adjunto')[0].files[0];
-    if (!archivo) {
-        console.error('No se seleccionó archivo');
-        mostrarAlerta('Por favor selecciona un archivo', 'warning');
+    // Validar que se seleccionó al menos un archivo
+    const archivos = $('#archivo_adjunto')[0].files;
+    if (!archivos || archivos.length === 0) {
+        console.error('No se seleccionaron archivos');
+        mostrarAlerta('Por favor selecciona al menos un archivo', 'warning');
         return;
     }
     
-    console.log('Archivo seleccionado:', archivo.name, 'Tamaño:', archivo.size);
-    
-    // Construir FormData manualmente
-    const formData = new FormData();
-    formData.append('solicitud_id', solicitudId);
-    formData.append('archivo', archivo);
-    formData.append('descripcion', $('#descripcion_adjunto').val() || '');
-    
-    console.log('FormData contents:');
-    for (let [key, value] of formData.entries()) {
-        console.log(key, value);
-    }
+    console.log('Archivos seleccionados:', archivos.length);
     
     if (!solicitudId) {
         console.error('No hay ID de solicitud');
@@ -62,14 +49,30 @@ window.subirAdjunto = function() {
         return;
     }
     
-    // Validar tamaño (máximo 10MB)
-    if (archivo.size > 10 * 1024 * 1024) {
-        console.error('Archivo demasiado grande:', archivo.size);
-        mostrarAlerta('El archivo es demasiado grande. Máximo 10MB', 'warning');
+    // Validar tamaño de cada archivo (máximo 10MB)
+    let archivosInvalidos = [];
+    for (let i = 0; i < archivos.length; i++) {
+        if (archivos[i].size > 10 * 1024 * 1024) {
+            archivosInvalidos.push(archivos[i].name);
+        }
+    }
+    
+    if (archivosInvalidos.length > 0) {
+        mostrarAlerta('Los siguientes archivos son demasiado grandes (máximo 10MB): ' + archivosInvalidos.join(', '), 'warning');
         return;
     }
     
-    console.log('Enviando petición AJAX...');
+    // Construir FormData con múltiples archivos
+    const formData = new FormData();
+    formData.append('solicitud_id', solicitudId);
+    formData.append('descripcion', $('#descripcion_adjunto').val() || '');
+    
+    // Agregar todos los archivos
+    for (let i = 0; i < archivos.length; i++) {
+        formData.append('archivo[]', archivos[i]);
+    }
+    
+    console.log('Enviando petición AJAX con', archivos.length, 'archivos...');
     
     $.ajax({
         url: 'api/adjuntos.php',
@@ -81,7 +84,8 @@ window.subirAdjunto = function() {
         success: function(response) {
             console.log('Respuesta recibida:', response);
             if (response.success) {
-                mostrarAlerta('Archivo subido correctamente', 'success');
+                const count = response.data && response.data.count ? response.data.count : archivos.length;
+                mostrarAlerta(count + ' archivo(s) subido(s) correctamente', 'success');
                 // Limpiar formulario
                 const form = document.getElementById('adjuntoForm');
                 if (form) {
@@ -90,13 +94,13 @@ window.subirAdjunto = function() {
                 cargarAdjuntos(solicitudId);
             } else {
                 console.error('Error en respuesta:', response.message);
-                mostrarAlerta('Error al subir archivo: ' + response.message, 'danger');
+                mostrarAlerta('Error al subir archivos: ' + response.message, 'danger');
             }
         },
         error: function(xhr, status, error) {
             console.error('Error AJAX:', status, error);
             console.error('Response text:', xhr.responseText);
-            mostrarAlerta('Error de conexión al subir archivo: ' + error, 'danger');
+            mostrarAlerta('Error de conexión al subir archivos: ' + error, 'danger');
         }
     });
 };

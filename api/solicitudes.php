@@ -17,6 +17,8 @@ switch ($method) {
     case 'GET':
         if (isset($_GET['id'])) {
             obtenerSolicitud($_GET['id']);
+        } elseif (isset($_GET['gestores'])) {
+            obtenerGestores();
         } else {
             obtenerSolicitudes();
         }
@@ -28,6 +30,8 @@ switch ($method) {
             actualizarSolicitud();
         } elseif (isset($_POST['action']) && $_POST['action'] === 'aprobar_solicitud') {
             aprobarSolicitud();
+        } elseif (isset($_POST['action']) && $_POST['action'] === 'cambiar_gestor') {
+            cambiarGestor();
         } elseif (isset($_POST['nuevo_estado']) && isset($_POST['nota_cambio_estado'])) {
             cambiarEstadoSolicitud();
         } else {
@@ -178,11 +182,11 @@ function crearSolicitud() {
             INSERT INTO solicitudes_credito (
                 gestor_id, banco_id, tipo_persona, nombre_cliente, cedula, edad, genero,
                 direccion, provincia, distrito, corregimiento, barriada, casa_edif,
-                numero_casa_apto, telefono, email, casado, hijos, perfil_financiero,
-                ingreso, tiempo_laborar, nombre_empresa_negocio, estabilidad_laboral,
-                fecha_constitucion, marca_auto, modelo_auto, año_auto, kilometraje,
+                numero_casa_apto, telefono, email, email_pipedrive, casado, hijos, perfil_financiero,
+                ingreso, tiempo_laborar, profesion, ocupacion, nombre_empresa_negocio, estabilidad_laboral,
+                fecha_constitucion, continuidad_laboral, marca_auto, modelo_auto, año_auto, kilometraje,
                 precio_especial, abono_porcentaje, abono_monto, comentarios_gestor
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         
         $stmt->execute([
@@ -202,14 +206,18 @@ function crearSolicitud() {
             $_POST['numero_casa_apto'] ?? null,
             $_POST['telefono'] ?? null,
             $_POST['email'] ?? null,
+            $_POST['email_pipedrive'] ?? null,
             isset($_POST['casado']) ? 1 : 0,
             $_POST['hijos'] ?? 0,
             $_POST['perfil_financiero'],
             $_POST['ingreso'] ?? null,
             $_POST['tiempo_laborar'] ?? null,
+            $_POST['profesion'] ?? null,
+            $_POST['ocupacion'] ?? null,
             $_POST['nombre_empresa_negocio'] ?? null,
             $_POST['estabilidad_laboral'] ?? null,
             $_POST['fecha_constitucion'] ?? null,
+            $_POST['continuidad_laboral'] ?? null,
             $_POST['marca_auto'] ?? null,
             $_POST['modelo_auto'] ?? null,
             $_POST['año_auto'] ?? null,
@@ -301,9 +309,10 @@ function actualizarSolicitud() {
         $camposPermitidos = [
             'banco_id', 'vendedor_id', 'tipo_persona', 'nombre_cliente', 'cedula', 'edad', 'genero',
             'direccion', 'provincia', 'distrito', 'corregimiento', 'barriada',
-            'casa_edif', 'numero_casa_apto', 'telefono', 'email', 'casado',
+            'casa_edif', 'numero_casa_apto', 'telefono', 'email', 'email_pipedrive', 'casado',
             'hijos', 'perfil_financiero', 'ingreso', 'tiempo_laborar',
-            'nombre_empresa_negocio', 'estabilidad_laboral', 'fecha_constitucion',
+            'profesion', 'ocupacion', 'nombre_empresa_negocio', 'estabilidad_laboral',
+            'fecha_constitucion', 'continuidad_laboral',
             'marca_auto', 'modelo_auto', 'año_auto', 'kilometraje',
             'precio_especial', 'abono_porcentaje', 'abono_monto',
             'comentarios_gestor', 'ejecutivo_banco', 'respuesta_banco',
@@ -428,13 +437,133 @@ function eliminarSolicitud() {
             echo json_encode(['success' => false, 'message' => 'Solicitud no encontrada']);
         }
         
+          } catch (PDOException $e) {
+          error_log("Error al eliminar solicitud: " . $e->getMessage());
+          http_response_code(500);
+          echo json_encode(['success' => false, 'message' => 'Error al eliminar solicitud']);
+      }
+  }
+
+function obtenerGestores() {
+    global $pdo;
+    
+    try {
+        // Verificar que el usuario sea administrador
+        if (!in_array('ROLE_ADMIN', $_SESSION['user_roles'])) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Solo los administradores pueden ver la lista de gestores']);
+            return;
+        }
+        
+        // Obtener usuarios con rol de gestor
+        $stmt = $pdo->prepare("
+            SELECT DISTINCT u.id, u.nombre, u.apellido, u.email, u.activo
+            FROM usuarios u
+            INNER JOIN usuario_roles ur ON u.id = ur.usuario_id
+            INNER JOIN roles r ON ur.rol_id = r.id
+            WHERE r.nombre = 'ROLE_GESTOR' AND u.activo = 1
+            ORDER BY u.nombre, u.apellido
+        ");
+        $stmt->execute();
+        $gestores = $stmt->fetchAll();
+        
+        echo json_encode(['success' => true, 'data' => $gestores]);
+        
     } catch (PDOException $e) {
-        error_log("Error al eliminar solicitud: " . $e->getMessage());
         http_response_code(500);
-        echo json_encode(['success' => false, 'message' => 'Error al eliminar solicitud']);
+        echo json_encode(['success' => false, 'message' => 'Error al obtener gestores']);
     }
 }
 
+function cambiarGestor() {
+    global $pdo;
+    
+    try {
+        // Verificar que el usuario sea administrador
+        if (!in_array('ROLE_ADMIN', $_SESSION['user_roles'])) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Solo los administradores pueden cambiar el gestor']);
+            return;
+        }
+        
+        if (empty($_POST['solicitud_id']) || empty($_POST['nuevo_gestor_id'])) {
+            echo json_encode(['success' => false, 'message' => 'Solicitud ID y nuevo gestor son requeridos']);
+            return;
+        }
+        
+        $solicitudId = $_POST['solicitud_id'];
+        $nuevoGestorId = $_POST['nuevo_gestor_id'];
+        
+        // Verificar que la solicitud existe
+        $stmt = $pdo->prepare("SELECT gestor_id FROM solicitudes_credito WHERE id = ?");
+        $stmt->execute([$solicitudId]);
+        $solicitud = $stmt->fetch();
+        
+        if (!$solicitud) {
+            echo json_encode(['success' => false, 'message' => 'Solicitud no encontrada']);
+            return;
+        }
+        
+        $gestorAnterior = $solicitud['gestor_id'];
+        
+        // Verificar que el nuevo gestor existe y tiene el rol de gestor
+        $stmt = $pdo->prepare("
+            SELECT COUNT(*) 
+            FROM usuarios u
+            INNER JOIN usuario_roles ur ON u.id = ur.usuario_id
+            INNER JOIN roles r ON ur.rol_id = r.id
+            WHERE u.id = ? AND r.nombre = 'ROLE_GESTOR' AND u.activo = 1
+        ");
+        $stmt->execute([$nuevoGestorId]);
+        if ($stmt->fetchColumn() == 0) {
+            echo json_encode(['success' => false, 'message' => 'El usuario seleccionado no es un gestor válido']);
+            return;
+        }
+        
+        // Actualizar el gestor de la solicitud
+        $stmt = $pdo->prepare("UPDATE solicitudes_credito SET gestor_id = ? WHERE id = ?");
+        $stmt->execute([$nuevoGestorId, $solicitudId]);
+        
+        // Crear nota del cambio de gestor
+        $stmt = $pdo->prepare("
+            SELECT nombre, apellido FROM usuarios WHERE id = ?
+        ");
+        $stmt->execute([$nuevoGestorId]);
+        $nuevoGestor = $stmt->fetch();
+        $nombreNuevoGestor = $nuevoGestor['nombre'] . ' ' . $nuevoGestor['apellido'];
+        
+        $stmt = $pdo->prepare("
+            INSERT INTO notas_solicitud (solicitud_id, usuario_id, tipo_nota, titulo, contenido)
+            VALUES (?, ?, 'Actualización', 'Cambio de Gestor', ?)
+        ");
+        
+        $contenidoNota = "Gestor cambiado";
+        if ($gestorAnterior) {
+            $stmtAnterior = $pdo->prepare("SELECT nombre, apellido FROM usuarios WHERE id = ?");
+            $stmtAnterior->execute([$gestorAnterior]);
+            $gestorAnteriorInfo = $stmtAnterior->fetch();
+            if ($gestorAnteriorInfo) {
+                $nombreGestorAnterior = $gestorAnteriorInfo['nombre'] . ' ' . $gestorAnteriorInfo['apellido'];
+                $contenidoNota .= " de " . $nombreGestorAnterior;
+            }
+        }
+        $contenidoNota .= " a " . $nombreNuevoGestor . " por Administrador";
+        
+        $stmt->execute([$solicitudId, $_SESSION['user_id'], $contenidoNota]);
+        
+        echo json_encode([
+            'success' => true, 
+            'message' => 'Gestor actualizado correctamente',
+            'data' => ['gestor_nombre' => $nombreNuevoGestor]
+        ]);
+        
+    } catch (PDOException $e) {
+        http_response_code(500);
+        error_log("Error al cambiar gestor: " . $e->getMessage());
+        echo json_encode(['success' => false, 'message' => 'Error al cambiar gestor']);
+    }
+}
+  
 function aprobarSolicitud() {
     global $pdo;
     

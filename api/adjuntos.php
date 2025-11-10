@@ -99,15 +99,9 @@ function subirAdjunto() {
     global $pdo;
     
     try {
-        // Log de depuración
-        error_log("=== SUBIR ADJUNTO DEBUG ===");
-        error_log("FILES: " . print_r($_FILES, true));
-        error_log("POST: " . print_r($_POST, true));
-        
-        // Verificar que se envió un archivo
-        if (!isset($_FILES['archivo']) || $_FILES['archivo']['error'] !== UPLOAD_ERR_OK) {
-            error_log("Error: Archivo no enviado o error en upload. Error code: " . ($_FILES['archivo']['error'] ?? 'NO_FILES'));
-            echo json_encode(['success' => false, 'message' => 'No se envió ningún archivo o hubo un error']);
+        // Verificar que se enviaron archivos
+        if (!isset($_FILES['archivo'])) {
+            echo json_encode(['success' => false, 'message' => 'No se envió ningún archivo']);
             return;
         }
         
@@ -127,15 +121,23 @@ function subirAdjunto() {
             return;
         }
         
-        $archivo = $_FILES['archivo'];
-        $nombreOriginal = $archivo['name'];
-        $tipoArchivo = $archivo['type'];
-        $tamañoArchivo = $archivo['size'];
+        $archivos = $_FILES['archivo'];
+        $archivosSubidos = 0;
+        $archivosFallidos = 0;
+        $errores = [];
         
-        // Validar tamaño (máximo 10MB)
-        if ($tamañoArchivo > 10 * 1024 * 1024) {
-            echo json_encode(['success' => false, 'message' => 'El archivo es demasiado grande. Máximo 10MB']);
-            return;
+        // Detectar si es un array de archivos o un solo archivo
+        $esArray = is_array($archivos['name']);
+        
+        if (!$esArray) {
+            // Convertir a array para simplificar el procesamiento
+            $archivos = [
+                'name' => [$archivos['name']],
+                'type' => [$archivos['type']],
+                'tmp_name' => [$archivos['tmp_name']],
+                'error' => [$archivos['error']],
+                'size' => [$archivos['size']]
+            ];
         }
         
         // Validar tipo de archivo
@@ -149,64 +151,95 @@ function subirAdjunto() {
             'text/plain'
         ];
         
-        if (!in_array($tipoArchivo, $tiposPermitidos)) {
-            echo json_encode(['success' => false, 'message' => 'Tipo de archivo no permitido']);
-            return;
-        }
-        
-        // Generar nombre único para el archivo
-        $extension = pathinfo($nombreOriginal, PATHINFO_EXTENSION);
-        $nombreArchivo = uniqid() . '_' . time() . '.' . $extension;
-        $rutaArchivo = '../adjuntos/solicitudes/' . $nombreArchivo;
-        $rutaArchivoDB = 'adjuntos/solicitudes/' . $nombreArchivo; // Ruta para la base de datos
-        
         // Crear directorio si no existe
-        $directorio = dirname($rutaArchivo);
+        $directorio = '../adjuntos/solicitudes/';
         if (!is_dir($directorio)) {
             mkdir($directorio, 0755, true);
         }
         
-        // Mover archivo
-        error_log("Intentando mover archivo de: " . $archivo['tmp_name'] . " a: " . $rutaArchivo);
-        error_log("Archivo temporal existe: " . (file_exists($archivo['tmp_name']) ? 'SÍ' : 'NO'));
-        error_log("Directorio destino existe: " . (is_dir($directorio) ? 'SÍ' : 'NO'));
-        error_log("Permisos directorio: " . substr(sprintf('%o', fileperms($directorio)), -4));
+        // Procesar cada archivo
+        for ($i = 0; $i < count($archivos['name']); $i++) {
+            // Verificar errores de subida
+            if ($archivos['error'][$i] !== UPLOAD_ERR_OK) {
+                $errores[] = $archivos['name'][$i] . ': Error en la subida';
+                $archivosFallidos++;
+                continue;
+            }
+            
+            $nombreOriginal = $archivos['name'][$i];
+            $tipoArchivo = $archivos['type'][$i];
+            $tamañoArchivo = $archivos['size'][$i];
+            $tmpName = $archivos['tmp_name'][$i];
+            
+            // Validar tamaño (máximo 10MB)
+            if ($tamañoArchivo > 10 * 1024 * 1024) {
+                $errores[] = $nombreOriginal . ': Archivo demasiado grande (máximo 10MB)';
+                $archivosFallidos++;
+                continue;
+            }
+            
+            // Validar tipo de archivo
+            if (!in_array($tipoArchivo, $tiposPermitidos)) {
+                $errores[] = $nombreOriginal . ': Tipo de archivo no permitido';
+                $archivosFallidos++;
+                continue;
+            }
+            
+            // Generar nombre único para el archivo
+            $extension = pathinfo($nombreOriginal, PATHINFO_EXTENSION);
+            $nombreArchivo = uniqid() . '_' . time() . '_' . $i . '.' . $extension;
+            $rutaArchivo = $directorio . $nombreArchivo;
+            $rutaArchivoDB = 'adjuntos/solicitudes/' . $nombreArchivo;
+            
+            // Mover archivo
+            if (move_uploaded_file($tmpName, $rutaArchivo)) {
+                // Guardar en base de datos
+                $stmt = $pdo->prepare("
+                    INSERT INTO adjuntos_solicitud 
+                    (solicitud_id, usuario_id, nombre_archivo, nombre_original, ruta_archivo, tipo_archivo, tamaño_archivo, descripcion)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                
+                $stmt->execute([
+                    $solicitudId,
+                    $_SESSION['user_id'],
+                    $nombreArchivo,
+                    $nombreOriginal,
+                    $rutaArchivoDB,
+                    $tipoArchivo,
+                    $tamañoArchivo,
+                    $descripcion
+                ]);
+                
+                $archivosSubidos++;
+            } else {
+                $errores[] = $nombreOriginal . ': Error al guardar el archivo';
+                $archivosFallidos++;
+            }
+        }
         
-        if (move_uploaded_file($archivo['tmp_name'], $rutaArchivo)) {
-            error_log("Archivo movido exitosamente");
-            // Guardar en base de datos
-            $stmt = $pdo->prepare("
-                INSERT INTO adjuntos_solicitud 
-                (solicitud_id, usuario_id, nombre_archivo, nombre_original, ruta_archivo, tipo_archivo, tamaño_archivo, descripcion)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ");
-            
-            $stmt->execute([
-                $solicitudId,
-                $_SESSION['user_id'],
-                $nombreArchivo,
-                $nombreOriginal,
-                $rutaArchivoDB,
-                $tipoArchivo,
-                $tamañoArchivo,
-                $descripcion
-            ]);
-            
-            $adjuntoId = $pdo->lastInsertId();
+        // Preparar respuesta
+        if ($archivosSubidos > 0) {
+            $mensaje = $archivosSubidos . ' archivo(s) subido(s) correctamente';
+            if ($archivosFallidos > 0) {
+                $mensaje .= '. ' . $archivosFallidos . ' archivo(s) fallaron';
+            }
             
             echo json_encode([
                 'success' => true,
-                'message' => 'Archivo subido correctamente',
+                'message' => $mensaje,
                 'data' => [
-                    'id' => $adjuntoId,
-                    'nombre_original' => $nombreOriginal,
-                    'tamaño' => $tamañoArchivo,
-                    'tipo' => $tipoArchivo
+                    'count' => $archivosSubidos,
+                    'failed' => $archivosFallidos,
+                    'errors' => $errores
                 ]
             ]);
         } else {
-            error_log("Error al mover archivo. Error: " . error_get_last()['message']);
-            echo json_encode(['success' => false, 'message' => 'Error al subir el archivo']);
+            echo json_encode([
+                'success' => false,
+                'message' => 'No se pudo subir ningún archivo',
+                'errors' => $errores
+            ]);
         }
         
     } catch (Exception $e) {

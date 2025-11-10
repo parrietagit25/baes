@@ -16,7 +16,7 @@ $method = $_SERVER['REQUEST_METHOD'];
 switch ($method) {
     case 'GET':
         if (isset($_GET['solicitud_id'])) {
-            obtenerNotasSolicitud($_GET['solicitud_id']);
+            obtenerNotasSolicitud($_GET['solicitud_id'], $_GET['vehiculo_id'] ?? null, $_GET['usuario_banco_id'] ?? null);
         } else {
             obtenerTodasLasNotas();
         }
@@ -40,7 +40,7 @@ switch ($method) {
         break;
 }
 
-function obtenerNotasSolicitud($solicitudId) {
+function obtenerNotasSolicitud($solicitudId, $vehiculoId = null, $usuarioBancoId = null) {
     global $pdo;
     
     try {
@@ -77,15 +77,30 @@ function obtenerNotasSolicitud($solicitudId) {
             return;
         }
         
-        // Obtener notas
-        $stmt = $pdo->prepare("
+        // Construir query con filtros opcionales
+        $query = "
             SELECT n.*, u.nombre, u.apellido, u.email
             FROM notas_solicitud n
             LEFT JOIN usuarios u ON n.usuario_id = u.id
             WHERE n.solicitud_id = ?
-            ORDER BY n.fecha_creacion DESC
-        ");
-        $stmt->execute([$solicitudId]);
+        ";
+        $params = [$solicitudId];
+        
+        if ($vehiculoId !== null) {
+            $query .= " AND n.vehiculo_id = ?";
+            $params[] = $vehiculoId;
+        }
+        
+        if ($usuarioBancoId !== null) {
+            $query .= " AND n.usuario_banco_id = ?";
+            $params[] = $usuarioBancoId;
+        }
+        
+        $query .= " ORDER BY n.fecha_creacion DESC";
+        
+        // Obtener notas
+        $stmt = $pdo->prepare($query);
+        $stmt->execute($params);
         $notas = $stmt->fetchAll();
         
         echo json_encode(['success' => true, 'data' => $notas]);
@@ -189,13 +204,15 @@ function crearNota() {
         
         // Crear nota
         $stmt = $pdo->prepare("
-            INSERT INTO notas_solicitud (solicitud_id, usuario_id, tipo_nota, titulo, contenido)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO notas_solicitud (solicitud_id, vehiculo_id, usuario_id, usuario_banco_id, tipo_nota, titulo, contenido)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         ");
         
         $stmt->execute([
             $solicitudId,
+            $_POST['vehiculo_id'] ?? null,
             $_SESSION['user_id'],
+            $_POST['usuario_banco_id'] ?? null,
             $_POST['tipo_nota'] ?? 'Comentario',
             $_POST['titulo'] ?? '',
             $_POST['contenido']
