@@ -4,6 +4,10 @@ user.txt
 .env
 *.env
 
+# Dependencias de Composer
+vendor/
+composer.lock
+
 # Archivos temporales de desarrollo
 debug_*.php
 test_*.php

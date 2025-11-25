@@ -5,6 +5,7 @@
 
 session_start();
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../includes/email_helper.php';
 
 header('Content-Type: application/json');
 
@@ -190,6 +191,20 @@ function asignarUsuarioBanco($pdo) {
     
     $stmt = $pdo->prepare($sql_nota);
     $stmt->execute([$solicitud_id, $_SESSION['user_id'], $contenido_nota]);
+    
+    // Obtener información completa de la solicitud para enviar correo
+    $sql_solicitud = "SELECT * FROM solicitudes_credito WHERE id = ?";
+    $stmt = $pdo->prepare($sql_solicitud);
+    $stmt->execute([$solicitud_id]);
+    $solicitud = $stmt->fetch();
+    
+    // Enviar notificación por correo al banco asignado
+    if ($solicitud) {
+        $resultadoEmail = notificarBancoNuevaSolicitud($solicitud_id, $usuario_banco_id);
+        if (!$resultadoEmail['success']) {
+            error_log("No se pudo enviar correo al banco asignado: " . $resultadoEmail['message']);
+        }
+    }
     
     echo json_encode(['success' => true, 'message' => 'Usuario asignado correctamente y solicitud enviada a revisión bancaria']);
 }

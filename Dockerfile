@@ -41,6 +41,9 @@ WORKDIR /var/www/html
 # Copiar archivos de la aplicación
 COPY . /var/www/html/
 
+# Instalar dependencias de Composer (PHPMailer)
+RUN if [ -f composer.json ]; then composer install --no-dev --optimize-autoloader; fi
+
 # Establecer permisos correctos
 RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 755 /var/www/html \

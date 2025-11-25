@@ -1,0 +1,155 @@
+sistema Motus
+
+Es un sistema de gestión de créditos, llevando la gestión y la comunicación con los bancos
+desde la solicitud por parte del cliente hasta su probación, el sistematiene una integración con pipedray 
+para improtar los led que genera el usuario vendedor 
+
+funciona de la siguiente manera 
+
+el usuario vendedor crea el led en pipedray, luego el usuario administrador o comercial importa el led y empieza la gestión
+con el banco, el usuario comercial o administrador también completa la imformacion, el banco aprueba o declina la propuesta   
+
+Existen 3 tipos de usuarios 
+
+administrador
+comercial
+banco
+
+el administrador cuenta con un dashboard general, donde puede ver el resumen de todas las solicitudes y sus estados actuales 
+el usuario administrador puede:
+	- crear, editar o eliminar Usuarios del sistema, de todos los tipos, comercial, admin, banco 
+	- crear, editar, eliminar e importar led de las Solicitudes de credito
+	- crear, editar o eliminar bancos y usuarios del banco
+
+el usuario comercial tiene un dashboard que solo muestra la información asignada a el 
+	- crear, editar, eliminar e importar led de las Solicitudes de crédito
+	- puede intercambiar información con el usuario Banco a cerca de la solicitud asignada 
+
+el usuario banco tiene un dashboard que solo muestra la información asignada a el 
+	- solo puede ver las Solicitudes de crédito asignadas a el
+	- puede aceptar o declinar las solicitudes 
+	- puede intercambiar información con el usuario comercial a cerca de la solicitud asignada 
+
+
+- agregar al vendedor, para saber la respuesta del banco, cuando el banco responda, que envié un correo al email del vendedor colocado en la solicitud
+- agregar el correo de pipedray y así llevar la comunicación de pipe por email
+- solo traer las solicitudes de pipedray que sean de financiamiento, la columna en pipedray se llama forma de pago 
+- en Solicitudes de Crédito, colocar un alerta en la solicitud cuando los bancos asignado a una solicitud tienen mas de 24 horas sin respuesta 
+- envió de alerta a los bancos, apretando un botón, poder enviar una alerta al usuario banco, de recordatorio
+- se tiene que agregar varios usuario de un mismo banco 
+- reasignar solicitudes a otro usuario banco 
+- agregar filtro en los lead de pipe
+- enviar correo plantilla al cliente de aprobación 
+
+************* reunión motus 21/10/25 ************
+
+- filtro en pipe, solo traer los créditos, omitir contado y los demás 
+-- buscador teléfono(este es el que siempre viene), celular, nombre
+-- filtrar por vendedor
+-- halar de pay, la forma de pago, Financiamiento / credito, esto esta en la vitacora de gestion
+-- etapa
+-- fecha de creacion del trato, cuando el cliente es creado en pay
+- ver los adjuntos, como me traigo lo que ya esta adjuntado en pay
+
+- no permitir colocar  menos(-) en hijos
+- quitar banco y colocar financiacion ya que son varias entidades que aprueba, 
+ya que no solo los bancos son los que financean 
+- no esta guardando las solicitudes, el boton de guardar
+en vez de ingreso colocar salario base, y colocar otros ingresos(otro campo)
+- boton de reservar el auto en el analisis 
+- perfil financiero > colocar continuidad labrorar
+-- colocar un campo de la daa de activdad
+-- profesion tambien otro que diga ocupacion no es lo mismo 
+-- en estabilidad laborar colocar un adicional la cantidad de años o tiempo(tiempo de laborar)
+-- ver los adjuntos cuando se descargan
+
+
+
+pedir una lista de todos los ejecutivos/vendedor 
+
+****************** reunión motus 22/10/25 ********************
+
+- verificar que guarde los cambios que se hacen en la solicitud
+- evaluar mas de un auto en la solicitud 
+- en la linea de tiempo, muro, colocar la respuesta del banco o la aprobación 
+del banco 
+- reevaluacion por banco individual -> pestaña usuario banco -> respuesta de cada banco 
+agregar un botón nuevo, 
+- usuario banco, tiene que agregar adjuntos
+- repuesta del banco: 
+ -- preaprobado
+ -- aprobado
+ -- aprobado condicional 
+ -- Rechazado
+
+
+//////////////////////////////////////////////////////////////////////
+
+
+- agregar al vendedor, para saber la respuesta del banco, solo eso 
+- agregar manual el correo de pay para cada solicitud agregar el correo de pay para que lleve la comunicación
+- solo traer las solicitudes de pay que sean de financiamiento, la columna en pay se llama forma de pago 
+- en Solicitudes de Crédito, colocar un alerta en la solicitud cuando el banco tiene mas de 24 horas sin respuesta 
+- envió de alerta a los bancos, reenvio de solicitudes etc etc 
+- se tiene que agregar varios usuario de un mismo banco 
+- reasignar solicitudes a otro usuario banco 
+- agregar filtro en los lead de pipe
+- enviar correo plantilla al cliente de aprobación 
+
+////////////////////////// motus reunión 23/10/25 /////////////////////////////////
+
+- luego que el banco responde 
+- el cliente decide si acepta la propuesta del banco, se adjunta unos documentos 
+-- proforma, esto lo genera automarket lo genera operaciones
+-- el banco y automarket pautan una cita de firma para que el cliente firme con el banco esto tiene que estar registrado en el app, si asiste o no
+-- liberación de carta promesa   
+-- el ultimo click del proceso es facturado, ese click tiene que enviar a octo la información 
+nota: hay un tema con la reserva que se hace del auto, 
+con respecto a esto, en la columna de de solicitudes, colocar una de reservas
+
+////////////////////////////////////////////////////////////////////////////////////
+
+
+clave de la base de datos de crédito 
+
+motus_pass_2024
+
+
+//////////////////////// motus reunión 24/10/25 /////////////////////////////////////
+
+
+- teléfono del client, halar el id en pay es el cliente
+- revaluación a los bancos botón
+- auto apartado es importante que que el banco lo vea
+- cuando el banco de su respuesta, se necesesita que de respuesta de toda las opciones de autos que se le carguen
+- 
+condiciones del banco
+- valor de auto
+- abono
+- plazo
+- letra
+- detalle de la promoción
+- comentarios
+- 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
