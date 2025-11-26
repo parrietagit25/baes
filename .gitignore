@@ -15,7 +15,6 @@ composer.lock
 
 # Archivos temporales de desarrollo
 debug_*.php
-test_*.php
 verificar_*.php
 ejecutar_*.php
 migrar_*.php
