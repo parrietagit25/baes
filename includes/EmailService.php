@@ -57,7 +57,10 @@ class EmailService {
     ) {
         try {
             // Detectar versión de SendGrid y usar la API apropiada
-            if (class_exists('SendGrid\Mail\Mail')) {
+            // Primero verificar si existe la clase nueva
+            $tieneV7 = class_exists('SendGrid\Mail\Mail');
+            
+            if ($tieneV7) {
                 // Versión nueva de SendGrid (v7+)
                 return $this->enviarCorreoV7($to, $toName, $subject, $bodyHTML, $bodyText, $attachments);
             } else {
@@ -77,6 +80,11 @@ class EmailService {
      * Envío usando SendGrid v7+ (API moderna)
      */
     private function enviarCorreoV7($to, $toName, $subject, $bodyHTML, $bodyText, $attachments) {
+        // Verificar que la clase existe antes de usarla
+        if (!class_exists('SendGrid\Mail\Mail')) {
+            throw new Exception('SendGrid v7 no está disponible, pero se intentó usar enviarCorreoV7');
+        }
+        
         $email = new \SendGrid\Mail\Mail();
         
         $email->setFrom($this->config['from_email'], $this->config['from_name']);
@@ -120,6 +128,19 @@ class EmailService {
      * Envío usando SendGrid v6 o anterior (API antigua)
      */
     private function enviarCorreoV6($to, $toName, $subject, $bodyHTML, $bodyText, $attachments) {
+        // Verificar que las clases de la versión antigua existen
+        if (!class_exists('SendGrid\Email')) {
+            // Intentar cargar manualmente
+            $sendgridPath = __DIR__ . '/../vendor/sendgrid/sendgrid/lib/SendGrid.php';
+            if (file_exists($sendgridPath)) {
+                require_once $sendgridPath;
+            }
+            
+            if (!class_exists('SendGrid\Email')) {
+                throw new Exception('No se pudo cargar SendGrid. Verifica que esté instalado correctamente.');
+            }
+        }
+        
         // Usar la API antigua de SendGrid
         $from = new \SendGrid\Email($this->config['from_name'], $this->config['from_email']);
         $to_email = new \SendGrid\Email($toName ?: '', $to);
