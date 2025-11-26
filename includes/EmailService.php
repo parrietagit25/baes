@@ -14,9 +14,11 @@ if (file_exists($autoloadPath)) {
     die('Error: Composer no está instalado. Ejecuta: composer install');
 }
 
-use SendGrid\Mail\Mail;
-use SendGrid\Mail\TypeException;
-use SendGrid\Mail\Attachment;
+// Cargar SendGrid - compatible con versiones antiguas y nuevas
+// Si es versión antigua, cargar manualmente
+if (file_exists(__DIR__ . '/../vendor/sendgrid/sendgrid/lib/SendGrid.php') && !class_exists('SendGrid\Mail\Mail')) {
+    require_once __DIR__ . '/../vendor/sendgrid/sendgrid/lib/SendGrid.php';
+}
 
 class EmailService {
     private $config;
@@ -54,89 +56,112 @@ class EmailService {
         $attachments = []
     ) {
         try {
-            // Crear objeto Mail de SendGrid
-            $email = new Mail();
-            
-            // Remitente
-            $email->setFrom(
-                $this->config['from_email'],
-                $this->config['from_name']
-            );
-            
-            // Destinatario
-            $email->addTo($to, $toName ?: '');
-            
-            // Reply-To
-            $email->setReplyTo(
-                $this->config['reply_to_email'],
-                $this->config['reply_to_name']
-            );
-            
-            // Asunto y contenido
-            $email->setSubject($subject);
-            $email->addContent("text/html", $bodyHTML);
-            
-            // Texto plano (opcional)
-            if ($bodyText) {
-                $email->addContent("text/plain", $bodyText);
+            // Detectar versión de SendGrid y usar la API apropiada
+            if (class_exists('SendGrid\Mail\Mail')) {
+                // Versión nueva de SendGrid (v7+)
+                return $this->enviarCorreoV7($to, $toName, $subject, $bodyHTML, $bodyText, $attachments);
             } else {
-                $email->addContent("text/plain", strip_tags($bodyHTML));
+                // Versión antigua de SendGrid (v6 o anterior)
+                return $this->enviarCorreoV6($to, $toName, $subject, $bodyHTML, $bodyText, $attachments);
             }
-            
-            // Adjuntos
-            foreach ($attachments as $attachment) {
-                if (file_exists($attachment)) {
-                    $fileContent = base64_encode(file_get_contents($attachment));
-                    $fileName = basename($attachment);
-                    $mimeType = function_exists('mime_content_type') 
-                        ? mime_content_type($attachment) 
-                        : 'application/octet-stream';
-                    
-                    $attachment_obj = new Attachment();
-                    $attachment_obj->setContent($fileContent);
-                    $attachment_obj->setType($mimeType);
-                    $attachment_obj->setFilename($fileName);
-                    $attachment_obj->setDisposition("attachment");
-                    
-                    $email->addAttachment($attachment_obj);
-                }
-            }
-            
-            // Enviar correo
-            $response = $this->sendgrid->send($email);
-            
-            // Verificar respuesta
-            $statusCode = $response->statusCode();
-            
-            if ($statusCode >= 200 && $statusCode < 300) {
-                return [
-                    'success' => true,
-                    'message' => 'Correo enviado correctamente',
-                    'status_code' => $statusCode
-                ];
-            } else {
-                $body = $response->body();
-                error_log("SendGrid error: Status $statusCode - $body");
-                return [
-                    'success' => false,
-                    'message' => "Error al enviar correo: Status $statusCode",
-                    'status_code' => $statusCode,
-                    'response' => $body
-                ];
-            }
-            
-        } catch (TypeException $e) {
-            error_log("Error de tipo en SendGrid: " . $e->getMessage());
-            return [
-                'success' => false,
-                'message' => 'Error al enviar correo: ' . $e->getMessage()
-            ];
         } catch (Exception $e) {
             error_log("Error al enviar correo con SendGrid: " . $e->getMessage());
             return [
                 'success' => false,
                 'message' => 'Error al enviar correo: ' . $e->getMessage()
             ];
+        }
+    }
+    
+    /**
+     * Envío usando SendGrid v7+ (API moderna)
+     */
+    private function enviarCorreoV7($to, $toName, $subject, $bodyHTML, $bodyText, $attachments) {
+        $email = new \SendGrid\Mail\Mail();
+        
+        $email->setFrom($this->config['from_email'], $this->config['from_name']);
+        $email->addTo($to, $toName ?: '');
+        $email->setReplyTo($this->config['reply_to_email'], $this->config['reply_to_name']);
+        $email->setSubject($subject);
+        $email->addContent("text/html", $bodyHTML);
+        $email->addContent("text/plain", $bodyText ?: strip_tags($bodyHTML));
+        
+        // Adjuntos
+        foreach ($attachments as $attachment) {
+            if (file_exists($attachment)) {
+                $fileContent = base64_encode(file_get_contents($attachment));
+                $fileName = basename($attachment);
+                $mimeType = function_exists('mime_content_type') 
+                    ? mime_content_type($attachment) 
+                    : 'application/octet-stream';
+                
+                $attachment_obj = new \SendGrid\Mail\Attachment();
+                $attachment_obj->setContent($fileContent);
+                $attachment_obj->setType($mimeType);
+                $attachment_obj->setFilename($fileName);
+                $attachment_obj->setDisposition("attachment");
+                $email->addAttachment($attachment_obj);
+            }
+        }
+        
+        $response = $this->sendgrid->send($email);
+        $statusCode = $response->statusCode();
+        
+        if ($statusCode >= 200 && $statusCode < 300) {
+            return ['success' => true, 'message' => 'Correo enviado correctamente', 'status_code' => $statusCode];
+        } else {
+            $body = $response->body();
+            error_log("SendGrid error: Status $statusCode - $body");
+            return ['success' => false, 'message' => "Error al enviar correo: Status $statusCode", 'status_code' => $statusCode];
+        }
+    }
+    
+    /**
+     * Envío usando SendGrid v6 o anterior (API antigua)
+     */
+    private function enviarCorreoV6($to, $toName, $subject, $bodyHTML, $bodyText, $attachments) {
+        // Usar la API antigua de SendGrid
+        $from = new \SendGrid\Email($this->config['from_name'], $this->config['from_email']);
+        $to_email = new \SendGrid\Email($toName ?: '', $to);
+        $content_html = new \SendGrid\Content("text/html", $bodyHTML);
+        $content_text = new \SendGrid\Content("text/plain", $bodyText ?: strip_tags($bodyHTML));
+        
+        $mail = new \SendGrid\Mail($from, $subject, $to_email, $content_text);
+        $mail->addContent($content_html);
+        
+        // Reply-To
+        if (!empty($this->config['reply_to_email'])) {
+            $replyTo = new \SendGrid\Email($this->config['reply_to_name'], $this->config['reply_to_email']);
+            $mail->setReplyTo($replyTo);
+        }
+        
+        // Adjuntos
+        foreach ($attachments as $attachment) {
+            if (file_exists($attachment)) {
+                $fileContent = base64_encode(file_get_contents($attachment));
+                $fileName = basename($attachment);
+                $mimeType = function_exists('mime_content_type') 
+                    ? mime_content_type($attachment) 
+                    : 'application/octet-stream';
+                
+                $attachment_obj = new \SendGrid\Attachment();
+                $attachment_obj->setContent($fileContent);
+                $attachment_obj->setType($mimeType);
+                $attachment_obj->setFilename($fileName);
+                $attachment_obj->setDisposition("attachment");
+                $mail->addAttachment($attachment_obj);
+            }
+        }
+        
+        $response = $this->sendgrid->client->mail()->send()->post($mail);
+        $statusCode = $response->statusCode();
+        
+        if ($statusCode >= 200 && $statusCode < 300) {
+            return ['success' => true, 'message' => 'Correo enviado correctamente', 'status_code' => $statusCode];
+        } else {
+            $body = $response->body();
+            error_log("SendGrid error: Status $statusCode - $body");
+            return ['success' => false, 'message' => "Error al enviar correo: Status $statusCode", 'status_code' => $statusCode];
         }
     }
     
