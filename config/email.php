@@ -10,9 +10,11 @@
  */
 
 // Función helper para obtener variables de entorno o valores por defecto
-function getEnvOrDefault($key, $default) {
-    $value = getenv($key);
-    return $value !== false ? $value : $default;
+if (!function_exists('getEnvOrDefault')) {
+    function getEnvOrDefault($key, $default) {
+        $value = getenv($key);
+        return $value !== false ? $value : $default;
+    }
 }
 
 // Cargar configuración local si existe (no está en git)

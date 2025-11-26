@@ -17,7 +17,6 @@ if (file_exists($autoloadPath)) {
 use SendGrid\Mail\Mail;
 use SendGrid\Mail\TypeException;
 use SendGrid\Mail\Attachment;
-use SendGrid;
 
 class EmailService {
     private $config;
@@ -28,7 +27,7 @@ class EmailService {
         
         // Inicializar SendGrid
         try {
-            $this->sendgrid = new SendGrid($this->config['sendgrid_api_key']);
+            $this->sendgrid = new \SendGrid($this->config['sendgrid_api_key']);
         } catch (Exception $e) {
             error_log("Error al inicializar SendGrid: " . $e->getMessage());
             throw $e;
