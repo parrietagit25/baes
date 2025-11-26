@@ -4,11 +4,16 @@
     "type": "project",
     "require": {
         "php": ">=7.4",
-        "phpmailer/phpmailer": "^6.9"
+        "phpmailer/phpmailer": "^6.8"
     },
     "autoload": {
         "psr-4": {
             "BAES\\": "includes/"
+        }
+    },
+    "config": {
+        "platform": {
+            "php": "7.4"
         }
     }
 }
