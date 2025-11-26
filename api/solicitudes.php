@@ -189,13 +189,21 @@ function crearSolicitud() {
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         
+        // Función helper para convertir campos numéricos vacíos a null o 0
+        $convertirNumero = function($valor, $default = null) {
+            if ($valor === '' || $valor === null) {
+                return $default;
+            }
+            return is_numeric($valor) ? (int)$valor : $default;
+        };
+        
         $stmt->execute([
             $_SESSION['user_id'],
-            $_POST['banco_id'] ?? null,
+            $convertirNumero($_POST['banco_id'] ?? null),
             $_POST['tipo_persona'],
             $_POST['nombre_cliente'],
             $_POST['cedula'],
-            $_POST['edad'] ?? null,
+            $convertirNumero($_POST['edad'] ?? null),
             $_POST['genero'] ?? null,
             $_POST['direccion'] ?? null,
             $_POST['provincia'] ?? null,
@@ -208,7 +216,7 @@ function crearSolicitud() {
             $_POST['email'] ?? null,
             $_POST['email_pipedrive'] ?? null,
             isset($_POST['casado']) ? 1 : 0,
-            $_POST['hijos'] ?? 0,
+            $convertirNumero($_POST['hijos'] ?? null, 0),
             $_POST['perfil_financiero'],
             $_POST['ingreso'] ?? null,
             $_POST['tiempo_laborar'] ?? null,
@@ -220,8 +228,8 @@ function crearSolicitud() {
             $_POST['continuidad_laboral'] ?? null,
             $_POST['marca_auto'] ?? null,
             $_POST['modelo_auto'] ?? null,
-            $_POST['año_auto'] ?? null,
-            $_POST['kilometraje'] ?? null,
+            $convertirNumero($_POST['año_auto'] ?? null),
+            $convertirNumero($_POST['kilometraje'] ?? null),
             $_POST['precio_especial'] ?? null,
             $_POST['abono_porcentaje'] ?? null,
             $_POST['abono_monto'] ?? null,
@@ -322,10 +330,24 @@ function actualizarSolicitud() {
             'comentarios_fi', 'comentarios_ejecutivo_banco', 'estado'
         ];
         
+        // Campos numéricos que deben convertirse a NULL si están vacíos
+        $camposNumericos = ['edad', 'hijos', 'año_auto', 'kilometraje', 'plazo', 'banco_id', 'vendedor_id'];
+        
         foreach ($camposPermitidos as $campo) {
             if (isset($_POST[$campo])) {
+                $valor = $_POST[$campo];
+                
+                // Convertir campos numéricos vacíos a NULL
+                if (in_array($campo, $camposNumericos)) {
+                    if ($valor === '' || $valor === null) {
+                        $valor = null;
+                    } else {
+                        $valor = (int)$valor;
+                    }
+                }
+                
                 $campos[] = "$campo = ?";
-                $valores[] = $_POST[$campo];
+                $valores[] = $valor;
             }
         }
         

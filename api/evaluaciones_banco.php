@@ -10,7 +10,6 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 require_once '../config/database.php';
-require_once '../includes/email_helper.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 
@@ -198,26 +197,28 @@ function guardarEvaluacion() {
             $solicitudId
         ]);
         
-        // Obtener la solicitud actualizada para enviar correos
-        $stmt = $pdo->prepare("SELECT * FROM solicitudes_credito WHERE id = ?");
-        $stmt->execute([$solicitudId]);
-        $solicitudActualizada = $stmt->fetch();
-        
-        // Enviar notificación al vendedor si el banco respondió
-        if (in_array($respuestaBancoEnum, ['Aprobado', 'Pre Aprobado', 'Rechazado', 'Aprobado Condicional'])) {
-            $resultadoEmail = enviarNotificacionVendedor($solicitudId);
-            // Log del resultado (no fallar si el correo no se envía)
-            if (!$resultadoEmail['success']) {
-                error_log("No se pudo enviar correo al vendedor: " . $resultadoEmail['message']);
-            }
+        // Enviar notificación al vendedor si el banco respondió (solo si email_helper está disponible)
+        try {
+            require_once '../includes/email_helper.php';
             
-            // Si está aprobada, también notificar al cliente
-            if (in_array($respuestaBancoEnum, ['Aprobado', 'Pre Aprobado'])) {
-                $resultadoCliente = notificarClienteAprobacion($solicitudId);
-                if (!$resultadoCliente['success']) {
-                    error_log("No se pudo enviar correo al cliente: " . $resultadoCliente['message']);
+            if (in_array($respuestaBancoEnum, ['Aprobado', 'Pre Aprobado', 'Rechazado', 'Aprobado Condicional'])) {
+                $resultadoEmail = enviarNotificacionVendedor($solicitudId);
+                // Log del resultado (no fallar si el correo no se envía)
+                if (!$resultadoEmail['success']) {
+                    error_log("No se pudo enviar correo al vendedor: " . $resultadoEmail['message']);
+                }
+                
+                // Si está aprobada, también notificar al cliente
+                if (in_array($respuestaBancoEnum, ['Aprobado', 'Pre Aprobado'])) {
+                    $resultadoCliente = notificarClienteAprobacion($solicitudId);
+                    if (!$resultadoCliente['success']) {
+                        error_log("No se pudo enviar correo al cliente: " . $resultadoCliente['message']);
+                    }
                 }
             }
+        } catch (Exception $e) {
+            // Si no se puede cargar email_helper (Composer no instalado), continuar sin enviar correo
+            error_log("No se pudo cargar email_helper: " . $e->getMessage());
         }
         
         echo json_encode([
@@ -323,10 +324,16 @@ function solicitarReevaluacion() {
         ");
         $stmt->execute([$evaluacionId, $solicitudId]);
         
-        // Enviar notificación al banco sobre la reevaluación
-        $resultadoEmail = notificarReevaluacion($solicitudId, $evaluacionId, $comentario);
-        if (!$resultadoEmail['success']) {
-            error_log("No se pudo enviar correo de reevaluación: " . $resultadoEmail['message']);
+        // Enviar notificación al banco sobre la reevaluación (solo si email_helper está disponible)
+        try {
+            require_once '../includes/email_helper.php';
+            $resultadoEmail = notificarReevaluacion($solicitudId, $evaluacionId, $comentario);
+            if (!$resultadoEmail['success']) {
+                error_log("No se pudo enviar correo de reevaluación: " . $resultadoEmail['message']);
+            }
+        } catch (Exception $e) {
+            // Si no se puede cargar email_helper (Composer no instalado), continuar sin enviar correo
+            error_log("No se pudo cargar email_helper: " . $e->getMessage());
         }
         
         echo json_encode([
