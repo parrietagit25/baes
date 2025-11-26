@@ -128,62 +128,74 @@ class EmailService {
      * Envío usando SendGrid v6 o anterior (API antigua)
      */
     private function enviarCorreoV6($to, $toName, $subject, $bodyHTML, $bodyText, $attachments) {
-        // Verificar que las clases de la versión antigua existen
-        if (!class_exists('SendGrid\Email')) {
-            // Intentar cargar manualmente
-            $sendgridPath = __DIR__ . '/../vendor/sendgrid/sendgrid/lib/SendGrid.php';
-            if (file_exists($sendgridPath)) {
-                require_once $sendgridPath;
+        // Suprimir warnings de deprecación de SendGrid
+        $errorLevel = error_reporting(E_ALL & ~E_DEPRECATED & ~E_STRICT);
+        ob_start();
+        
+        try {
+            // Verificar que las clases de la versión antigua existen
+            if (!class_exists('SendGrid\Email')) {
+                // Intentar cargar manualmente
+                $sendgridPath = __DIR__ . '/../vendor/sendgrid/sendgrid/lib/SendGrid.php';
+                if (file_exists($sendgridPath)) {
+                    require_once $sendgridPath;
+                }
+                
+                if (!class_exists('SendGrid\Email')) {
+                    throw new Exception('No se pudo cargar SendGrid. Verifica que esté instalado correctamente.');
+                }
             }
             
-            if (!class_exists('SendGrid\Email')) {
-                throw new Exception('No se pudo cargar SendGrid. Verifica que esté instalado correctamente.');
+            // Usar la API antigua de SendGrid
+            $from = new \SendGrid\Email($this->config['from_name'], $this->config['from_email']);
+            $to_email = new \SendGrid\Email($toName ?: '', $to);
+            $content_html = new \SendGrid\Content("text/html", $bodyHTML);
+            $content_text = new \SendGrid\Content("text/plain", $bodyText ?: strip_tags($bodyHTML));
+            
+            $mail = new \SendGrid\Mail($from, $subject, $to_email, $content_text);
+            $mail->addContent($content_html);
+            
+            // Reply-To
+            if (!empty($this->config['reply_to_email'])) {
+                $replyTo = new \SendGrid\Email($this->config['reply_to_name'], $this->config['reply_to_email']);
+                $mail->setReplyTo($replyTo);
             }
-        }
-        
-        // Usar la API antigua de SendGrid
-        $from = new \SendGrid\Email($this->config['from_name'], $this->config['from_email']);
-        $to_email = new \SendGrid\Email($toName ?: '', $to);
-        $content_html = new \SendGrid\Content("text/html", $bodyHTML);
-        $content_text = new \SendGrid\Content("text/plain", $bodyText ?: strip_tags($bodyHTML));
-        
-        $mail = new \SendGrid\Mail($from, $subject, $to_email, $content_text);
-        $mail->addContent($content_html);
-        
-        // Reply-To
-        if (!empty($this->config['reply_to_email'])) {
-            $replyTo = new \SendGrid\Email($this->config['reply_to_name'], $this->config['reply_to_email']);
-            $mail->setReplyTo($replyTo);
-        }
-        
-        // Adjuntos
-        foreach ($attachments as $attachment) {
-            if (file_exists($attachment)) {
-                $fileContent = base64_encode(file_get_contents($attachment));
-                $fileName = basename($attachment);
-                $mimeType = function_exists('mime_content_type') 
-                    ? mime_content_type($attachment) 
-                    : 'application/octet-stream';
-                
-                $attachment_obj = new \SendGrid\Attachment();
-                $attachment_obj->setContent($fileContent);
-                $attachment_obj->setType($mimeType);
-                $attachment_obj->setFilename($fileName);
-                $attachment_obj->setDisposition("attachment");
-                $mail->addAttachment($attachment_obj);
+            
+            // Adjuntos
+            foreach ($attachments as $attachment) {
+                if (file_exists($attachment)) {
+                    $fileContent = base64_encode(file_get_contents($attachment));
+                    $fileName = basename($attachment);
+                    $mimeType = function_exists('mime_content_type') 
+                        ? mime_content_type($attachment) 
+                        : 'application/octet-stream';
+                    
+                    $attachment_obj = new \SendGrid\Attachment();
+                    $attachment_obj->setContent($fileContent);
+                    $attachment_obj->setType($mimeType);
+                    $attachment_obj->setFilename($fileName);
+                    $attachment_obj->setDisposition("attachment");
+                    $mail->addAttachment($attachment_obj);
+                }
             }
+            
+            $response = $this->sendgrid->client->mail()->send()->post($mail);
+            $statusCode = $response->statusCode();
+            
+            if ($statusCode >= 200 && $statusCode < 300) {
+                $resultado = ['success' => true, 'message' => 'Correo enviado correctamente', 'status_code' => $statusCode];
+            } else {
+                $body = $response->body();
+                error_log("SendGrid error: Status $statusCode - $body");
+                $resultado = ['success' => false, 'message' => "Error al enviar correo: Status $statusCode", 'status_code' => $statusCode];
+            }
+        } finally {
+            // Limpiar cualquier salida de warnings
+            ob_end_clean();
+            error_reporting($errorLevel);
         }
         
-        $response = $this->sendgrid->client->mail()->send()->post($mail);
-        $statusCode = $response->statusCode();
-        
-        if ($statusCode >= 200 && $statusCode < 300) {
-            return ['success' => true, 'message' => 'Correo enviado correctamente', 'status_code' => $statusCode];
-        } else {
-            $body = $response->body();
-            error_log("SendGrid error: Status $statusCode - $body");
-            return ['success' => false, 'message' => "Error al enviar correo: Status $statusCode", 'status_code' => $statusCode];
-        }
+        return $resultado;
     }
     
     /**

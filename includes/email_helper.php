@@ -29,14 +29,25 @@ function enviarNotificacionVendedor($solicitudId) {
             return ['success' => false, 'message' => 'Vendedor no encontrado o sin email'];
         }
         
-        $emailService = new EmailService();
-        $vendedorNombre = trim(($solicitud['vendedor_nombre'] ?? '') . ' ' . ($solicitud['vendedor_apellido'] ?? ''));
+        // Suprimir warnings de deprecación de SendGrid
+        $errorLevel = error_reporting(E_ALL & ~E_DEPRECATED & ~E_STRICT);
+        ob_start();
         
-        return $emailService->notificarVendedorBancoResponde(
-            $solicitud['vendedor_email'],
-            $vendedorNombre ?: 'Vendedor',
-            $solicitud
-        );
+        try {
+            $emailService = new EmailService();
+            $vendedorNombre = trim(($solicitud['vendedor_nombre'] ?? '') . ' ' . ($solicitud['vendedor_apellido'] ?? ''));
+            
+            $resultado = $emailService->notificarVendedorBancoResponde(
+                $solicitud['vendedor_email'],
+                $vendedorNombre ?: 'Vendedor',
+                $solicitud
+            );
+        } finally {
+            ob_end_clean();
+            error_reporting($errorLevel);
+        }
+        
+        return $resultado;
         
     } catch (Exception $e) {
         error_log("Error al enviar notificación al vendedor: " . $e->getMessage());
@@ -67,14 +78,25 @@ function enviarRecordatorioBanco($solicitudId, $usuarioBancoId) {
             return ['success' => false, 'message' => 'Usuario banco no encontrado o sin email'];
         }
         
-        $emailService = new EmailService();
-        $bancoNombre = trim(($solicitud['banco_nombre'] ?? '') . ' ' . ($solicitud['banco_apellido'] ?? ''));
+        // Suprimir warnings de deprecación de SendGrid
+        $errorLevel = error_reporting(E_ALL & ~E_DEPRECATED & ~E_STRICT);
+        ob_start();
         
-        return $emailService->enviarRecordatorioBanco(
-            $solicitud['banco_email'],
-            $bancoNombre ?: 'Usuario Banco',
-            $solicitud
-        );
+        try {
+            $emailService = new EmailService();
+            $bancoNombre = trim(($solicitud['banco_nombre'] ?? '') . ' ' . ($solicitud['banco_apellido'] ?? ''));
+            
+            $resultado = $emailService->enviarRecordatorioBanco(
+                $solicitud['banco_email'],
+                $bancoNombre ?: 'Usuario Banco',
+                $solicitud
+            );
+        } finally {
+            ob_end_clean();
+            error_reporting($errorLevel);
+        }
+        
+        return $resultado;
         
     } catch (Exception $e) {
         error_log("Error al enviar recordatorio al banco: " . $e->getMessage());
@@ -103,14 +125,26 @@ function notificarBancoNuevaSolicitud($solicitudId, $usuarioBancoId) {
             return ['success' => false, 'message' => 'Usuario banco no encontrado o sin email'];
         }
         
-        $emailService = new EmailService();
-        $bancoNombre = trim(($solicitud['banco_nombre'] ?? '') . ' ' . ($solicitud['banco_apellido'] ?? ''));
+        // Suprimir warnings de deprecación de SendGrid
+        $errorLevel = error_reporting(E_ALL & ~E_DEPRECATED & ~E_STRICT);
+        ob_start();
         
-        return $emailService->notificarBancoNuevaSolicitud(
-            $solicitud['banco_email'],
-            $bancoNombre ?: 'Usuario Banco',
-            $solicitud
-        );
+        try {
+            $emailService = new EmailService();
+            $bancoNombre = trim(($solicitud['banco_nombre'] ?? '') . ' ' . ($solicitud['banco_apellido'] ?? ''));
+            
+            $resultado = $emailService->notificarBancoNuevaSolicitud(
+                $solicitud['banco_email'],
+                $bancoNombre ?: 'Usuario Banco',
+                $solicitud
+            );
+        } finally {
+            // Limpiar cualquier salida de warnings
+            ob_end_clean();
+            error_reporting($errorLevel);
+        }
+        
+        return $resultado;
         
     } catch (Exception $e) {
         error_log("Error al notificar banco de nueva solicitud: " . $e->getMessage());
@@ -139,13 +173,24 @@ function notificarClienteAprobacion($solicitudId) {
             return ['success' => false, 'message' => 'La solicitud no está aprobada'];
         }
         
-        $emailService = new EmailService();
+        // Suprimir warnings de deprecación de SendGrid
+        $errorLevel = error_reporting(E_ALL & ~E_DEPRECATED & ~E_STRICT);
+        ob_start();
         
-        return $emailService->notificarClienteAprobacion(
-            $solicitud['email'],
-            $solicitud['nombre_cliente'],
-            $solicitud
-        );
+        try {
+            $emailService = new EmailService();
+            
+            $resultado = $emailService->notificarClienteAprobacion(
+                $solicitud['email'],
+                $solicitud['nombre_cliente'],
+                $solicitud
+            );
+        } finally {
+            ob_end_clean();
+            error_reporting($errorLevel);
+        }
+        
+        return $resultado;
         
     } catch (Exception $e) {
         error_log("Error al notificar cliente de aprobación: " . $e->getMessage());
@@ -174,16 +219,27 @@ function notificarGestorCambioEstado($solicitudId, $estadoAnterior, $estadoNuevo
             return ['success' => false, 'message' => 'Gestor no encontrado o sin email'];
         }
         
-        $emailService = new EmailService();
-        $gestorNombre = trim(($solicitud['gestor_nombre'] ?? '') . ' ' . ($solicitud['gestor_apellido'] ?? ''));
+        // Suprimir warnings de deprecación de SendGrid
+        $errorLevel = error_reporting(E_ALL & ~E_DEPRECATED & ~E_STRICT);
+        ob_start();
         
-        return $emailService->notificarGestorCambioEstado(
-            $solicitud['gestor_email'],
-            $gestorNombre ?: 'Gestor',
-            $solicitud,
-            $estadoAnterior,
-            $estadoNuevo
-        );
+        try {
+            $emailService = new EmailService();
+            $gestorNombre = trim(($solicitud['gestor_nombre'] ?? '') . ' ' . ($solicitud['gestor_apellido'] ?? ''));
+            
+            $resultado = $emailService->notificarGestorCambioEstado(
+                $solicitud['gestor_email'],
+                $gestorNombre ?: 'Gestor',
+                $solicitud,
+                $estadoAnterior,
+                $estadoNuevo
+            );
+        } finally {
+            ob_end_clean();
+            error_reporting($errorLevel);
+        }
+        
+        return $resultado;
         
     } catch (Exception $e) {
         error_log("Error al notificar gestor de cambio de estado: " . $e->getMessage());
@@ -214,15 +270,26 @@ function notificarReevaluacion($solicitudId, $evaluacionId, $comentario) {
             return ['success' => false, 'message' => 'Usuario banco no encontrado o sin email'];
         }
         
-        $emailService = new EmailService();
-        $bancoNombre = trim(($resultado['banco_nombre'] ?? '') . ' ' . ($resultado['banco_apellido'] ?? ''));
+        // Suprimir warnings de deprecación de SendGrid
+        $errorLevel = error_reporting(E_ALL & ~E_DEPRECATED & ~E_STRICT);
+        ob_start();
         
-        return $emailService->notificarReevaluacion(
-            $resultado['banco_email'],
-            $bancoNombre ?: 'Usuario Banco',
-            $resultado,
-            $comentario
-        );
+        try {
+            $emailService = new EmailService();
+            $bancoNombre = trim(($resultado['banco_nombre'] ?? '') . ' ' . ($resultado['banco_apellido'] ?? ''));
+            
+            $resultado = $emailService->notificarReevaluacion(
+                $resultado['banco_email'],
+                $bancoNombre ?: 'Usuario Banco',
+                $resultado,
+                $comentario
+            );
+        } finally {
+            ob_end_clean();
+            error_reporting($errorLevel);
+        }
+        
+        return $resultado;
         
     } catch (Exception $e) {
         error_log("Error al notificar reevaluación: " . $e->getMessage());

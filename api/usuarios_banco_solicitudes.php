@@ -6,6 +6,10 @@
 session_start();
 require_once __DIR__ . '/../config/database.php';
 
+// Suprimir warnings de deprecación que pueden romper el JSON
+error_reporting(E_ALL & ~E_DEPRECATED & ~E_STRICT);
+ini_set('display_errors', 0);
+
 header('Content-Type: application/json');
 
 // Verificar autenticación
