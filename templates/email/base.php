@@ -89,14 +89,14 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1><?php echo htmlspecialchars($app_name ?? 'Sistema BAES'); ?></h1>
+            <h1><?php echo htmlspecialchars($app_name ?? 'Automarket Rent a Car'); ?></h1>
         </div>
         <div class="content">
             <?php echo $content ?? ''; ?>
         </div>
         <div class="footer">
             <p>Este es un correo automático del sistema. Por favor no responda a este mensaje.</p>
-            <p>&copy; <?php echo date('Y'); ?> Sistema BAES. Todos los derechos reservados.</p>
+            <p>&copy; <?php echo date('Y'); ?> Automarket Rent a Car. Todos los derechos reservados.</p>
         </div>
     </div>
 </body>

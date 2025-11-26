@@ -37,7 +37,7 @@ $content .= '
     
     <p>Si tiene alguna pregunta, no dude en contactarnos.</p>
     
-    <p>Saludos cordiales,<br>Equipo BAES</p>
+    <p>Saludos cordiales,<br>Equipo Automarket Rent a Car</p>
 ';
 
 include __DIR__ . '/base.php';

@@ -1,0 +1,29 @@
+<?php
+/**
+ * Configuración local de email (NO SUBIR A GIT)
+ * 
+ * Copia este archivo a config/email.local.php y configura tus credenciales
+ * Este archivo está en .gitignore y no se subirá al repositorio
+ */
+
+return [
+    // Configuración SendGrid API
+    // IMPORTANTE: Reemplaza TU_API_KEY_DE_SENDGRID_AQUI con tu API key real de SendGrid
+    'sendgrid_api_key' => 'TU_API_KEY_DE_SENDGRID_AQUI',
+    
+    // Configuración del remitente (verificado en SendGrid)
+    'from_email' => 'noreply@automarketrentacar.com',
+    'from_name' => 'Automarket Rent a Car',
+    
+    // Configuración adicional
+    'reply_to_email' => 'noreply@automarketrentacar.com',
+    'reply_to_name' => 'Automarket Rent a Car - Soporte',
+    
+    // Configuración de la aplicación
+    'app_url' => 'http://localhost:8086',
+    'app_name' => 'Automarket Rent a Car',
+    
+    // Debug (desactivar en producción)
+    'debug' => false,
+];
+

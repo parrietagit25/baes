@@ -3,6 +3,11 @@ Petro.pem
 user.txt
 .env
 *.env
+.env.local
+.env.production
+config/email.local.php
+configurar_sendgrid_servidor.sh
+CREDENCIALES_SENDGRID.txt
 
 # Dependencias de Composer
 vendor/

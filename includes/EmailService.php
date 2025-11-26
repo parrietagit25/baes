@@ -1,8 +1,8 @@
 <?php
 /**
- * Servicio de envío de correos electrónicos
+ * Servicio de envío de correos electrónicos usando SendGrid
  * 
- * Utiliza PHPMailer para el envío de correos con soporte SMTP
+ * Utiliza SendGrid API para el envío de correos
  * Incluye templates HTML para diferentes tipos de notificaciones
  */
 
@@ -14,54 +14,24 @@ if (file_exists($autoloadPath)) {
     die('Error: Composer no está instalado. Ejecuta: composer install');
 }
 
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\Exception;
-use PHPMailer\PHPMailer\SMTP;
+use SendGrid\Mail\Mail;
+use SendGrid\Mail\TypeException;
+use SendGrid\Mail\Attachment;
+use SendGrid;
 
 class EmailService {
     private $config;
-    private $mailer;
+    private $sendgrid;
     
     public function __construct() {
         $this->config = require __DIR__ . '/../config/email.php';
-        $this->mailer = new PHPMailer(true);
-        $this->configurarMailer();
-    }
-    
-    /**
-     * Configura PHPMailer con los parámetros SMTP
-     */
-    private function configurarMailer() {
+        
+        // Inicializar SendGrid
         try {
-            // Configuración del servidor
-            $this->mailer->isSMTP();
-            $this->mailer->Host = $this->config['smtp_host'];
-            $this->mailer->SMTPAuth = true;
-            $this->mailer->Username = $this->config['smtp_username'];
-            $this->mailer->Password = $this->config['smtp_password'];
-            $this->mailer->SMTPSecure = $this->config['smtp_secure'];
-            $this->mailer->Port = $this->config['smtp_port'];
-            $this->mailer->CharSet = 'UTF-8';
-            
-            // Remitente
-            $this->mailer->setFrom(
-                $this->config['from_email'],
-                $this->config['from_name']
-            );
-            
-            // Reply-To
-            $this->mailer->addReplyTo(
-                $this->config['reply_to_email'],
-                $this->config['reply_to_name']
-            );
-            
-            // Debug (solo en desarrollo)
-            if ($this->config['debug']) {
-                $this->mailer->SMTPDebug = SMTP::DEBUG_SERVER;
-            }
-            
+            $this->sendgrid = new SendGrid($this->config['sendgrid_api_key']);
         } catch (Exception $e) {
-            error_log("Error al configurar EmailService: " . $e->getMessage());
+            error_log("Error al inicializar SendGrid: " . $e->getMessage());
+            throw $e;
         }
     }
     
@@ -85,39 +55,88 @@ class EmailService {
         $attachments = []
     ) {
         try {
-            // Limpiar destinatarios anteriores
-            $this->mailer->clearAddresses();
-            $this->mailer->clearAttachments();
+            // Crear objeto Mail de SendGrid
+            $email = new Mail();
+            
+            // Remitente
+            $email->setFrom(
+                $this->config['from_email'],
+                $this->config['from_name']
+            );
             
             // Destinatario
-            $this->mailer->addAddress($to, $toName);
+            $email->addTo($to, $toName ?: '');
             
-            // Contenido
-            $this->mailer->isHTML(true);
-            $this->mailer->Subject = $subject;
-            $this->mailer->Body = $bodyHTML;
-            $this->mailer->AltBody = $bodyText ?: strip_tags($bodyHTML);
+            // Reply-To
+            $email->setReplyTo(
+                $this->config['reply_to_email'],
+                $this->config['reply_to_name']
+            );
+            
+            // Asunto y contenido
+            $email->setSubject($subject);
+            $email->addContent("text/html", $bodyHTML);
+            
+            // Texto plano (opcional)
+            if ($bodyText) {
+                $email->addContent("text/plain", $bodyText);
+            } else {
+                $email->addContent("text/plain", strip_tags($bodyHTML));
+            }
             
             // Adjuntos
             foreach ($attachments as $attachment) {
                 if (file_exists($attachment)) {
-                    $this->mailer->addAttachment($attachment);
+                    $fileContent = base64_encode(file_get_contents($attachment));
+                    $fileName = basename($attachment);
+                    $mimeType = function_exists('mime_content_type') 
+                        ? mime_content_type($attachment) 
+                        : 'application/octet-stream';
+                    
+                    $attachment_obj = new Attachment();
+                    $attachment_obj->setContent($fileContent);
+                    $attachment_obj->setType($mimeType);
+                    $attachment_obj->setFilename($fileName);
+                    $attachment_obj->setDisposition("attachment");
+                    
+                    $email->addAttachment($attachment_obj);
                 }
             }
             
-            // Enviar
-            $this->mailer->send();
+            // Enviar correo
+            $response = $this->sendgrid->send($email);
             
-            return [
-                'success' => true,
-                'message' => 'Correo enviado correctamente'
-            ];
+            // Verificar respuesta
+            $statusCode = $response->statusCode();
             
-        } catch (Exception $e) {
-            error_log("Error al enviar correo: " . $this->mailer->ErrorInfo);
+            if ($statusCode >= 200 && $statusCode < 300) {
+                return [
+                    'success' => true,
+                    'message' => 'Correo enviado correctamente',
+                    'status_code' => $statusCode
+                ];
+            } else {
+                $body = $response->body();
+                error_log("SendGrid error: Status $statusCode - $body");
+                return [
+                    'success' => false,
+                    'message' => "Error al enviar correo: Status $statusCode",
+                    'status_code' => $statusCode,
+                    'response' => $body
+                ];
+            }
+            
+        } catch (TypeException $e) {
+            error_log("Error de tipo en SendGrid: " . $e->getMessage());
             return [
                 'success' => false,
-                'message' => 'Error al enviar correo: ' . $this->mailer->ErrorInfo
+                'message' => 'Error al enviar correo: ' . $e->getMessage()
+            ];
+        } catch (Exception $e) {
+            error_log("Error al enviar correo con SendGrid: " . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Error al enviar correo: ' . $e->getMessage()
             ];
         }
     }
@@ -153,7 +172,7 @@ class EmailService {
         $bodyText = strip_tags($bodyHTML);
         
         // Obtener asunto del template si está definido
-        $subject = $data['subject'] ?? 'Notificación del Sistema BAES';
+        $subject = $data['subject'] ?? 'Notificación de Automarket Rent a Car';
         
         return $this->enviarCorreo($to, $toName, $subject, $bodyHTML, $bodyText);
     }
@@ -263,4 +282,3 @@ class EmailService {
         );
     }
 }
-
