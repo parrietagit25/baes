@@ -15,6 +15,7 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 require_once '../config/database.php';
+require_once '../includes/historial_helper.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 
@@ -250,6 +251,9 @@ function crearSolicitud() {
         ");
         $stmt->execute([$solicitudId, $_SESSION['user_id']]);
         
+        // Registrar en historial
+        registrarHistorialSolicitud($pdo, $solicitudId, $_SESSION['user_id'], 'creacion', 'Solicitud de crédito creada', null, 'Nueva');
+        
         echo json_encode([
             'success' => true, 
             'message' => 'Solicitud creada correctamente', 
@@ -404,6 +408,18 @@ function actualizarSolicitud() {
                 // Si hay error al crear la nota, loguearlo pero no fallar la actualización
                 error_log("Error al crear nota: " . $e->getMessage());
                 // Continuar con la actualización aunque falle la nota
+            }
+            
+            // Registrar historial si cambió el estado
+            if (isset($_POST['estado']) && $_POST['estado'] != $solicitud['estado']) {
+                registrarHistorialSolicitud($pdo, (int)$_POST['id'], $_SESSION['user_id'], 'cambio_estado',
+                    'Estado cambiado de "' . $solicitud['estado'] . '" a "' . $_POST['estado'] . '"',
+                    $solicitud['estado'], $_POST['estado']);
+            }
+            // Registrar historial si fue asignación a banco
+            if ($esAsignacionBanco) {
+                registrarHistorialSolicitud($pdo, (int)$_POST['id'], $_SESSION['user_id'], 'asignacion_banco',
+                    'Solicitud asignada al banco para revisión', $solicitud['estado'], 'En Revisión Banco');
             }
         }
         
@@ -785,6 +801,9 @@ function cambiarEstadoSolicitud() {
                 VALUES (?, ?, 'Actualización', ?, ?)
             ");
             $stmt->execute([$solicitud_id, $_SESSION['user_id'], $titulo_nota, $contenido_nota]);
+            
+            // Registrar en historial
+            registrarHistorialSolicitud($pdo, $solicitud_id, $_SESSION['user_id'], 'cambio_estado', $contenido_nota, $estado_anterior, $nuevo_estado);
             
             // Si el estado es Desistimiento, también actualizar respuesta_cliente
             if ($nuevo_estado === 'Desistimiento') {

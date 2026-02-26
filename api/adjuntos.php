@@ -14,6 +14,7 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 require_once '../config/database.php';
+require_once '../includes/historial_helper.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 
@@ -210,6 +211,9 @@ function subirAdjunto() {
                     $tamañoArchivo,
                     $descripcion
                 ]);
+                
+                $descHistorial = 'Se agregó el documento: ' . $nombreOriginal . ($descripcion ? ' - ' . $descripcion : '');
+                registrarHistorialSolicitud($pdo, $solicitudId, $_SESSION['user_id'], 'documento_agregado', $descHistorial, null, null);
                 
                 $archivosSubidos++;
             } else {

@@ -5,6 +5,7 @@
 
 session_start();
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../includes/historial_helper.php';
 
 // Suprimir warnings de deprecación que pueden romper el JSON
 error_reporting(E_ALL & ~E_DEPRECATED & ~E_STRICT);
@@ -194,6 +195,12 @@ function asignarUsuarioBanco($pdo) {
     
     $stmt = $pdo->prepare($sql_nota);
     $stmt->execute([$solicitud_id, $_SESSION['user_id'], $contenido_nota]);
+    
+    // Registrar en historial
+    $stmt = $pdo->prepare("SELECT estado FROM solicitudes_credito WHERE id = ?");
+    $stmt->execute([$solicitud_id]);
+    $estadoActual = $stmt->fetchColumn();
+    registrarHistorialSolicitud($pdo, $solicitud_id, $_SESSION['user_id'], 'asignacion_banco', $contenido_nota, $estadoActual, 'En Revisión Banco');
     
     // Enviar notificación por correo al banco asignado (solo si email_helper está disponible)
     try {
