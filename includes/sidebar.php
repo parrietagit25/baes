@@ -59,6 +59,13 @@ $isVendedor = in_array('ROLE_VENDEDOR', $_SESSION['user_roles']);
         </a>
         <?php endif; ?>
         
+        <!-- Reportes - Solo Admin -->
+        <?php if ($isAdmin): ?>
+        <a class="nav-link <?php echo ($current_page == 'reportes.php') ? 'active' : ''; ?>" href="reportes.php">
+            <i class="fas fa-chart-bar me-2"></i>Reportes
+        </a>
+        <?php endif; ?>
+        
         <!-- Cerrar Sesión - Visible para todos -->
         <a class="nav-link" href="logout.php">
             <i class="fas fa-sign-out-alt me-2"></i>Cerrar Sesión
