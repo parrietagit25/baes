@@ -59,10 +59,23 @@ $isVendedor = in_array('ROLE_VENDEDOR', $_SESSION['user_roles']);
         </a>
         <?php endif; ?>
         
-        <!-- Reportes - Solo Admin -->
+        <!-- Reportes - Solo Admin (con submenú) -->
         <?php if ($isAdmin): ?>
-        <a class="nav-link <?php echo ($current_page == 'reportes.php') ? 'active' : ''; ?>" href="reportes.php">
-            <i class="fas fa-chart-bar me-2"></i>Reportes
+        <?php
+        $en_reportes = ($current_page == 'reportes.php');
+        $report_submenu = $en_reportes ? ($_GET['submenu'] ?? 'usuarios') : '';
+        ?>
+        <div class="nav-link py-2 <?php echo $en_reportes ? 'active' : ''; ?>">
+            <i class="fas fa-chart-bar me-2"></i><strong>Reportes</strong>
+        </div>
+        <a class="nav-link ps-4 py-1 small <?php echo ($report_submenu === 'usuarios') ? 'active' : ''; ?>" href="reportes.php?submenu=usuarios">
+            <i class="fas fa-users me-1"></i> Rep. Usuarios
+        </a>
+        <a class="nav-link ps-4 py-1 small <?php echo ($report_submenu === 'tiempo') ? 'active' : ''; ?>" href="reportes.php?submenu=tiempo">
+            <i class="fas fa-clock me-1"></i> Rep. Tiempo
+        </a>
+        <a class="nav-link ps-4 py-1 small <?php echo ($report_submenu === 'banco') ? 'active' : ''; ?>" href="reportes.php?submenu=banco">
+            <i class="fas fa-university me-1"></i> Rep. Banco
         </a>
         <?php endif; ?>
         

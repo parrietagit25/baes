@@ -15,7 +15,11 @@ if (!in_array('ROLE_ADMIN', $_SESSION['user_roles'])) {
 }
 
 $submenu = $_GET['submenu'] ?? 'usuarios';
+if (!in_array($submenu, ['usuarios', 'tiempo', 'banco'], true)) {
+    $submenu = 'usuarios';
+}
 $estadosCol = ['Nueva', 'En Revisión Banco', 'Aprobada', 'Rechazada', 'Completada', 'Desistimiento'];
+$titulosReporte = ['usuarios' => 'Rep. Usuarios', 'tiempo' => 'Rep. Tiempo', 'banco' => 'Rep. Banco'];
 ?>
 
 <!DOCTYPE html>
@@ -50,22 +54,13 @@ $estadosCol = ['Nueva', 'En Revisión Banco', 'Aprobada', 'Rechazada', 'Completa
             <div class="col-md-9 col-lg-10 main-content">
                 <div class="container-fluid py-4">
                     <div class="reportes-header">
-                        <h2 class="mb-1"><i class="fas fa-chart-bar me-2"></i>Reportes</h2>
-                        <p class="mb-0 opacity-90">Rep. Usuarios y Rep. Tiempo</p>
+                        <h2 class="mb-1"><i class="fas fa-chart-bar me-2"></i><?php echo htmlspecialchars($titulosReporte[$submenu]); ?></h2>
+                        <p class="mb-0 opacity-90"><?php
+                            if ($submenu === 'usuarios') echo 'Total de solicitudes por usuario y estado';
+                            elseif ($submenu === 'tiempo') echo 'Tiempo entre cambios de estado por solicitud';
+                            else echo 'Tiempo que tardan los bancos en dar respuesta a las solicitudes asignadas';
+                        ?></p>
                     </div>
-
-                    <ul class="nav nav-pills submenu-reportes mb-4">
-                        <li class="nav-item">
-                            <a class="nav-link <?php echo $submenu === 'usuarios' ? 'active' : ''; ?>" href="reportes.php?submenu=usuarios">
-                                <i class="fas fa-users me-1"></i> Rep. Usuarios
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link <?php echo $submenu === 'tiempo' ? 'active' : ''; ?>" href="reportes.php?submenu=tiempo">
-                                <i class="fas fa-clock me-1"></i> Rep. Tiempo
-                            </a>
-                        </li>
-                    </ul>
 
                     <!-- Rep. Usuarios -->
                     <div id="panel-usuarios" class="report-panel" style="display: <?php echo $submenu === 'usuarios' ? 'block' : 'none'; ?>">
@@ -106,6 +101,30 @@ $estadosCol = ['Nueva', 'En Revisión Banco', 'Aprobada', 'Rechazada', 'Completa
                                                 <th>Última actualización</th>
                                                 <th>Tiempo en estado actual</th>
                                                 <th>Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Rep. Banco -->
+                    <div id="panel-banco" class="report-panel" style="display: <?php echo $submenu === 'banco' ? 'block' : 'none'; ?>">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title mb-3">Tiempo de respuesta del banco por solicitud</h5>
+                                <div class="table-responsive">
+                                    <table class="table table-bordered table-reportes" id="tabla-banco">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Id</th>
+                                                <th>Cliente</th>
+                                                <th>Banco</th>
+                                                <th>Fecha asignación</th>
+                                                <th>Fecha respuesta</th>
+                                                <th>Tiempo de respuesta</th>
                                             </tr>
                                         </thead>
                                         <tbody></tbody>
@@ -170,6 +189,8 @@ $estadosCol = ['Nueva', 'En Revisión Banco', 'Aprobada', 'Rechazada', 'Completa
         loadReporteUsuarios();
     } else if (submenu === 'tiempo') {
         loadReporteTiempo();
+    } else if (submenu === 'banco') {
+        loadReporteBanco();
     }
 
     function loadReporteUsuarios() {
@@ -245,6 +266,30 @@ $estadosCol = ['Nueva', 'En Revisión Banco', 'Aprobada', 'Rechazada', 'Completa
                 });
             })
             .catch(() => { document.querySelector('#tabla-tiempo tbody').innerHTML = '<tr><td colspan="7" class="text-center text-danger">Error al cargar</td></tr>'; });
+    }
+
+    function loadReporteBanco() {
+        fetch('api/reportes.php?action=reporte_banco')
+            .then(r => r.json())
+            .then(data => {
+                const tbody = document.querySelector('#tabla-banco tbody');
+                if (!data.success) { tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Sin datos</td></tr>'; return; }
+                let html = '';
+                data.data.forEach(row => {
+                    let tiempo = '-';
+                    if (row.pendiente) {
+                        tiempo = '<span class="text-muted">Pendiente</span>';
+                    } else if (row.dias_respuesta != null) {
+                        if (row.dias_respuesta > 0) tiempo = row.dias_respuesta + ' día(s)';
+                        else tiempo = (row.horas_respuesta || 0) + ' hora(s)';
+                    }
+                    const fechaResp = row.fecha_respuesta ? row.fecha_respuesta : '-';
+                    html += '<tr><td>' + row.solicitud_id + '</td><td>' + escapeHtml(row.nombre_cliente || '') + '</td><td>' + escapeHtml(row.banco_nombre || '-') + '</td><td>' + (row.fecha_asignacion || '-') + '</td><td>' + fechaResp + '</td><td>' + tiempo + '</td></tr>';
+                });
+                if (!html) html = '<tr><td colspan="6" class="text-center text-muted">Sin datos</td></tr>';
+                tbody.innerHTML = html;
+            })
+            .catch(() => { document.querySelector('#tabla-banco tbody').innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error al cargar</td></tr>'; });
     }
 
     function abrirModalHistorial(solicitudId, cliente) {

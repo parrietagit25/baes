@@ -29,6 +29,9 @@ switch ($action) {
     case 'historial_solicitud':
         historialSolicitud();
         break;
+    case 'reporte_banco':
+        reporteBanco();
+        break;
     default:
         echo json_encode(['success' => false, 'message' => 'Acción no válida']);
 }
@@ -194,6 +197,56 @@ function historialSolicitud() {
         }
         
         echo json_encode(['success' => true, 'data' => $historial]);
+    } catch (PDOException $e) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Error de base de datos']);
+    }
+}
+
+/**
+ * Rep. Banco: tiempo que tardan los bancos en dar respuesta a las solicitudes asignadas.
+ * Desde fecha_asignacion (usuarios_banco_solicitudes) hasta primera fecha_evaluacion (evaluaciones_banco).
+ */
+function reporteBanco() {
+    global $pdo;
+    try {
+        $sql = "
+            SELECT 
+                s.id AS solicitud_id,
+                s.nombre_cliente,
+                s.cedula,
+                s.estado,
+                b.id AS banco_id,
+                b.nombre AS banco_nombre,
+                ubs.fecha_asignacion,
+                MIN(eb.fecha_evaluacion) AS fecha_respuesta
+            FROM solicitudes_credito s
+            INNER JOIN usuarios_banco_solicitudes ubs ON ubs.solicitud_id = s.id
+            INNER JOIN usuarios u ON u.id = ubs.usuario_banco_id
+            LEFT JOIN bancos b ON b.id = u.banco_id
+            LEFT JOIN evaluaciones_banco eb ON eb.solicitud_id = s.id AND eb.usuario_banco_id = ubs.id
+            GROUP BY s.id, s.nombre_cliente, s.cedula, s.estado, b.id, b.nombre, ubs.id, ubs.fecha_asignacion
+            ORDER BY ubs.fecha_asignacion DESC
+        ";
+        $stmt = $pdo->query($sql);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        foreach ($rows as &$r) {
+            $r['dias_respuesta'] = null;
+            $r['horas_respuesta'] = null;
+            $r['pendiente'] = empty($r['fecha_respuesta']);
+            if (!empty($r['fecha_respuesta']) && !empty($r['fecha_asignacion'])) {
+                $stmt2 = $pdo->prepare("
+                    SELECT TIMESTAMPDIFF(DAY, ?, ?) AS dias, TIMESTAMPDIFF(HOUR, ?, ?) AS horas
+                ");
+                $stmt2->execute([$r['fecha_asignacion'], $r['fecha_respuesta'], $r['fecha_asignacion'], $r['fecha_respuesta']]);
+                $d = $stmt2->fetch(PDO::FETCH_ASSOC);
+                $r['dias_respuesta'] = (int)$d['dias'];
+                $r['horas_respuesta'] = (int)$d['horas'];
+            }
+        }
+        
+        echo json_encode(['success' => true, 'data' => $rows]);
     } catch (PDOException $e) {
         http_response_code(500);
         echo json_encode(['success' => false, 'message' => 'Error de base de datos']);
