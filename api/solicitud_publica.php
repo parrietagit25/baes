@@ -82,6 +82,10 @@ function getDefaultGestorId($pdo) {
         LIMIT 1
     ");
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($row) return (int)$row['id'];
+    // Fallback: cualquier usuario activo (por si no hay roles asignados correctamente)
+    $stmt = $pdo->query("SELECT id FROM usuarios WHERE activo = 1 ORDER BY id ASC LIMIT 1");
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
     return $row ? (int)$row['id'] : null;
 }
 
