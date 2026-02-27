@@ -37,6 +37,9 @@ $debugMode = (getenv('SOLICITUD_PUBLICA_DEBUG') === '1' || getenv('APP_DEBUG') =
 function logSolPub($msg) {
     @file_put_contents($GLOBALS['logFile'], date('Y-m-d H:i:s') . ' ' . $msg . "\n", FILE_APPEND | LOCK_EX);
 }
+
+/*
+
 function sendError500($message, $detail = null) {
     $payload = ['success' => false, 'message' => $message];
     if ($detail !== null) {
@@ -47,6 +50,7 @@ function sendError500($message, $detail = null) {
     echo json_encode($payload);
     exit();
 }
+*/
 // Capturar cualquier error fatal o excepción no capturada
 set_exception_handler(function (Throwable $e) {
     logSolPub('UNCAUGHT: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
@@ -55,6 +59,7 @@ set_exception_handler(function (Throwable $e) {
         $e->getMessage() . ' en ' . basename($e->getFile()) . ':' . $e->getLine()
     );
 });
+
 set_error_handler(function ($severity, $message, $file, $line) {
     if (!(error_reporting() & $severity)) return false;
     // Solo convertir errores fatales en excepción para no romper el JSON
@@ -63,15 +68,17 @@ set_error_handler(function ($severity, $message, $file, $line) {
     }
     return false;
 });
-
+/*
 logSolPub('start');
-
+*/
+/*
 $configPath = __DIR__ . '/../config/database.php';
 $historialPath = __DIR__ . '/../includes/historial_helper.php';
 if (!is_file($configPath) || !is_file($historialPath)) {
     logSolPub('missing file: config=' . (is_file($configPath) ? 'ok' : $configPath) . ' historial=' . (is_file($historialPath) ? 'ok' : $historialPath));
     sendError500('Error de configuración del servidor.', 'Faltan config/database.php o includes/historial_helper.php');
 }
+    */
 try {
     require_once $configPath;
     require_once $historialPath;
@@ -84,7 +91,7 @@ if (!isset($pdo) || !($pdo instanceof PDO)) {
     logSolPub('pdo no definido');
     sendError500('Error de configuración del servidor.', 'Variable $pdo no definida tras cargar database.php');
 }
-logSolPub('pdo ok');
+//logSolPub('pdo ok');
 
 // Obtener body JSON si viene por fetch
 $input = $_POST;
@@ -100,7 +107,7 @@ $token = isset($input['token']) ? trim($input['token']) : '';
 $token = $token !== '' ? urldecode($token) : '';
 $firmaBase64 = isset($input['firma']) ? $input['firma'] : '';
 unset($input['token'], $input['firma']);
-
+/*
 function getDefaultGestorId($pdo) {
     $stmt = $pdo->query("
         SELECT u.id FROM usuarios u
@@ -116,7 +123,7 @@ function getDefaultGestorId($pdo) {
     $stmt = $pdo->query("SELECT id FROM usuarios WHERE activo = 1 ORDER BY id ASC LIMIT 1");
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
     return $row ? (int)$row['id'] : null;
-}
+} */
 
 function mapGenero($v) {
     if (empty($v)) return null;
@@ -200,11 +207,13 @@ try {
     logSolPub('get gestor');
     $gestorId = getDefaultGestorId($pdo);
     logSolPub('gestorId=' . ($gestorId ?: 'null'));
+    /*
     if (!$gestorId) {
         http_response_code(500);
         echo json_encode(['success' => false, 'message' => 'No hay gestor configurado para recibir solicitudes']);
         exit();
     }
+        */
 
     // Campos obligatorios mínimos
     $nombre = trim($input['cliente_nombre'] ?? $input['nombre_cliente'] ?? '');
