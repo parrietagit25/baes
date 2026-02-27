@@ -2,6 +2,8 @@
 /**
  * Formulario público de Solicitud de Financiamiento (Wizard).
  * Acceso sin login. Al enviar se crea una solicitud en el sistema.
+ * pailas 
+ * palis
  */
 // Sin verificación de sesión: página pública
 ?>
