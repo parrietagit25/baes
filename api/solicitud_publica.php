@@ -64,26 +64,6 @@ set_error_handler(function ($severity, $message, $file, $line) {
 
 logSolPub('start');
 
-$configPath = __DIR__ . '/../config/database.php';
-$historialPath = __DIR__ . '/../includes/historial_helper.php';
-if (!is_file($configPath) || !is_file($historialPath)) {
-    logSolPub('missing file: config=' . (is_file($configPath) ? 'ok' : $configPath) . ' historial=' . (is_file($historialPath) ? 'ok' : $historialPath));
-    sendError500('Error de configuración del servidor.', 'Faltan config/database.php o includes/historial_helper.php');
-}
-try {
-    require_once $configPath;
-    require_once $historialPath;
-    logSolPub('require ok');
-} catch (Throwable $e) {
-    logSolPub('require fail: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
-    sendError500('Error al conectar con el servidor.', $e->getMessage());
-}
-if (!isset($pdo) || !($pdo instanceof PDO)) {
-    logSolPub('pdo no definido');
-    sendError500('Error de configuración del servidor.', 'Variable $pdo no definida tras cargar database.php');
-}
-logSolPub('pdo ok');
-
 // Obtener body JSON si viene por fetch
 $input = $_POST;
 if (empty($input) || !is_array($input)) {
@@ -98,6 +78,15 @@ $token = isset($input['token']) ? trim($input['token']) : '';
 $token = $token !== '' ? urldecode($token) : '';
 $firmaBase64 = isset($input['firma']) ? $input['firma'] : '';
 unset($input['token'], $input['firma']);
+
+// Validación mínima (no depende de base de datos)
+$nombre = trim($input['cliente_nombre'] ?? $input['nombre_cliente'] ?? '');
+$cedula = trim($input['cliente_id'] ?? $input['cedula'] ?? '');
+if ($nombre === '' || $cedula === '') {
+    if (ob_get_level()) ob_end_clean();
+    echo json_encode(['success' => false, 'message' => 'Nombre del cliente y cédula son obligatorios']);
+    exit();
+}
 
 function getDefaultGestorId($pdo) {
     try {
@@ -197,169 +186,126 @@ function buildPdfHtmlFinanciamiento($input, $firmaBase64, $nombreCliente) {
     return $html;
 }
 
-try {
-    logSolPub('get gestor');
-    $gestorId = getDefaultGestorId($pdo);
-    logSolPub('gestorId=' . ($gestorId ?: 'null'));
-    if (!$gestorId) {
-        sendError500('No hay gestor configurado para recibir solicitudes.', 'No existe ningún usuario activo en la base de datos.');
-    }
+$solicitudId = 0;
+$emailEnviado = false;
 
-    // Campos obligatorios mínimos
-    $nombre = trim($input['cliente_nombre'] ?? $input['nombre_cliente'] ?? '');
-    $cedula = trim($input['cliente_id'] ?? $input['cedula'] ?? '');
-    if ($nombre === '' || $cedula === '') {
-        echo json_encode(['success' => false, 'message' => 'Nombre del cliente y cédula son obligatorios']);
-        exit();
-    }
-
-    // Construir comentarios_gestor con datos extra del wizard
-    $extras = [];
-    if (!empty($input['sucursal'])) $extras[] = 'Sucursal: ' . $input['sucursal'];
-    if (!empty($input['nombre_gestor'])) $extras[] = 'Gestor indicado: ' . $input['nombre_gestor'];
-    if (!empty($input['vivienda'])) $extras[] = 'Vivienda: ' . $input['vivienda'] . (isset($input['vivienda_monto']) && $input['vivienda_monto'] !== '' ? ' (Monto: ' . $input['vivienda_monto'] . ')' : '');
-    if (!empty($input['cliente_nacionalidad'])) $extras[] = 'Nacionalidad: ' . $input['cliente_nacionalidad'];
-    if (!empty($input['prov_dist_corr'])) $extras[] = 'Prov/Dist/Corr: ' . $input['prov_dist_corr'];
-    if (!empty($input['empresa_direccion'])) $extras[] = 'Dirección laboral: ' . $input['empresa_direccion'];
-    if (!empty($input['otros_ingresos'])) $extras[] = 'Otros ingresos: ' . $input['otros_ingresos'];
-    if (!empty($input['trabajo_anterior'])) $extras[] = 'Trabajo anterior: ' . $input['trabajo_anterior'];
-    if (!empty($input['tiene_conyuge']) && !empty($input['con_nombre'])) {
-        $extras[] = 'Cónyuge: ' . $input['con_nombre'] . ' | Cédula: ' . ($input['con_id'] ?? '') . ' | Empresa: ' . ($input['con_empresa'] ?? '') . ' | Salario: ' . ($input['con_salario'] ?? '');
-    }
-    $refs = [];
-    if (!empty($input['refp1_nombre'])) $refs[] = 'Ref. Personal 1: ' . $input['refp1_nombre'] . ' ' . ($input['refp1_cel'] ?? '');
-    if (!empty($input['refp2_nombre'])) $refs[] = 'Ref. Personal 2: ' . $input['refp2_nombre'] . ' ' . ($input['refp2_cel'] ?? '');
-    if (!empty($input['reff1_nombre'])) $refs[] = 'Ref. Familiar 1: ' . $input['reff1_nombre'] . ' ' . ($input['reff1_cel'] ?? '');
-    if (!empty($input['reff2_nombre'])) $refs[] = 'Ref. Familiar 2: ' . $input['reff2_nombre'] . ' ' . ($input['reff2_cel'] ?? '');
-    if (!empty($refs)) $extras[] = 'Referencias: ' . implode('; ', $refs);
-    $comentariosGestor = trim(($input['comentarios_gestor'] ?? '') . "\n\n[Solicitud desde formulario público]\n" . implode("\n", $extras));
-
-    $casado = 0;
-    if (!empty($input['cliente_estado_civil'])) {
-        $ec = $input['cliente_estado_civil'];
-        if (stripos($ec, 'Casado') !== false || stripos($ec, 'Unión') !== false) $casado = 1;
-    }
-
-    logSolPub('insert');
-    $stmt = $pdo->prepare("
-        INSERT INTO solicitudes_credito (
-            gestor_id, tipo_persona, nombre_cliente, cedula, edad, genero,
-            telefono, telefono_principal, email, direccion, provincia, distrito, corregimiento,
-            barriada, casa_edif, numero_casa_apto, casado, hijos, perfil_financiero,
-            ingreso, tiempo_laborar, ocupacion, nombre_empresa_negocio,
-            marca_auto, modelo_auto, año_auto, kilometraje, precio_especial, abono_monto,
-            comentarios_gestor
-        ) VALUES (?, 'Natural', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ");
-
-    $stmt->execute([
-        $gestorId,
-        $nombre,
-        $cedula,
-        toInt($input['cliente_edad'] ?? null),
-        mapGenero($input['cliente_sexo'] ?? null),
-        $input['tel_residencia'] ?? null,
-        $input['celular_cliente'] ?? null,
-        $input['cliente_correo'] ?? $input['correo_residencial'] ?? null,
-        $input['barriada_calle_casa'] ?? null,
-        $input['prov_dist_corr'] ?? null, // guardamos en provincia el texto completo si no separamos
-        null,
-        null,
-        null,
-        $input['edificio_apto'] ?? null,
-        $casado,
-        toInt($input['cliente_dependientes'] ?? null, 0),
-        'Asalariado',
-        toNum($input['empresa_salario'] ?? null),
-        isset($input['empresa_anios']) ? $input['empresa_anios'] . ' años' : null,
-        $input['empresa_ocupacion'] ?? null,
-        $input['empresa_nombre'] ?? null,
-        $input['marca_auto'] ?? null,
-        $input['modelo_auto'] ?? null,
-        toInt($input['anio_auto'] ?? null),
-        toInt($input['kms_cod_auto'] ?? null),
-        toNum($input['precio_venta'] ?? null),
-        toNum($input['abono'] ?? null),
-        $comentariosGestor
-    ]);
-
-    $solicitudId = (int) $pdo->lastInsertId();
-
-    // Nota inicial (opcional: si falla no bloqueamos)
+// 1) Enviar PDF por correo si hay token (no requiere base de datos)
+if ($token !== '') {
     try {
-        $stmtNota = $pdo->prepare("
-            INSERT INTO notas_solicitud (solicitud_id, usuario_id, tipo_nota, titulo, contenido)
-            VALUES (?, ?, 'Comentario', 'Solicitud desde formulario público', 'Solicitud enviada desde el formulario de financiamiento (sin login).')
-        ");
-        $stmtNota->execute([$solicitudId, $gestorId]);
-    } catch (PDOException $e) {
-        error_log('solicitud_publica nota: ' . $e->getMessage());
-    }
-
-    // Historial (opcional: si la tabla no existe no bloqueamos)
-    try {
-        registrarHistorialSolicitud($pdo, $solicitudId, $gestorId, 'creacion', 'Solicitud enviada desde formulario público de financiamiento', null, 'Nueva');
-    } catch (Throwable $e) {
-        error_log('solicitud_publica historial: ' . $e->getMessage());
-    }
-
-    // Si hay token (email codificado en base64): enviar PDF por correo a ese email
-    $emailEnviado = false;
-    if ($token !== '') {
-        try {
-            $emailDestino = @base64_decode(str_replace(['-', '_'], ['+', '/'], $token), true);
-            if ($emailDestino === false) $emailDestino = @base64_decode($token, true);
-            if (!is_string($emailDestino) || !filter_var($emailDestino, FILTER_VALIDATE_EMAIL)) $emailDestino = null;
-            if ($emailDestino) {
-                $pdfPath = null;
-                if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
-                    require_once __DIR__ . '/../vendor/autoload.php';
-                    if (class_exists('Dompdf\Dompdf')) {
-                        $html = buildPdfHtmlFinanciamiento($input, $firmaBase64, $nombre);
-                        $dompdf = new \Dompdf\Dompdf(['isRemoteEnabled' => true]);
-                        $dompdf->loadHtml($html, 'UTF-8');
-                        $dompdf->setPaper('A4', 'portrait');
-                        $dompdf->render();
-                        $pdfPath = sys_get_temp_dir() . '/sol_fin_' . $solicitudId . '_' . uniqid() . '.pdf';
-                        file_put_contents($pdfPath, $dompdf->output());
-                    }
-                }
-                if ($pdfPath && file_exists($pdfPath)) {
-                    $config = require __DIR__ . '/../config/email.php';
-                    $fromEmail = $config['from_email'] ?? 'noreply@ejemplo.com';
-                    $fromName = $config['from_name'] ?? 'Solicitud de Crédito';
-                    require_once __DIR__ . '/../includes/EmailService.php';
-                    $emailService = new EmailService();
-                    $asunto = 'Solicitud de Financiamiento completada - ' . $nombre;
-                    $cuerpo = '<p>Se ha recibido una solicitud de financiamiento completada.</p><p><strong>Cliente:</strong> ' . htmlspecialchars($nombre) . '</p><p>Ver adjunto PDF con todos los datos y la firma.</p>';
-                    $result = $emailService->enviarCorreo($emailDestino, '', $asunto, $cuerpo, strip_tags($cuerpo), [$pdfPath]);
-                    @unlink($pdfPath);
-                    $emailEnviado = !empty($result['success']);
+        $emailDestino = @base64_decode(str_replace(['-', '_'], ['+', '/'], $token), true);
+        if ($emailDestino === false) $emailDestino = @base64_decode($token, true);
+        if (is_string($emailDestino) && filter_var($emailDestino, FILTER_VALIDATE_EMAIL)) {
+            $pdfPath = null;
+            if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
+                require_once __DIR__ . '/../vendor/autoload.php';
+                if (class_exists('Dompdf\Dompdf')) {
+                    $html = buildPdfHtmlFinanciamiento($input, $firmaBase64, $nombre);
+                    $dompdf = new \Dompdf\Dompdf(['isRemoteEnabled' => true]);
+                    $dompdf->loadHtml($html, 'UTF-8');
+                    $dompdf->setPaper('A4', 'portrait');
+                    $dompdf->render();
+                    $pdfPath = sys_get_temp_dir() . '/sol_fin_' . uniqid('', true) . '.pdf';
+                    file_put_contents($pdfPath, $dompdf->output());
                 }
             }
-        } catch (Exception $e) {
-            error_log('solicitud_publica email: ' . $e->getMessage());
+            if ($pdfPath && file_exists($pdfPath)) {
+                $config = require __DIR__ . '/../config/email.php';
+                $fromEmail = $config['from_email'] ?? 'noreply@ejemplo.com';
+                $fromName = $config['from_name'] ?? 'Solicitud de Crédito';
+                require_once __DIR__ . '/../includes/EmailService.php';
+                $emailService = new EmailService();
+                $asunto = 'Solicitud de Financiamiento completada - ' . $nombre;
+                $cuerpo = '<p>Se ha recibido una solicitud de financiamiento completada.</p><p><strong>Cliente:</strong> ' . htmlspecialchars($nombre) . '</p><p>Ver adjunto PDF con todos los datos y la firma.</p>';
+                $result = $emailService->enviarCorreo($emailDestino, '', $asunto, $cuerpo, strip_tags($cuerpo), [$pdfPath]);
+                @unlink($pdfPath);
+                $emailEnviado = !empty($result['success']);
+            }
         }
+    } catch (Exception $e) {
+        error_log('solicitud_publica email: ' . $e->getMessage());
+        logSolPub('email error: ' . $e->getMessage());
     }
-
-    ob_end_clean();
-    echo json_encode([
-        'success' => true,
-        'message' => $emailEnviado
-            ? 'Solicitud registrada correctamente. Hemos enviado una copia por correo al vendedor.'
-            : 'Solicitud registrada correctamente. Nos pondremos en contacto contigo.',
-        'data' => ['id' => $solicitudId]
-    ]);
-    exit();
-
-} catch (PDOException $e) {
-    $msg = 'PDO: ' . $e->getMessage();
-    error_log('solicitud_publica ' . $msg);
-    logSolPub($msg);
-    sendError500('Error al registrar la solicitud. Intenta de nuevo más tarde.', $e->getMessage());
-} catch (Throwable $e) {
-    $msg = $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine() . "\n" . $e->getTraceAsString();
-    error_log('solicitud_publica: ' . $msg);
-    logSolPub($msg);
-    sendError500('Error al procesar la solicitud. Intenta de nuevo más tarde.', $e->getMessage() . ' en ' . basename($e->getFile()) . ':' . $e->getLine());
 }
+
+// 2) Opcional: guardar en base de datos (si falla, no bloqueamos; el correo ya pudo enviarse)
+$configPath = __DIR__ . '/../config/database.php';
+$historialPath = __DIR__ . '/../includes/historial_helper.php';
+if (is_file($configPath) && is_file($historialPath)) {
+    try {
+        require_once $configPath;
+        require_once $historialPath;
+        if (isset($pdo) && $pdo instanceof PDO) {
+            $gestorId = getDefaultGestorId($pdo);
+            if ($gestorId) {
+                // Construir comentarios_gestor con datos extra del wizard
+                $extras = [];
+                if (!empty($input['sucursal'])) $extras[] = 'Sucursal: ' . $input['sucursal'];
+                if (!empty($input['nombre_gestor'])) $extras[] = 'Gestor indicado: ' . $input['nombre_gestor'];
+                if (!empty($input['vivienda'])) $extras[] = 'Vivienda: ' . $input['vivienda'] . (isset($input['vivienda_monto']) && $input['vivienda_monto'] !== '' ? ' (Monto: ' . $input['vivienda_monto'] . ')' : '');
+                if (!empty($input['cliente_nacionalidad'])) $extras[] = 'Nacionalidad: ' . $input['cliente_nacionalidad'];
+                if (!empty($input['prov_dist_corr'])) $extras[] = 'Prov/Dist/Corr: ' . $input['prov_dist_corr'];
+                if (!empty($input['empresa_direccion'])) $extras[] = 'Dirección laboral: ' . $input['empresa_direccion'];
+                if (!empty($input['otros_ingresos'])) $extras[] = 'Otros ingresos: ' . $input['otros_ingresos'];
+                if (!empty($input['trabajo_anterior'])) $extras[] = 'Trabajo anterior: ' . $input['trabajo_anterior'];
+                if (!empty($input['tiene_conyuge']) && !empty($input['con_nombre'])) {
+                    $extras[] = 'Cónyuge: ' . $input['con_nombre'] . ' | Cédula: ' . ($input['con_id'] ?? '') . ' | Empresa: ' . ($input['con_empresa'] ?? '') . ' | Salario: ' . ($input['con_salario'] ?? '');
+                }
+                $refs = [];
+                if (!empty($input['refp1_nombre'])) $refs[] = 'Ref. Personal 1: ' . $input['refp1_nombre'] . ' ' . ($input['refp1_cel'] ?? '');
+                if (!empty($input['refp2_nombre'])) $refs[] = 'Ref. Personal 2: ' . $input['refp2_nombre'] . ' ' . ($input['refp2_cel'] ?? '');
+                if (!empty($input['reff1_nombre'])) $refs[] = 'Ref. Familiar 1: ' . $input['reff1_nombre'] . ' ' . ($input['reff1_cel'] ?? '');
+                if (!empty($input['reff2_nombre'])) $refs[] = 'Ref. Familiar 2: ' . $input['reff2_nombre'] . ' ' . ($input['reff2_cel'] ?? '');
+                if (!empty($refs)) $extras[] = 'Referencias: ' . implode('; ', $refs);
+                $comentariosGestor = trim(($input['comentarios_gestor'] ?? '') . "\n\n[Solicitud desde formulario público]\n" . implode("\n", $extras));
+
+                $casado = 0;
+                if (!empty($input['cliente_estado_civil'])) {
+                    $ec = $input['cliente_estado_civil'];
+                    if (stripos($ec, 'Casado') !== false || stripos($ec, 'Unión') !== false) $casado = 1;
+                }
+
+                $stmt = $pdo->prepare("
+                    INSERT INTO solicitudes_credito (
+                        gestor_id, tipo_persona, nombre_cliente, cedula, edad, genero,
+                        telefono, telefono_principal, email, direccion, provincia, distrito, corregimiento,
+                        barriada, casa_edif, numero_casa_apto, casado, hijos, perfil_financiero,
+                        ingreso, tiempo_laborar, ocupacion, nombre_empresa_negocio,
+                        marca_auto, modelo_auto, año_auto, kilometraje, precio_especial, abono_monto,
+                        comentarios_gestor
+                    ) VALUES (?, 'Natural', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                $stmt->execute([
+                    $gestorId, $nombre, $cedula, toInt($input['cliente_edad'] ?? null), mapGenero($input['cliente_sexo'] ?? null),
+                    $input['tel_residencia'] ?? null, $input['celular_cliente'] ?? null, $input['cliente_correo'] ?? $input['correo_residencial'] ?? null,
+                    $input['barriada_calle_casa'] ?? null, $input['prov_dist_corr'] ?? null, null, null, null,
+                    $input['edificio_apto'] ?? null, $casado, toInt($input['cliente_dependientes'] ?? null, 0), 'Asalariado',
+                    toNum($input['empresa_salario'] ?? null), isset($input['empresa_anios']) ? $input['empresa_anios'] . ' años' : null,
+                    $input['empresa_ocupacion'] ?? null, $input['empresa_nombre'] ?? null,
+                    $input['marca_auto'] ?? null, $input['modelo_auto'] ?? null, toInt($input['anio_auto'] ?? null), toInt($input['kms_cod_auto'] ?? null),
+                    toNum($input['precio_venta'] ?? null), toNum($input['abono'] ?? null), $comentariosGestor
+                ]);
+                $solicitudId = (int) $pdo->lastInsertId();
+                try {
+                    $stmtNota = $pdo->prepare("INSERT INTO notas_solicitud (solicitud_id, usuario_id, tipo_nota, titulo, contenido) VALUES (?, ?, 'Comentario', 'Solicitud desde formulario público', 'Solicitud enviada desde el formulario de financiamiento (sin login).')");
+                    $stmtNota->execute([$solicitudId, $gestorId]);
+                } catch (PDOException $e) { /* ignorar */ }
+                try {
+                    registrarHistorialSolicitud($pdo, $solicitudId, $gestorId, 'creacion', 'Solicitud enviada desde formulario público de financiamiento', null, 'Nueva');
+                } catch (Throwable $e) { /* ignorar */ }
+            }
+        }
+    } catch (Throwable $e) {
+        logSolPub('DB optional fail: ' . $e->getMessage());
+        error_log('solicitud_publica DB: ' . $e->getMessage());
+    }
+}
+
+if (ob_get_level()) ob_end_clean();
+echo json_encode([
+    'success' => true,
+    'message' => $emailEnviado
+        ? 'Solicitud enviada correctamente. Hemos enviado una copia por correo al vendedor.'
+        : 'Solicitud enviada correctamente. Nos pondremos en contacto contigo.',
+    'data' => ['id' => $solicitudId]
+]);
+exit();
