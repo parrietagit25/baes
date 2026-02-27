@@ -3,7 +3,6 @@
  * API pública para crear solicitudes desde el formulario externo (sin login).
  * Solo acepta POST para crear una solicitud.
  */
-/*
 error_reporting(E_ALL);
 ini_set('display_errors', '0');
 ini_set('log_errors', '1');
@@ -15,30 +14,22 @@ header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');
 
-/*
-
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
     exit();
 }
-
-
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
     echo json_encode(['success' => false, 'message' => 'Método no permitido']);
     exit();
 }
-    
-*/
 
 $logFile = '/tmp/solicitud_publica_baes_log.txt';
 $debugMode = (getenv('SOLICITUD_PUBLICA_DEBUG') === '1' || getenv('APP_DEBUG') === '1');
 function logSolPub($msg) {
     @file_put_contents($GLOBALS['logFile'], date('Y-m-d H:i:s') . ' ' . $msg . "\n", FILE_APPEND | LOCK_EX);
 }
-
-/*
 
 function sendError500($message, $detail = null) {
     $payload = ['success' => false, 'message' => $message];
@@ -50,8 +41,7 @@ function sendError500($message, $detail = null) {
     echo json_encode($payload);
     exit();
 }
-*/
-// Capturar cualquier error fatal o excepción no capturada
+
 set_exception_handler(function (Throwable $e) {
     logSolPub('UNCAUGHT: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
     sendError500(
@@ -62,23 +52,20 @@ set_exception_handler(function (Throwable $e) {
 
 set_error_handler(function ($severity, $message, $file, $line) {
     if (!(error_reporting() & $severity)) return false;
-    // Solo convertir errores fatales en excepción para no romper el JSON
     if (in_array($severity, [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR], true)) {
         throw new ErrorException($message, 0, $severity, $file, $line);
     }
     return false;
 });
-/*
+
 logSolPub('start');
-*/
-/*
+
 $configPath = __DIR__ . '/../config/database.php';
 $historialPath = __DIR__ . '/../includes/historial_helper.php';
 if (!is_file($configPath) || !is_file($historialPath)) {
     logSolPub('missing file: config=' . (is_file($configPath) ? 'ok' : $configPath) . ' historial=' . (is_file($historialPath) ? 'ok' : $historialPath));
     sendError500('Error de configuración del servidor.', 'Faltan config/database.php o includes/historial_helper.php');
 }
-    */
 try {
     require_once $configPath;
     require_once $historialPath;
@@ -91,7 +78,7 @@ if (!isset($pdo) || !($pdo instanceof PDO)) {
     logSolPub('pdo no definido');
     sendError500('Error de configuración del servidor.', 'Variable $pdo no definida tras cargar database.php');
 }
-//logSolPub('pdo ok');
+logSolPub('pdo ok');
 
 // Obtener body JSON si viene por fetch
 $input = $_POST;
@@ -107,23 +94,26 @@ $token = isset($input['token']) ? trim($input['token']) : '';
 $token = $token !== '' ? urldecode($token) : '';
 $firmaBase64 = isset($input['firma']) ? $input['firma'] : '';
 unset($input['token'], $input['firma']);
-/*
+
 function getDefaultGestorId($pdo) {
-    $stmt = $pdo->query("
-        SELECT u.id FROM usuarios u
-        INNER JOIN usuario_roles ur ON ur.usuario_id = u.id
-        INNER JOIN roles r ON r.id = ur.rol_id
-        WHERE u.activo = 1 AND r.nombre IN ('ROLE_ADMIN', 'ROLE_GESTOR')
-        ORDER BY r.nombre = 'ROLE_ADMIN' DESC, u.id ASC
-        LIMIT 1
-    ");
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
-    if ($row) return (int)$row['id'];
-    // Fallback: cualquier usuario activo (por si no hay roles asignados correctamente)
+    try {
+        $stmt = $pdo->query("
+            SELECT u.id FROM usuarios u
+            INNER JOIN usuario_roles ur ON ur.usuario_id = u.id
+            INNER JOIN roles r ON r.id = ur.rol_id
+            WHERE u.activo = 1 AND r.nombre IN ('ROLE_ADMIN', 'ROLE_GESTOR')
+            ORDER BY r.nombre = 'ROLE_ADMIN' DESC, u.id ASC
+            LIMIT 1
+        ");
+        $row = $stmt ? $stmt->fetch(PDO::FETCH_ASSOC) : null;
+        if ($row) return (int)$row['id'];
+    } catch (PDOException $e) {
+        // Si no existe tabla usuario_roles, usar fallback
+    }
     $stmt = $pdo->query("SELECT id FROM usuarios WHERE activo = 1 ORDER BY id ASC LIMIT 1");
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    $row = $stmt ? $stmt->fetch(PDO::FETCH_ASSOC) : null;
     return $row ? (int)$row['id'] : null;
-} */
+}
 
 function mapGenero($v) {
     if (empty($v)) return null;
@@ -207,13 +197,9 @@ try {
     logSolPub('get gestor');
     $gestorId = getDefaultGestorId($pdo);
     logSolPub('gestorId=' . ($gestorId ?: 'null'));
-    /*
     if (!$gestorId) {
-        http_response_code(500);
-        echo json_encode(['success' => false, 'message' => 'No hay gestor configurado para recibir solicitudes']);
-        exit();
+        sendError500('No hay gestor configurado para recibir solicitudes.', 'No existe ningún usuario activo en la base de datos.');
     }
-        */
 
     // Campos obligatorios mínimos
     $nombre = trim($input['cliente_nombre'] ?? $input['nombre_cliente'] ?? '');
