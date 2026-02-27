@@ -1,11 +1,9 @@
 <?php
 /**
  * Formulario público de Solicitud de Financiamiento (Wizard).
- * Acceso sin login. Al enviar se crea una solicitud en el sistema.
- * pailas 
- * palis
+ * Acceso sin login. Si se accede con ?t=TOKEN, al enviar se envía por correo el PDF al email del vendedor.
  */
-// Sin verificación de sesión: página pública
+$tokenLink = isset($_GET['t']) ? trim($_GET['t']) : '';
 ?>
 <!doctype html>
 <html lang="es">
@@ -828,6 +826,16 @@
             <input id="reff2_dir_lab" name="reff2_dir_lab" maxlength="140" />
             <div class="error" data-error-for="reff2_dir_lab"></div>
           </div>
+          <div class="col-12" style="margin-top:14px">
+            <label class="d-block mb-2"><strong>Firma con el dedo (obligatorio)</strong></label>
+            <p class="subtitle mb-2" style="font-size:12px;color:var(--muted)">Firme en el recuadro con el dedo o el mouse. Luego confirme abajo.</p>
+            <div class="signature-wrap" style="border:2px solid rgba(255,255,255,.2);border-radius:12px;background:rgba(0,0,0,.2);position:relative;touch-action:none;">
+              <canvas id="firmaCanvas" width="400" height="160" style="display:block;width:100%;max-width:400px;height:160px;cursor:crosshair;border-radius:10px;"></canvas>
+              <button type="button" id="btnLimpiarFirma" class="btn btn-sm" style="position:absolute;top:8px;right:8px;background:rgba(255,255,255,.15);color:var(--text);border:1px solid var(--line);">Limpiar firma</button>
+            </div>
+            <input type="hidden" id="firmaData" name="firma" />
+            <div class="error" data-error-for="firma"></div>
+          </div>
           <div class="col-12" style="margin-top:10px">
             <label class="chip" style="display:flex;gap:10px;align-items:center;justify-content:flex-start">
               <input type="checkbox" id="acepta" name="acepta" required />
@@ -851,8 +859,9 @@
 
   <script>
     (function(){
-      const STORAGE_KEY = "baes_financiamiento_wizard_v1";
-      const API_URL = "api/solicitud_publica.php";
+      var TOKEN_LINK = "<?php echo $tokenLink !== '' ? addslashes($tokenLink) : ''; ?>";
+      var STORAGE_KEY = "baes_financiamiento_wizard_v1" + (TOKEN_LINK ? "_t_" + TOKEN_LINK.substring(0,8) : "");
+      var API_URL = "api/solicitud_publica.php";
 
       const form = document.getElementById("wizardForm");
       const fieldsets = Array.from(form.querySelectorAll("fieldset"));
@@ -867,6 +876,32 @@
       const stepLabels = ["Generales", "A. Cliente", "B. Dirección", "C. Laboral", "D. Cónyuge", "E. Referencias"];
       let step = 0;
       let toastTimer = null;
+
+      // Firma: canvas
+      var canvas = document.getElementById("firmaCanvas");
+      var firmaDataInput = document.getElementById("firmaData");
+      var btnLimpiarFirma = document.getElementById("btnLimpiarFirma");
+      if (canvas) {
+        var ctx = canvas.getContext("2d");
+        var drawing = false;
+        var lastX = 0, lastY = 0;
+        ctx.strokeStyle = "#eaf0ff";
+        ctx.lineWidth = 2;
+        ctx.lineCap = "round";
+        function getPos(e){
+          var r = canvas.getBoundingClientRect();
+          var scaleX = canvas.width / r.width, scaleY = canvas.height / r.height;
+          var clientX = e.touches ? e.touches[0].clientX : e.clientX;
+          var clientY = e.touches ? e.touches[0].clientY : e.clientY;
+          return { x: (clientX - r.left) * scaleX, y: (clientY - r.top) * scaleY };
+        }
+        function start(e){ e.preventDefault(); drawing = true; var p = getPos(e); lastX = p.x; lastY = p.y; }
+        function move(e){ e.preventDefault(); if (!drawing) return; var p = getPos(e); ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(p.x, p.y); ctx.stroke(); lastX = p.x; lastY = p.y; }
+        function end(e){ e.preventDefault(); drawing = false; if (firmaDataInput) firmaDataInput.value = canvas.toDataURL("image/png").replace(/^data:image\/png;base64,/, ""); }
+        canvas.addEventListener("mousedown", start); canvas.addEventListener("mousemove", move); canvas.addEventListener("mouseup", end); canvas.addEventListener("mouseleave", end);
+        canvas.addEventListener("touchstart", start, { passive: false }); canvas.addEventListener("touchmove", move, { passive: false }); canvas.addEventListener("touchend", end, { passive: false });
+        if (btnLimpiarFirma) btnLimpiarFirma.addEventListener("click", function(){ ctx.clearRect(0, 0, canvas.width, canvas.height); if (firmaDataInput) firmaDataInput.value = ""; });
+      }
 
       function showToast(msg, type){
         toast.textContent = msg;
@@ -1075,6 +1110,10 @@
         if(stepIndex === 3) ok = validateMoneyField("empresa_salario", true) && ok;
         if(stepIndex === 4 && tieneConyuge) ok = validateMoneyField("con_salario", false) && ok;
         if(stepIndex === 5){
+          if(TOKEN_LINK){
+            var firmaVal = (firmaDataInput && firmaDataInput.value) ? firmaDataInput.value.trim() : "";
+            if(!firmaVal){ ok = false; setError("firma", "Debe firmar en el recuadro con el dedo o el mouse."); }
+          }
           var acepta = form.elements["acepta"];
           if(acepta && !acepta.checked){ ok = false; setError("acepta", "Debes confirmar para continuar."); }
         }
@@ -1159,6 +1198,8 @@
           var payload = readFormToObject();
           delete payload.__meta;
           delete payload.acepta;
+          if(TOKEN_LINK) payload.token = TOKEN_LINK;
+          if(firmaDataInput && firmaDataInput.value) payload.firma = firmaDataInput.value;
 
           btnSubmit.disabled = true;
           btnSubmit.textContent = "Enviando…";

@@ -34,6 +34,9 @@ if (empty($input) && ($raw = file_get_contents('php://input'))) {
 
 // Quitar __meta del payload si existe
 unset($input['__meta']);
+$token = $input['token'] ?? '';
+$firmaBase64 = $input['firma'] ?? '';
+unset($input['token'], $input['firma']);
 
 function getDefaultGestorId($pdo) {
     $stmt = $pdo->query("
@@ -63,6 +66,67 @@ function toNum($v, $default = null) {
 function toInt($v, $default = null) {
     if ($v === '' || $v === null) return $default;
     return is_numeric($v) ? (int)$v : $default;
+}
+
+function buildPdfHtmlFinanciamiento($input, $firmaBase64, $nombreCliente) {
+    $h = function($s) { return htmlspecialchars($s ?? '', ENT_QUOTES, 'UTF-8'); };
+    $bloque = function($titulo, $pares) {
+        $r = '<tr><td colspan="2" style="background:#eee;padding:6px;font-weight:bold">' . $titulo . '</td></tr>';
+        foreach ($pares as $k => $v) {
+            if ((string)$v === '') continue;
+            $r .= '<tr><td style="width:35%">' . $k . '</td><td>' . $v . '</td></tr>';
+        }
+        return $r;
+    };
+    $html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{font-family:DejaVu Sans,sans-serif;font-size:11px;} table{width:100%;border-collapse:collapse;} td,th{border:1px solid #ccc;padding:6px;text-align:left;} .firma{max-width:280px;max-height:120px;}</style></head><body>';
+    $html .= '<h1>Solicitud de Financiamiento</h1><p>Cliente: ' . $h($nombreCliente) . '</p>';
+    $html .= '<table>';
+    $html .= $bloque('1. Generales', [
+        'Sucursal' => $h($input['sucursal'] ?? ''),
+        'Nombre gestor' => $h($input['nombre_gestor'] ?? ''),
+        'Marca/Modelo/Año auto' => $h(($input['marca_auto'] ?? '') . ' ' . ($input['modelo_auto'] ?? '') . ' ' . ($input['anio_auto'] ?? '')),
+        'KMS / Cód. auto' => $h($input['kms_cod_auto'] ?? ''),
+        'Precio venta (USD)' => $h($input['precio_venta'] ?? ''),
+        'Abono (USD)' => $h($input['abono'] ?? ''),
+    ]);
+    $html .= $bloque('2. Cliente', [
+        'Nombre' => $h($input['cliente_nombre'] ?? ''),
+        'Estado civil / Sexo' => $h(($input['cliente_estado_civil'] ?? '') . ' / ' . ($input['cliente_sexo'] ?? '')),
+        'Cédula' => $h($input['cliente_id'] ?? ''),
+        'Fecha nacimiento / Edad' => $h(($input['cliente_nacimiento'] ?? '') . ' / ' . ($input['cliente_edad'] ?? '')),
+        'Nacionalidad' => $h($input['cliente_nacionalidad'] ?? ''),
+        'Dependientes' => $h($input['cliente_dependientes'] ?? ''),
+        'Correo' => $h($input['cliente_correo'] ?? ''),
+    ]);
+    $html .= $bloque('3. Dirección', [
+        'Vivienda' => $h(($input['vivienda'] ?? '') . (isset($input['vivienda_monto']) && $input['vivienda_monto'] !== '' ? ' - ' . $input['vivienda_monto'] . ' USD' : '')),
+        'Provincia, Distrito, Corregimiento' => $h($input['prov_dist_corr'] ?? ''),
+        'Barriada, calle, casa' => $h($input['barriada_calle_casa'] ?? ''),
+        'Edificio/Apto' => $h($input['edificio_apto'] ?? ''),
+        'Tel. residencia' => $h($input['tel_residencia'] ?? ''),
+        'Celular' => $h($input['celular_cliente'] ?? ''),
+    ]);
+    $html .= $bloque('4. Laboral', [
+        'Empresa' => $h($input['empresa_nombre'] ?? ''),
+        'Ocupación' => $h($input['empresa_ocupacion'] ?? ''),
+        'Años servicio' => $h($input['empresa_anios'] ?? ''),
+        'Salario (USD)' => $h($input['empresa_salario'] ?? ''),
+        'Dirección' => $h($input['empresa_direccion'] ?? ''),
+        'Otros ingresos' => $h($input['otros_ingresos'] ?? ''),
+        'Trabajo anterior' => $h($input['trabajo_anterior'] ?? ''),
+    ]);
+    $html .= $bloque('5. Referencias', [
+        'Ref. Personal 1' => $h(($input['refp1_nombre'] ?? '') . ' - ' . ($input['refp1_cel'] ?? '')),
+        'Ref. Personal 2' => $h(($input['refp2_nombre'] ?? '') . ' - ' . ($input['refp2_cel'] ?? '')),
+        'Ref. Familiar 1' => $h(($input['reff1_nombre'] ?? '') . ' - ' . ($input['reff1_cel'] ?? '')),
+        'Ref. Familiar 2' => $h(($input['reff2_nombre'] ?? '') . ' - ' . ($input['reff2_cel'] ?? '')),
+    ]);
+    if ($firmaBase64 !== '') {
+        $html .= '<tr><td colspan="2" style="background:#eee;padding:6px;font-weight:bold">Firma del solicitante</td></tr>';
+        $html .= '<tr><td colspan="2"><img class="firma" src="data:image/png;base64,' . $firmaBase64 . '" alt="Firma"/></td></tr>';
+    }
+    $html .= '</table></body></html>';
+    return $html;
 }
 
 try {
@@ -162,9 +226,51 @@ try {
     // Historial con el gestor por defecto como "autor"
     registrarHistorialSolicitud($pdo, $solicitudId, $gestorId, 'creacion', 'Solicitud enviada desde formulario público de financiamiento', null, 'Nueva');
 
+    // Si hay token: enviar PDF por correo al email del vendedor
+    $emailEnviado = false;
+    if ($token !== '') {
+        try {
+            $stmtLink = $pdo->prepare("SELECT email_destino FROM link_financiamiento WHERE token = ? LIMIT 1");
+            $stmtLink->execute([$token]);
+            $linkRow = $stmtLink->fetch(PDO::FETCH_ASSOC);
+            if ($linkRow && !empty($linkRow['email_destino'])) {
+                $emailDestino = $linkRow['email_destino'];
+                $pdfPath = null;
+                if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
+                    require_once __DIR__ . '/../vendor/autoload.php';
+                    if (class_exists('Dompdf\Dompdf')) {
+                        $html = buildPdfHtmlFinanciamiento($input, $firmaBase64, $nombre);
+                        $dompdf = new \Dompdf\Dompdf(['isRemoteEnabled' => true]);
+                        $dompdf->loadHtml($html, 'UTF-8');
+                        $dompdf->setPaper('A4', 'portrait');
+                        $dompdf->render();
+                        $pdfPath = sys_get_temp_dir() . '/sol_fin_' . $solicitudId . '_' . uniqid() . '.pdf';
+                        file_put_contents($pdfPath, $dompdf->output());
+                    }
+                }
+                if ($pdfPath && file_exists($pdfPath)) {
+                    $config = require __DIR__ . '/../config/email.php';
+                    $fromEmail = $config['from_email'] ?? 'noreply@ejemplo.com';
+                    $fromName = $config['from_name'] ?? 'Solicitud de Crédito';
+                    require_once __DIR__ . '/../includes/EmailService.php';
+                    $emailService = new EmailService();
+                    $asunto = 'Solicitud de Financiamiento completada - ' . $nombre;
+                    $cuerpo = '<p>Se ha recibido una solicitud de financiamiento completada.</p><p><strong>Cliente:</strong> ' . htmlspecialchars($nombre) . '</p><p>Ver adjunto PDF con todos los datos y la firma.</p>';
+                    $result = $emailService->enviarCorreo($emailDestino, '', $asunto, $cuerpo, strip_tags($cuerpo), [$pdfPath]);
+                    @unlink($pdfPath);
+                    $emailEnviado = !empty($result['success']);
+                }
+            }
+        } catch (Exception $e) {
+            error_log('solicitud_publica email: ' . $e->getMessage());
+        }
+    }
+
     echo json_encode([
         'success' => true,
-        'message' => 'Solicitud registrada correctamente. Nos pondremos en contacto contigo.',
+        'message' => $emailEnviado
+            ? 'Solicitud registrada correctamente. Hemos enviado una copia por correo al vendedor.'
+            : 'Solicitud registrada correctamente. Nos pondremos en contacto contigo.',
         'data' => ['id' => $solicitudId]
     ]);
 

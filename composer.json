@@ -4,7 +4,8 @@
     "type": "project",
     "require": {
         "php": ">=7.4",
-        "sendgrid/sendgrid": "^7.11"
+        "sendgrid/sendgrid": "^7.11",
+        "dompdf/dompdf": "^2.0"
     },
     "autoload": {
         "psr-4": {
@@ -17,4 +18,3 @@
         }
     }
 }
-

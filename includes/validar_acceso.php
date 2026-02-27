@@ -20,10 +20,10 @@ $isVendedor = in_array('ROLE_VENDEDOR', $userRoles);
 $current_page = basename($_SERVER['PHP_SELF']);
 
 // Definir páginas permitidas por rol
-$paginasAdmin = ['dashboard.php', 'usuarios.php', 'roles.php', 'bancos.php', 'solicitudes.php', 'pipedrive.php', 'reportes.php'];
-$paginasGestor = ['dashboard.php', 'solicitudes.php', 'pipedrive.php'];
+$paginasAdmin = ['dashboard.php', 'usuarios.php', 'roles.php', 'bancos.php', 'solicitudes.php', 'pipedrive.php', 'reportes.php', 'generar_link_financiamiento.php'];
+$paginasGestor = ['dashboard.php', 'solicitudes.php', 'pipedrive.php', 'generar_link_financiamiento.php'];
 $paginasBanco = ['dashboard.php', 'solicitudes.php'];
-$paginasVendedor = ['dashboard.php', 'solicitudes.php'];
+$paginasVendedor = ['dashboard.php', 'solicitudes.php', 'generar_link_financiamiento.php'];
 
 // Función para verificar acceso
 function verificarAcceso($pagina, $roles, $paginasPermitidas) {

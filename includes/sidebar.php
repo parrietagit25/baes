@@ -58,6 +58,13 @@ $isVendedor = in_array('ROLE_VENDEDOR', $_SESSION['user_roles']);
             <i class="fas fa-plug me-2"></i>Integración Pipedrive
         </a>
         <?php endif; ?>
+
+        <!-- Generar link formulario financiamiento - Vendedor, Gestor, Admin -->
+        <?php if ($isAdmin || $isGestor || $isVendedor): ?>
+        <a class="nav-link <?php echo ($current_page == 'generar_link_financiamiento.php') ? 'active' : ''; ?>" href="generar_link_financiamiento.php">
+            <i class="fas fa-link me-2"></i>Generar link financiamiento
+        </a>
+        <?php endif; ?>
         
         <!-- Reportes - Solo Admin (con submenú) -->
         <?php if ($isAdmin): ?>
