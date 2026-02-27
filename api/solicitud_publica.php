@@ -3,6 +3,9 @@
  * API pública para crear solicitudes desde el formulario externo (sin login).
  * Solo acepta POST para crear una solicitud.
  */
+error_reporting(E_ALL);
+ini_set('display_errors', '0');
+ini_set('log_errors', '1');
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -25,17 +28,17 @@ require_once __DIR__ . '/../includes/historial_helper.php';
 
 // Obtener body JSON si viene por fetch
 $input = $_POST;
-if (empty($input) && ($raw = file_get_contents('php://input'))) {
-    $decoded = json_decode($raw, true);
-    if (is_array($decoded)) {
-        $input = $decoded;
-    }
+if (empty($input) || !is_array($input)) {
+    $raw = file_get_contents('php://input');
+    $decoded = $raw ? json_decode($raw, true) : null;
+    $input = is_array($decoded) ? $decoded : [];
 }
 
 // Quitar __meta del payload si existe
 unset($input['__meta']);
-$token = $input['token'] ?? '';
-$firmaBase64 = $input['firma'] ?? '';
+$token = isset($input['token']) ? trim($input['token']) : '';
+$token = $token !== '' ? urldecode($token) : '';
+$firmaBase64 = isset($input['firma']) ? $input['firma'] : '';
 unset($input['token'], $input['firma']);
 
 function getDefaultGestorId($pdo) {
@@ -216,15 +219,23 @@ try {
 
     $solicitudId = (int) $pdo->lastInsertId();
 
-    // Nota inicial
-    $stmtNota = $pdo->prepare("
-        INSERT INTO notas_solicitud (solicitud_id, usuario_id, tipo_nota, titulo, contenido)
-        VALUES (?, ?, 'Comentario', 'Solicitud desde formulario público', 'Solicitud enviada desde el formulario de financiamiento (sin login).')
-    ");
-    $stmtNota->execute([$solicitudId, $gestorId]);
+    // Nota inicial (opcional: si falla no bloqueamos)
+    try {
+        $stmtNota = $pdo->prepare("
+            INSERT INTO notas_solicitud (solicitud_id, usuario_id, tipo_nota, titulo, contenido)
+            VALUES (?, ?, 'Comentario', 'Solicitud desde formulario público', 'Solicitud enviada desde el formulario de financiamiento (sin login).')
+        ");
+        $stmtNota->execute([$solicitudId, $gestorId]);
+    } catch (PDOException $e) {
+        error_log('solicitud_publica nota: ' . $e->getMessage());
+    }
 
-    // Historial con el gestor por defecto como "autor"
-    registrarHistorialSolicitud($pdo, $solicitudId, $gestorId, 'creacion', 'Solicitud enviada desde formulario público de financiamiento', null, 'Nueva');
+    // Historial (opcional: si la tabla no existe no bloqueamos)
+    try {
+        registrarHistorialSolicitud($pdo, $solicitudId, $gestorId, 'creacion', 'Solicitud enviada desde formulario público de financiamiento', null, 'Nueva');
+    } catch (Throwable $e) {
+        error_log('solicitud_publica historial: ' . $e->getMessage());
+    }
 
     // Si hay token (email codificado en base64): enviar PDF por correo a ese email
     $emailEnviado = false;
@@ -274,7 +285,11 @@ try {
     ]);
 
 } catch (PDOException $e) {
-    error_log('solicitud_publica: ' . $e->getMessage());
+    error_log('solicitud_publica PDO: ' . $e->getMessage());
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Error al registrar la solicitud. Intenta de nuevo más tarde.']);
+} catch (Throwable $e) {
+    error_log('solicitud_publica: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+    http_response_code(500);
+    echo json_encode(['success' => false, 'message' => 'Error al procesar la solicitud. Intenta de nuevo más tarde.']);
 }
