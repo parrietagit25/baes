@@ -23,8 +23,29 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit();
 }
 
-require_once __DIR__ . '/../config/database.php';
-require_once __DIR__ . '/../includes/historial_helper.php';
+$configPath = __DIR__ . '/../config/database.php';
+$historialPath = __DIR__ . '/../includes/historial_helper.php';
+if (!is_file($configPath) || !is_file($historialPath)) {
+    error_log('solicitud_publica: missing file config=' . (is_file($configPath) ? 'ok' : $configPath) . ' historial=' . (is_file($historialPath) ? 'ok' : $historialPath));
+    http_response_code(500);
+    echo json_encode(['success' => false, 'message' => 'Error de configuración del servidor.']);
+    exit();
+}
+try {
+    require_once $configPath;
+    require_once $historialPath;
+} catch (Throwable $e) {
+    error_log('solicitud_publica load: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+    http_response_code(500);
+    echo json_encode(['success' => false, 'message' => 'Error al conectar con el servidor.']);
+    exit();
+}
+if (!isset($pdo) || !($pdo instanceof PDO)) {
+    error_log('solicitud_publica: $pdo no definido tras cargar config');
+    http_response_code(500);
+    echo json_encode(['success' => false, 'message' => 'Error de configuración del servidor.']);
+    exit();
+}
 
 // Obtener body JSON si viene por fetch
 $input = $_POST;
@@ -285,11 +306,15 @@ try {
     ]);
 
 } catch (PDOException $e) {
-    error_log('solicitud_publica PDO: ' . $e->getMessage());
+    $msg = 'solicitud_publica PDO: ' . $e->getMessage();
+    error_log($msg);
+    @file_put_contents(__DIR__ . '/last_error_solicitud_publica.txt', date('Y-m-d H:i:s') . ' ' . $msg . "\n", LOCK_EX);
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Error al registrar la solicitud. Intenta de nuevo más tarde.']);
 } catch (Throwable $e) {
-    error_log('solicitud_publica: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+    $msg = $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine();
+    error_log('solicitud_publica: ' . $msg);
+    @file_put_contents(__DIR__ . '/last_error_solicitud_publica.txt', date('Y-m-d H:i:s') . ' ' . $msg . "\n", LOCK_EX);
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Error al procesar la solicitud. Intenta de nuevo más tarde.']);
 }
