@@ -12,7 +12,7 @@ return [
     'sendgrid_api_key' => 'TU_API_KEY_DE_SENDGRID_AQUI',
     
     // Configuración del remitente (verificado en SendGrid)
-    'from_email' => 'noreply@automarketrentacar.com',
+    'from_email' => 'notificaciones@grupopcr.com.pa',
     'from_name' => 'Automarket Rent a Car',
     
     // Configuración adicional

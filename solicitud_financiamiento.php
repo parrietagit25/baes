@@ -861,7 +861,10 @@ $tokenLink = isset($_GET['e']) ? trim($_GET['e']) : '';
     (function(){
       var TOKEN_LINK = "<?php echo $tokenLink !== '' ? addslashes($tokenLink) : ''; ?>";
       var STORAGE_KEY = "baes_financiamiento_wizard_v1" + (TOKEN_LINK ? "_t_" + TOKEN_LINK.substring(0,8) : "");
-      var API_URL = "api/solicitud_publica.php";
+      var API_URL = (function(){
+        var base = window.location.pathname.replace(/\/[^\/]*$/, "");
+        return window.location.origin + (base ? base + "/" : "/") + "api/solicitud_publica.php";
+      })();
 
       const form = document.getElementById("wizardForm");
       const fieldsets = Array.from(form.querySelectorAll("fieldset"));

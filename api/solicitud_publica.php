@@ -21,7 +21,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
-    echo json_encode(['success' => false, 'message' => 'Método no permitido']);
+    echo json_encode([
+        'success' => false,
+        'message' => 'Método no permitido',
+        'error_detail' => 'Se recibió ' . ($_SERVER['REQUEST_METHOD'] ?? 'vacío') . '. Este endpoint solo acepta POST.'
+    ]);
     exit();
 }
 
