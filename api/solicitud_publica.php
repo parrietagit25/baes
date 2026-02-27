@@ -6,6 +6,8 @@
 error_reporting(E_ALL);
 ini_set('display_errors', '0');
 ini_set('log_errors', '1');
+if (ob_get_level()) ob_end_clean();
+ob_start();
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -23,10 +25,16 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit();
 }
 
+$logFile = '/tmp/solicitud_publica_baes_log.txt';
+function logSolPub($msg) {
+    @file_put_contents($GLOBALS['logFile'], date('Y-m-d H:i:s') . ' ' . $msg . "\n", FILE_APPEND | LOCK_EX);
+}
+logSolPub('start');
+
 $configPath = __DIR__ . '/../config/database.php';
 $historialPath = __DIR__ . '/../includes/historial_helper.php';
 if (!is_file($configPath) || !is_file($historialPath)) {
-    error_log('solicitud_publica: missing file config=' . (is_file($configPath) ? 'ok' : $configPath) . ' historial=' . (is_file($historialPath) ? 'ok' : $historialPath));
+    logSolPub('missing file: config=' . (is_file($configPath) ? 'ok' : $configPath) . ' historial=' . (is_file($historialPath) ? 'ok' : $historialPath));
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Error de configuración del servidor.']);
     exit();
@@ -34,18 +42,20 @@ if (!is_file($configPath) || !is_file($historialPath)) {
 try {
     require_once $configPath;
     require_once $historialPath;
+    logSolPub('require ok');
 } catch (Throwable $e) {
-    error_log('solicitud_publica load: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+    logSolPub('require fail: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Error al conectar con el servidor.']);
     exit();
 }
 if (!isset($pdo) || !($pdo instanceof PDO)) {
-    error_log('solicitud_publica: $pdo no definido tras cargar config');
+    logSolPub('pdo no definido');
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Error de configuración del servidor.']);
     exit();
 }
+logSolPub('pdo ok');
 
 // Obtener body JSON si viene por fetch
 $input = $_POST;
@@ -154,7 +164,9 @@ function buildPdfHtmlFinanciamiento($input, $firmaBase64, $nombreCliente) {
 }
 
 try {
+    logSolPub('get gestor');
     $gestorId = getDefaultGestorId($pdo);
+    logSolPub('gestorId=' . ($gestorId ?: 'null'));
     if (!$gestorId) {
         http_response_code(500);
         echo json_encode(['success' => false, 'message' => 'No hay gestor configurado para recibir solicitudes']);
@@ -196,6 +208,7 @@ try {
         if (stripos($ec, 'Casado') !== false || stripos($ec, 'Unión') !== false) $casado = 1;
     }
 
+    logSolPub('insert');
     $stmt = $pdo->prepare("
         INSERT INTO solicitudes_credito (
             gestor_id, tipo_persona, nombre_cliente, cedula, edad, genero,
@@ -297,6 +310,7 @@ try {
         }
     }
 
+    ob_end_clean();
     echo json_encode([
         'success' => true,
         'message' => $emailEnviado
@@ -304,17 +318,20 @@ try {
             : 'Solicitud registrada correctamente. Nos pondremos en contacto contigo.',
         'data' => ['id' => $solicitudId]
     ]);
+    exit();
 
 } catch (PDOException $e) {
-    $msg = 'solicitud_publica PDO: ' . $e->getMessage();
-    error_log($msg);
-    @file_put_contents(__DIR__ . '/last_error_solicitud_publica.txt', date('Y-m-d H:i:s') . ' ' . $msg . "\n", LOCK_EX);
+    $msg = 'PDO: ' . $e->getMessage();
+    error_log('solicitud_publica ' . $msg);
+    logSolPub($msg);
+    if (ob_get_level()) ob_end_clean();
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Error al registrar la solicitud. Intenta de nuevo más tarde.']);
 } catch (Throwable $e) {
-    $msg = $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine();
+    $msg = $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine() . "\n" . $e->getTraceAsString();
     error_log('solicitud_publica: ' . $msg);
-    @file_put_contents(__DIR__ . '/last_error_solicitud_publica.txt', date('Y-m-d H:i:s') . ' ' . $msg . "\n", LOCK_EX);
+    logSolPub($msg);
+    if (ob_get_level()) ob_end_clean();
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Error al procesar la solicitud. Intenta de nuevo más tarde.']);
 }

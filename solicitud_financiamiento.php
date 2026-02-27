@@ -895,11 +895,13 @@ $tokenLink = isset($_GET['e']) ? trim($_GET['e']) : '';
           var clientY = e.touches ? e.touches[0].clientY : e.clientY;
           return { x: (clientX - r.left) * scaleX, y: (clientY - r.top) * scaleY };
         }
-        function start(e){ e.preventDefault(); drawing = true; var p = getPos(e); lastX = p.x; lastY = p.y; }
+        function start(e){ if (!e.touches) e.preventDefault(); drawing = true; var p = getPos(e); lastX = p.x; lastY = p.y; }
         function move(e){ e.preventDefault(); if (!drawing) return; var p = getPos(e); ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(p.x, p.y); ctx.stroke(); lastX = p.x; lastY = p.y; }
-        function end(e){ e.preventDefault(); drawing = false; if (firmaDataInput) firmaDataInput.value = canvas.toDataURL("image/png").replace(/^data:image\/png;base64,/, ""); }
+        function end(e){ if (!e.changedTouches) e.preventDefault(); drawing = false; if (firmaDataInput) firmaDataInput.value = canvas.toDataURL("image/png").replace(/^data:image\/png;base64,/, ""); }
         canvas.addEventListener("mousedown", start); canvas.addEventListener("mousemove", move); canvas.addEventListener("mouseup", end); canvas.addEventListener("mouseleave", end);
-        canvas.addEventListener("touchstart", start, { passive: false }); canvas.addEventListener("touchmove", move, { passive: false }); canvas.addEventListener("touchend", end, { passive: false });
+        canvas.addEventListener("touchstart", start, { passive: true });
+        canvas.addEventListener("touchmove", move, { passive: false });
+        canvas.addEventListener("touchend", end, { passive: true });
         if (btnLimpiarFirma) btnLimpiarFirma.addEventListener("click", function(){ ctx.clearRect(0, 0, canvas.width, canvas.height); if (firmaDataInput) firmaDataInput.value = ""; });
       }
 
