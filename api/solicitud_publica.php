@@ -26,18 +26,44 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 $logFile = '/tmp/solicitud_publica_baes_log.txt';
+$debugMode = (getenv('SOLICITUD_PUBLICA_DEBUG') === '1' || getenv('APP_DEBUG') === '1');
 function logSolPub($msg) {
     @file_put_contents($GLOBALS['logFile'], date('Y-m-d H:i:s') . ' ' . $msg . "\n", FILE_APPEND | LOCK_EX);
 }
+function sendError500($message, $detail = null) {
+    $payload = ['success' => false, 'message' => $message];
+    if ($detail !== null) {
+        $payload['error_detail'] = $detail;
+    }
+    if (ob_get_level()) ob_end_clean();
+    http_response_code(500);
+    echo json_encode($payload);
+    exit();
+}
+// Capturar cualquier error fatal o excepción no capturada
+set_exception_handler(function (Throwable $e) {
+    logSolPub('UNCAUGHT: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+    sendError500(
+        'Error inesperado en el servidor.',
+        $e->getMessage() . ' en ' . basename($e->getFile()) . ':' . $e->getLine()
+    );
+});
+set_error_handler(function ($severity, $message, $file, $line) {
+    if (!(error_reporting() & $severity)) return false;
+    // Solo convertir errores fatales en excepción para no romper el JSON
+    if (in_array($severity, [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR], true)) {
+        throw new ErrorException($message, 0, $severity, $file, $line);
+    }
+    return false;
+});
+
 logSolPub('start');
 
 $configPath = __DIR__ . '/../config/database.php';
 $historialPath = __DIR__ . '/../includes/historial_helper.php';
 if (!is_file($configPath) || !is_file($historialPath)) {
     logSolPub('missing file: config=' . (is_file($configPath) ? 'ok' : $configPath) . ' historial=' . (is_file($historialPath) ? 'ok' : $historialPath));
-    http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Error de configuración del servidor.']);
-    exit();
+    sendError500('Error de configuración del servidor.', 'Faltan config/database.php o includes/historial_helper.php');
 }
 try {
     require_once $configPath;
@@ -45,15 +71,11 @@ try {
     logSolPub('require ok');
 } catch (Throwable $e) {
     logSolPub('require fail: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
-    http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Error al conectar con el servidor.']);
-    exit();
+    sendError500('Error al conectar con el servidor.', $e->getMessage());
 }
 if (!isset($pdo) || !($pdo instanceof PDO)) {
     logSolPub('pdo no definido');
-    http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Error de configuración del servidor.']);
-    exit();
+    sendError500('Error de configuración del servidor.', 'Variable $pdo no definida tras cargar database.php');
 }
 logSolPub('pdo ok');
 
@@ -328,14 +350,10 @@ try {
     $msg = 'PDO: ' . $e->getMessage();
     error_log('solicitud_publica ' . $msg);
     logSolPub($msg);
-    if (ob_get_level()) ob_end_clean();
-    http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Error al registrar la solicitud. Intenta de nuevo más tarde.']);
+    sendError500('Error al registrar la solicitud. Intenta de nuevo más tarde.', $e->getMessage());
 } catch (Throwable $e) {
     $msg = $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine() . "\n" . $e->getTraceAsString();
     error_log('solicitud_publica: ' . $msg);
     logSolPub($msg);
-    if (ob_get_level()) ob_end_clean();
-    http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Error al procesar la solicitud. Intenta de nuevo más tarde.']);
+    sendError500('Error al procesar la solicitud. Intenta de nuevo más tarde.', $e->getMessage() . ' en ' . basename($e->getFile()) . ':' . $e->getLine());
 }
