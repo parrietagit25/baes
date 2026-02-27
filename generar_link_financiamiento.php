@@ -70,9 +70,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email_destino'])) {
     <script>
         function copiarLink() {
             var input = document.getElementById('linkInput');
+            if (!input) return;
             input.select();
             input.setSelectionRange(0, 99999);
-            navigator.clipboard.writeText(input.value).then(function() { alert('Link copiado al portapapeles.'); });
+            var ok = false;
+            if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                navigator.clipboard.writeText(input.value).then(function() { alert('Link copiado al portapapeles.'); }).catch(function() { fallbackCopy(); });
+            } else {
+                fallbackCopy();
+            }
+            function fallbackCopy() {
+                try {
+                    ok = document.execCommand('copy');
+                } catch (e) {}
+                alert(ok ? 'Link copiado al portapapeles.' : 'Seleccione el link y cópielo con Ctrl+C.');
+            }
         }
     </script>
 </body>
