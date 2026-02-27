@@ -1,9 +1,9 @@
 <?php
 /**
  * Formulario público de Solicitud de Financiamiento (Wizard).
- * Acceso sin login. Si se accede con ?t=TOKEN, al enviar se envía por correo el PDF al email del vendedor.
+ * Acceso sin login. Si se accede con ?e=EMAIL_CODIFICADO, al enviar se envía por correo el PDF a ese email.
  */
-$tokenLink = isset($_GET['t']) ? trim($_GET['t']) : '';
+$tokenLink = isset($_GET['e']) ? trim($_GET['e']) : '';
 ?>
 <!doctype html>
 <html lang="es">

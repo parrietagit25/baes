@@ -226,15 +226,14 @@ try {
     // Historial con el gestor por defecto como "autor"
     registrarHistorialSolicitud($pdo, $solicitudId, $gestorId, 'creacion', 'Solicitud enviada desde formulario público de financiamiento', null, 'Nueva');
 
-    // Si hay token: enviar PDF por correo al email del vendedor
+    // Si hay token (email codificado en base64): enviar PDF por correo a ese email
     $emailEnviado = false;
     if ($token !== '') {
         try {
-            $stmtLink = $pdo->prepare("SELECT email_destino FROM link_financiamiento WHERE token = ? LIMIT 1");
-            $stmtLink->execute([$token]);
-            $linkRow = $stmtLink->fetch(PDO::FETCH_ASSOC);
-            if ($linkRow && !empty($linkRow['email_destino'])) {
-                $emailDestino = $linkRow['email_destino'];
+            $emailDestino = @base64_decode(str_replace(['-', '_'], ['+', '/'], $token), true);
+            if ($emailDestino === false) $emailDestino = @base64_decode($token, true);
+            if (!is_string($emailDestino) || !filter_var($emailDestino, FILTER_VALIDATE_EMAIL)) $emailDestino = null;
+            if ($emailDestino) {
                 $pdfPath = null;
                 if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
                     require_once __DIR__ . '/../vendor/autoload.php';
