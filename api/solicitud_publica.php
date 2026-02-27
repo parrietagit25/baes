@@ -3,6 +3,7 @@
  * API pública para crear solicitudes desde el formulario externo (sin login).
  * Solo acepta POST para crear una solicitud.
  */
+/*
 error_reporting(E_ALL);
 ini_set('display_errors', '0');
 ini_set('log_errors', '1');
