@@ -127,62 +127,144 @@ function toInt($v, $default = null) {
 
 function buildPdfHtmlFinanciamiento($input, $firmaBase64, $nombreCliente) {
     $h = function($s) { return htmlspecialchars($s ?? '', ENT_QUOTES, 'UTF-8'); };
-    $bloque = function($titulo, $pares) {
-        $r = '<tr><td colspan="2" style="background:#eee;padding:6px;font-weight:bold">' . $titulo . '</td></tr>';
+    $baseDir = dirname(__DIR__);
+    $logoPath = $baseDir . '/img/seminuevos.jpg';
+    $logoImg = '';
+    if (is_file($logoPath)) {
+        $logoData = @file_get_contents($logoPath);
+        if ($logoData !== false) {
+            $logoB64 = base64_encode($logoData);
+            $logoImg = '<img src="data:image/jpeg;base64,' . $logoB64 . '" alt="AUTOMARKET SEMINUEVOS" style="position:absolute;top:0;right:0;height:52px;width:auto;" />';
+        }
+    }
+
+    $secHeader = '#1e3a5f'; // azul oscuro como en la imagen
+    $bloqueSec = function($titulo, $pares) use ($h, $secHeader) {
+        $r = '<tr><td colspan="2" style="background:' . $secHeader . ';color:#fff;padding:6px 8px;font-weight:bold;font-size:11px;">' . $titulo . '</td></tr>';
         foreach ($pares as $k => $v) {
             if ((string)$v === '') continue;
-            $r .= '<tr><td style="width:35%">' . $k . '</td><td>' . $v . '</td></tr>';
+            $r .= '<tr><td style="width:38%;padding:5px 8px;border-bottom:1px solid #ddd;">' . $k . '</td><td style="padding:5px 8px;border-bottom:1px solid #ddd;">' . $v . '</td></tr>';
         }
         return $r;
     };
-    $html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{font-family:DejaVu Sans,sans-serif;font-size:11px;} table{width:100%;border-collapse:collapse;} td,th{border:1px solid #ccc;padding:6px;text-align:left;} .firma{max-width:280px;max-height:120px;}</style></head><body>';
-    $html .= '<h1>Solicitud de Financiamiento</h1><p>Cliente: ' . $h($nombreCliente) . '</p>';
-    $html .= '<table>';
-    $html .= $bloque('1. Generales', [
-        'Sucursal' => $h($input['sucursal'] ?? ''),
-        'Nombre gestor' => $h($input['nombre_gestor'] ?? ''),
-        'Marca/Modelo/Año auto' => $h(($input['marca_auto'] ?? '') . ' ' . ($input['modelo_auto'] ?? '') . ' ' . ($input['anio_auto'] ?? '')),
-        'KMS / Cód. auto' => $h($input['kms_cod_auto'] ?? ''),
-        'Precio venta (USD)' => $h($input['precio_venta'] ?? ''),
-        'Abono (USD)' => $h($input['abono'] ?? ''),
-    ]);
-    $html .= $bloque('2. Cliente', [
-        'Nombre' => $h($input['cliente_nombre'] ?? ''),
-        'Estado civil / Sexo' => $h(($input['cliente_estado_civil'] ?? '') . ' / ' . ($input['cliente_sexo'] ?? '')),
-        'Cédula' => $h($input['cliente_id'] ?? ''),
-        'Fecha nacimiento / Edad' => $h(($input['cliente_nacimiento'] ?? '') . ' / ' . ($input['cliente_edad'] ?? '')),
-        'Nacionalidad' => $h($input['cliente_nacionalidad'] ?? ''),
-        'Dependientes' => $h($input['cliente_dependientes'] ?? ''),
-        'Correo' => $h($input['cliente_correo'] ?? ''),
-    ]);
-    $html .= $bloque('3. Dirección', [
-        'Vivienda' => $h(($input['vivienda'] ?? '') . (isset($input['vivienda_monto']) && $input['vivienda_monto'] !== '' ? ' - ' . $input['vivienda_monto'] . ' USD' : '')),
-        'Provincia, Distrito, Corregimiento' => $h($input['prov_dist_corr'] ?? ''),
-        'Barriada, calle, casa' => $h($input['barriada_calle_casa'] ?? ''),
-        'Edificio/Apto' => $h($input['edificio_apto'] ?? ''),
-        'Tel. residencia' => $h($input['tel_residencia'] ?? ''),
-        'Celular' => $h($input['celular_cliente'] ?? ''),
-    ]);
-    $html .= $bloque('4. Laboral', [
-        'Empresa' => $h($input['empresa_nombre'] ?? ''),
-        'Ocupación' => $h($input['empresa_ocupacion'] ?? ''),
-        'Años servicio' => $h($input['empresa_anios'] ?? ''),
-        'Salario (USD)' => $h($input['empresa_salario'] ?? ''),
-        'Dirección' => $h($input['empresa_direccion'] ?? ''),
-        'Otros ingresos' => $h($input['otros_ingresos'] ?? ''),
-        'Trabajo anterior' => $h($input['trabajo_anterior'] ?? ''),
-    ]);
-    $html .= $bloque('5. Referencias', [
-        'Ref. Personal 1' => $h(($input['refp1_nombre'] ?? '') . ' - ' . ($input['refp1_cel'] ?? '')),
-        'Ref. Personal 2' => $h(($input['refp2_nombre'] ?? '') . ' - ' . ($input['refp2_cel'] ?? '')),
-        'Ref. Familiar 1' => $h(($input['reff1_nombre'] ?? '') . ' - ' . ($input['reff1_cel'] ?? '')),
-        'Ref. Familiar 2' => $h(($input['reff2_nombre'] ?? '') . ' - ' . ($input['reff2_cel'] ?? '')),
-    ]);
-    if ($firmaBase64 !== '') {
-        $html .= '<tr><td colspan="2" style="background:#eee;padding:6px;font-weight:bold">Firma del solicitante</td></tr>';
-        $html .= '<tr><td colspan="2"><img class="firma" src="data:image/png;base64,' . $firmaBase64 . '" alt="Firma"/></td></tr>';
+
+    $html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+        body{font-family:DejaVu Sans,sans-serif;font-size:10px;color:#000;margin:0;padding:0;}
+        .pdf-wrap{position:relative;padding-top:8px;padding-right:140px;}
+        .pdf-title{font-size:14px;font-weight:bold;margin:0 0 6px 0;}
+        .banner{background:' . $secHeader . ';color:#fff;padding:8px 10px;text-align:center;font-weight:bold;font-size:11px;margin:10px 0;}
+        table{width:100%;border-collapse:collapse;} td,th{border:1px solid #ccc;padding:5px 8px;text-align:left;}
+        .firma{max-width:280px;max-height:120px;}
+        .grid2{width:100%;border-collapse:collapse;font-size:10px;}
+        .grid2 td{padding:4px 8px;border:1px solid #ddd;vertical-align:top;}
+        .footer-note{font-size:8px;color:#555;margin-top:14px;line-height:1.3;}
+    </style></head><body>';
+    $html .= '<div class="pdf-wrap">';
+    if ($logoImg !== '') {
+        $html .= $logoImg;
     }
-    $html .= '</table></body></html>';
+    $html .= '<h1 class="pdf-title">GENERALES DEL CLIENTE:</h1>';
+    $html .= '<table class="grid2"><tr>';
+    $html .= '<td style="width:50%"><strong>SUCURSAL:</strong> ' . $h($input['sucursal'] ?? '') . '</td>';
+    $html .= '<td style="width:50%"><strong>MARCA DEL AUTO:</strong> ' . $h($input['marca_auto'] ?? '') . '</td></tr><tr>';
+    $html .= '<td><strong>KMS / COD AUTO:</strong> ' . $h($input['kms_cod_auto'] ?? '') . '</td>';
+    $html .= '<td><strong>MODELO DEL AUTO:</strong> ' . $h($input['modelo_auto'] ?? '') . '</td></tr><tr>';
+    $html .= '<td><strong>NOMBRE DEL GESTOR:</strong> ' . $h($input['nombre_gestor'] ?? '') . '</td>';
+    $html .= '<td><strong>AÑO:</strong> ' . $h($input['anio_auto'] ?? '') . ' &nbsp; <strong>PRECIO DE VENTA:</strong> ' . $h($input['precio_venta'] ?? '') . ' &nbsp; <strong>ABONO:</strong> ' . $h($input['abono'] ?? '') . '</td></tr></table>';
+
+    $html .= '<div class="banner">Análisis de Perfil para Financiamientos de Bancos</div>';
+    $html .= '<table>';
+
+    $html .= $bloqueSec('A. INFORMACIÓN DEL CLIENTE:', [
+        'NOMBRE Y APELLIDO:' => $h($input['cliente_nombre'] ?? ''),
+        'ESTADO CIVIL:' => $h($input['cliente_estado_civil'] ?? ''),
+        'CÉDULA/PASAPORTE/RUC:' => $h($input['cliente_id'] ?? ''),
+        'FECHA DE NACIMIENTO:' => $h($input['cliente_nacimiento'] ?? ''),
+        'EDAD:' => $h($input['cliente_edad'] ?? ''),
+        'SEXO:' => $h($input['cliente_sexo'] ?? ''),
+        'NACIONALIDAD:' => $h($input['cliente_nacionalidad'] ?? ''),
+        'DEPENDIENTES:' => $h($input['cliente_dependientes'] ?? ''),
+        'PESO:' => $h($input['cliente_peso'] ?? ''),
+        'ESTATURA:' => $h($input['cliente_estatura'] ?? ''),
+        'CORREO:' => $h($input['cliente_correo'] ?? ''),
+    ]);
+
+    $vivienda = $h($input['vivienda'] ?? '');
+    if (isset($input['vivienda_monto']) && (string)$input['vivienda_monto'] !== '') {
+        $vivienda .= ' — MONTO $: ' . $h($input['vivienda_monto']);
+    }
+    $html .= $bloqueSec('B. DIRECCIÓN RESIDENCIAL:', [
+        'PROPIA / HIPOTECADA / ALQUILADA — MONTO $:' => $vivienda,
+        'PROVINCIA, DISTRITO, CORREGIMIENTO:' => $h($input['prov_dist_corr'] ?? ''),
+        'BARRIADA, No. CALLE, CASA No.:' => $h($input['barriada_calle_casa'] ?? ''),
+        'EDIFICIO, APARTAMENTO No.:' => $h($input['edificio_apto'] ?? ''),
+        'TELÉFONO DE RESIDENCIA:' => $h($input['tel_residencia'] ?? ''),
+        'CELULAR:' => $h($input['celular_cliente'] ?? ''),
+        'CORREO ELECTRÓNICO:' => $h($input['cliente_correo'] ?? $input['correo_residencial'] ?? ''),
+    ]);
+
+    $html .= $bloqueSec('C. INFORMACIÓN LABORAL:', [
+        'NOMBRE DE LA EMPRESA:' => $h($input['empresa_nombre'] ?? ''),
+        'OCUPACIÓN:' => $h($input['empresa_ocupacion'] ?? ''),
+        'AÑOS DE SERVICIO:' => $h($input['empresa_anios'] ?? ''),
+        'DIRECCIÓN:' => $h($input['empresa_direccion'] ?? ''),
+        'TELÉFONO:' => $h($input['empresa_telefono'] ?? ''),
+        'SALARIO:' => $h($input['empresa_salario'] ?? ''),
+        'INDEPENDIENTE Y/O OTROS INGRESOS — OCUPACIÓN:' => $h($input['otros_ingresos'] ?? ''),
+        'TRABAJO ANTERIOR SI TIENE MENOS DE 2 AÑOS:' => $h($input['trabajo_anterior'] ?? ''),
+    ]);
+
+    $hayConyuge = !empty($input['con_nombre']) || !empty($input['con_id']);
+    if ($hayConyuge) {
+        $html .= $bloqueSec('D. SOLICITANTE ADICIONAL Y/O CÓNYUGE:', [
+            'NOMBRE Y APELLIDO:' => $h($input['con_nombre'] ?? ''),
+            'ESTADO CIVIL:' => $h($input['con_estado_civil'] ?? ''),
+            'CÉDULA/PASAPORTE/RUC:' => $h($input['con_id'] ?? ''),
+            'FECHA DE NACIMIENTO:' => $h($input['con_nacimiento'] ?? ''),
+            'EDAD:' => $h($input['con_edad'] ?? ''),
+            'SEXO:' => $h($input['con_sexo'] ?? ''),
+            'NACIONALIDAD:' => $h($input['con_nacionalidad'] ?? ''),
+            'DEPENDIENTES:' => $h($input['con_dependientes'] ?? ''),
+            'CORREO:' => $h($input['con_correo'] ?? ''),
+            'NOMBRE DE LA EMPRESA:' => $h($input['con_empresa'] ?? ''),
+            'OCUPACIÓN:' => $h($input['con_ocupacion'] ?? ''),
+            'AÑOS DE SERVICIO:' => $h($input['con_anios'] ?? ''),
+            'DIRECCIÓN:' => $h($input['con_direccion'] ?? ''),
+            'TELÉFONO / CELULAR:' => $h($input['con_tel'] ?? ''),
+            'SALARIO:' => $h($input['con_salario'] ?? ''),
+            'INDEPENDIENTE Y/O OTROS INGRESOS — OCUPACIÓN:' => $h($input['con_otros_ingresos'] ?? ''),
+            'TRABAJO ANTERIOR SI TIENE MENOS DE 2 AÑOS:' => $h($input['con_trabajo_anterior'] ?? ''),
+        ]);
+    }
+
+    $html .= $bloqueSec('E. REFERENCIAS — 2 REF PERSONALES (NO PARIENTES):', [
+        '1. NOMBRE COMPLETO:' => $h($input['refp1_nombre'] ?? ''),
+        '   DIR. RESIDENCIAL:' => $h($input['refp1_dir_res'] ?? ''),
+        '   DIR. LABORAL:' => $h($input['refp1_dir_lab'] ?? ''),
+        '   CELULAR:' => $h($input['refp1_cel'] ?? ''),
+        '2. NOMBRE COMPLETO:' => $h($input['refp2_nombre'] ?? ''),
+        '   DIR. RESIDENCIAL:' => $h($input['refp2_dir_res'] ?? ''),
+        '   DIR. LABORAL:' => $h($input['refp2_dir_lab'] ?? ''),
+        '   CELULAR:' => $h($input['refp2_cel'] ?? ''),
+    ]);
+    $html .= $bloqueSec('2 REF FAMILIARES (QUE NO VIVAN CON USTED):', [
+        '1. NOMBRE COMPLETO:' => $h($input['reff1_nombre'] ?? ''),
+        '   DIR. RESIDENCIAL:' => $h($input['reff1_dir_res'] ?? ''),
+        '   DIR. LABORAL:' => $h($input['reff1_dir_lab'] ?? ''),
+        '   CELULAR:' => $h($input['reff1_cel'] ?? ''),
+        '2. NOMBRE COMPLETO:' => $h($input['reff2_nombre'] ?? ''),
+        '   DIR. RESIDENCIAL:' => $h($input['reff2_dir_res'] ?? ''),
+        '   DIR. LABORAL:' => $h($input['reff2_dir_lab'] ?? ''),
+        '   CELULAR:' => $h($input['reff2_cel'] ?? ''),
+    ]);
+
+    if ($firmaBase64 !== '') {
+        $html .= '<tr><td colspan="2" style="background:#eee;padding:6px 8px;font-weight:bold">Firma del solicitante</td></tr>';
+        $html .= '<tr><td colspan="2" style="padding:10px;"><img class="firma" src="data:image/png;base64,' . $firmaBase64 . '" alt="Firma"/></td></tr>';
+    }
+    $html .= '</table>';
+    $html .= '<p class="footer-note">El solicitante autoriza a PANAMA CAR RENTAL, S.A. y a las instituciones financieras con las que tramite (MULTIBANK, INC., THE BANK OF NOVA SCOTIA (PANAMÁ), S.A., BANCO GENERAL, S.A., GLOBAL BANK CORPORATION, BAC International Bank, Inc., BANISTMO, S.A., BANCO DELTA, S.A., BANESCO (Panamá), S.A., BANISI, S.A., MULTIFINANCIAMIENTOS, S.A., entre otras) a verificar la información proporcionada y a consultar bureaus de crédito según corresponda.</p>';
+    $html .= '</div></body></html>';
     return $html;
 }
 
