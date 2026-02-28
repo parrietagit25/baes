@@ -4,6 +4,7 @@
  * Acceso sin login. Si se accede con ?e=EMAIL_CODIFICADO, al enviar se envía por correo el PDF a ese email.
  */
 $tokenLink = isset($_GET['e']) ? trim($_GET['e']) : '';
+$modoPrueba = isset($_GET['prueba']) && $_GET['prueba'] === '1';
 ?>
 <!doctype html>
 <html lang="es">
@@ -330,6 +331,11 @@ $tokenLink = isset($_GET['e']) ? trim($_GET['e']) : '';
       </div>
     </div>
 
+    <?php if ($modoPrueba): ?>
+    <div style="margin-bottom:12px;padding:12px 16px;background:rgba(78,161,255,.2);border:1px solid rgba(78,161,255,.4);border-radius:12px;color:var(--text);">
+      <strong>Modo prueba:</strong> formulario con datos precargados. Solo ingresa o corrige el correo del cliente y firma al final.
+    </div>
+    <?php endif; ?>
     <form id="wizardForm" novalidate>
       <fieldset data-step="0" class="active">
         <div class="sectionTitle">
@@ -860,6 +866,7 @@ $tokenLink = isset($_GET['e']) ? trim($_GET['e']) : '';
   <script>
     (function(){
       var TOKEN_LINK = "<?php echo $tokenLink !== '' ? addslashes($tokenLink) : ''; ?>";
+      var MODO_PRUEBA = window.location.search.indexOf("prueba=1") !== -1;
       var STORAGE_KEY = "baes_financiamiento_wizard_v1" + (TOKEN_LINK ? "_t_" + TOKEN_LINK.substring(0,8) : "");
       var API_URL = (function(){
         var base = window.location.pathname.replace(/\/[^\/]*$/, "");
@@ -1007,7 +1014,7 @@ $tokenLink = isset($_GET['e']) ? trim($_GET['e']) : '';
             el.checked = (String(v || "") === el.value);
             return;
           }
-          if(v !== undefined && v !== null) el.value = v;
+          if(v !== undefined && v !== null) el.value = String(v);
         });
         if(data.__meta && typeof data.__meta.step === "number"){
           step = Math.max(0, Math.min(fieldsets.length - 1, data.__meta.step));
@@ -1033,7 +1040,7 @@ $tokenLink = isset($_GET['e']) ? trim($_GET['e']) : '';
           cliente_edad: "34",
           cliente_nacionalidad: "Panameña",
           cliente_dependientes: "0",
-          cliente_correo: "",
+          cliente_correo: "prueba@ejemplo.com",
           cliente_peso: "75",
           cliente_estatura: "175",
           vivienda: "Alquilada",
@@ -1233,7 +1240,12 @@ $tokenLink = isset($_GET['e']) ? trim($_GET['e']) : '';
         attachNavButtons();
 
         var draft = loadDraft();
-        if(draft){
+        var cargarPrueba = MODO_PRUEBA || TOKEN_LINK;
+        if (MODO_PRUEBA) {
+          clearDraft();
+          draft = null;
+        }
+        if(draft && !cargarPrueba){
           fillFormFromObject(draft);
           fieldsets.forEach(function(fs){ fs.classList.remove("active"); });
           fieldsets[step].classList.add("active");
@@ -1242,7 +1254,7 @@ $tokenLink = isset($_GET['e']) ? trim($_GET['e']) : '';
           saveState.textContent = "Restaurado";
           showToast("Progreso restaurado");
         } else {
-          if(TOKEN_LINK){
+          if(cargarPrueba){
             fillFormFromObject(getTestData());
             showToast("Datos de prueba cargados. Solo ingresa tu correo en el paso 2 y firma al final.", "ok");
           }
