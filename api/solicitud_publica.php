@@ -134,7 +134,7 @@ function buildPdfHtmlFinanciamiento($input, $firmaBase64, $nombreCliente) {
         $logoData = @file_get_contents($logoPath);
         if ($logoData !== false) {
             $logoB64 = base64_encode($logoData);
-            $logoImg = '<img src="data:image/jpeg;base64,' . $logoB64 . '" alt="AUTOMARKET SEMINUEVOS" style="position:absolute;top:0;right:0;height:52px;width:auto;" />';
+            $logoImg = '<img src="data:image/jpeg;base64,' . $logoB64 . '" alt="AUTOMARKET SEMINUEVOS" style="height:52px;width:auto;display:block;" />';
         }
     }
 
@@ -149,21 +149,22 @@ function buildPdfHtmlFinanciamiento($input, $firmaBase64, $nombreCliente) {
     };
 
     $html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
-        body{font-family:DejaVu Sans,sans-serif;font-size:10px;color:#000;margin:0;padding:0;}
-        .pdf-wrap{position:relative;padding-top:8px;padding-right:140px;}
+        body{font-family:DejaVu Sans,sans-serif;font-size:10px;color:#000;margin:0;padding:0;width:100%;}
+        .pdf-wrap{width:100%;}
         .pdf-title{font-size:14px;font-weight:bold;margin:0 0 6px 0;}
-        .banner{background:' . $secHeader . ';color:#fff;padding:8px 10px;text-align:center;font-weight:bold;font-size:11px;margin:10px 0;}
+        .banner{background:' . $secHeader . ';color:#fff;padding:8px 10px;text-align:center;font-weight:bold;font-size:11px;margin:10px 0;width:100%;}
         table{width:100%;border-collapse:collapse;} td,th{border:1px solid #ccc;padding:5px 8px;text-align:left;}
         .firma{max-width:280px;max-height:120px;}
         .grid2{width:100%;border-collapse:collapse;font-size:10px;}
         .grid2 td{padding:4px 8px;border:1px solid #ddd;vertical-align:top;}
+        .header-row{width:100%;border:none;}
+        .header-row td{border:none;padding:0;vertical-align:top;}
+        .header-left{width:100%;}
+        .header-logo{text-align:right;white-space:nowrap;}
         .footer-note{font-size:8px;color:#555;margin-top:14px;line-height:1.3;}
     </style></head><body>';
     $html .= '<div class="pdf-wrap">';
-    if ($logoImg !== '') {
-        $html .= $logoImg;
-    }
-    $html .= '<h1 class="pdf-title">GENERALES DEL CLIENTE:</h1>';
+    $html .= '<table class="header-row"><tr><td class="header-left"><h1 class="pdf-title">GENERALES DEL CLIENTE:</h1>';
     $html .= '<table class="grid2"><tr>';
     $html .= '<td style="width:50%"><strong>SUCURSAL:</strong> ' . $h($input['sucursal'] ?? '') . '</td>';
     $html .= '<td style="width:50%"><strong>MARCA DEL AUTO:</strong> ' . $h($input['marca_auto'] ?? '') . '</td></tr><tr>';
@@ -171,6 +172,7 @@ function buildPdfHtmlFinanciamiento($input, $firmaBase64, $nombreCliente) {
     $html .= '<td><strong>MODELO DEL AUTO:</strong> ' . $h($input['modelo_auto'] ?? '') . '</td></tr><tr>';
     $html .= '<td><strong>NOMBRE DEL GESTOR:</strong> ' . $h($input['nombre_gestor'] ?? '') . '</td>';
     $html .= '<td><strong>AÑO:</strong> ' . $h($input['anio_auto'] ?? '') . ' &nbsp; <strong>PRECIO DE VENTA:</strong> ' . $h($input['precio_venta'] ?? '') . ' &nbsp; <strong>ABONO:</strong> ' . $h($input['abono'] ?? '') . '</td></tr></table>';
+    $html .= '</td><td class="header-logo">' . ($logoImg !== '' ? $logoImg : '') . '</td></tr></table>';
 
     $html .= '<div class="banner">Análisis de Perfil para Financiamientos de Bancos</div>';
     $html .= '<table>';
