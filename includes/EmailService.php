@@ -1,12 +1,9 @@
 <?php
 /**
- * Servicio de envío de correos electrónicos usando SendGrid
- * 
- * Utiliza SendGrid API para el envío de correos
- * Incluye templates HTML para diferentes tipos de notificaciones
+ * Servicio de envío de correos: SMTP (Outlook) o SendGrid
+ * Si en config está driver=smtp y smtp_host/smtp_user/smtp_pass, se usa SMTP (como pasevistainter.py).
  */
 
-// Cargar autoload de Composer si existe
 $autoloadPath = __DIR__ . '/../vendor/autoload.php';
 if (file_exists($autoloadPath)) {
     require_once $autoloadPath;
@@ -14,22 +11,33 @@ if (file_exists($autoloadPath)) {
     die('Error: Composer no está instalado. Ejecuta: composer install');
 }
 
-// Cargar SendGrid - compatible con versiones antiguas y nuevas
-// Si es versión antigua, cargar manualmente
 if (file_exists(__DIR__ . '/../vendor/sendgrid/sendgrid/lib/SendGrid.php') && !class_exists('SendGrid\Mail\Mail')) {
     require_once __DIR__ . '/../vendor/sendgrid/sendgrid/lib/SendGrid.php';
 }
 
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\SMTP;
+use PHPMailer\PHPMailer\Exception as PHPMailerException;
+
 class EmailService {
     private $config;
     private $sendgrid;
+    private $useSmtp = false;
     
     public function __construct() {
         $this->config = require __DIR__ . '/../config/email.php';
+        $driver = $this->config['driver'] ?? 'sendgrid';
+        $smtpHost = $this->config['smtp_host'] ?? '';
+        $smtpUser = $this->config['smtp_user'] ?? '';
+        $smtpPass = $this->config['smtp_pass'] ?? '';
         
-        // Inicializar SendGrid
+        if (($driver === 'smtp' || $smtpHost !== '') && $smtpUser !== '' && $smtpPass !== '') {
+            $this->useSmtp = true;
+            return;
+        }
+        
         try {
-            $this->sendgrid = new \SendGrid($this->config['sendgrid_api_key']);
+            $this->sendgrid = new \SendGrid($this->config['sendgrid_api_key'] ?? '');
         } catch (Exception $e) {
             error_log("Error al inicializar SendGrid: " . $e->getMessage());
             throw $e;
@@ -37,15 +45,7 @@ class EmailService {
     }
     
     /**
-     * Envía un correo genérico
-     * 
-     * @param string $to Email del destinatario
-     * @param string $toName Nombre del destinatario
-     * @param string $subject Asunto del correo
-     * @param string $bodyHTML Cuerpo del correo en HTML
-     * @param string $bodyText Cuerpo del correo en texto plano (opcional)
-     * @param array $attachments Array de rutas de archivos adjuntos (opcional)
-     * @return array ['success' => bool, 'message' => string]
+     * Envía un correo genérico (SMTP Outlook o SendGrid)
      */
     public function enviarCorreo(
         $to,
@@ -56,23 +56,51 @@ class EmailService {
         $attachments = []
     ) {
         try {
-            // Detectar versión de SendGrid y usar la API apropiada
-            // Primero verificar si existe la clase nueva
-            $tieneV7 = class_exists('SendGrid\Mail\Mail');
-            
-            if ($tieneV7) {
-                // Versión nueva de SendGrid (v7+)
-                return $this->enviarCorreoV7($to, $toName, $subject, $bodyHTML, $bodyText, $attachments);
-            } else {
-                // Versión antigua de SendGrid (v6 o anterior)
-                return $this->enviarCorreoV6($to, $toName, $subject, $bodyHTML, $bodyText, $attachments);
+            if ($this->useSmtp) {
+                return $this->enviarCorreoSMTP($to, $toName, $subject, $bodyHTML, $bodyText, $attachments);
             }
+            $tieneV7 = class_exists('SendGrid\Mail\Mail');
+            if ($tieneV7) {
+                return $this->enviarCorreoV7($to, $toName, $subject, $bodyHTML, $bodyText, $attachments);
+            }
+            return $this->enviarCorreoV6($to, $toName, $subject, $bodyHTML, $bodyText, $attachments);
         } catch (Exception $e) {
-            error_log("Error al enviar correo con SendGrid: " . $e->getMessage());
-            return [
-                'success' => false,
-                'message' => 'Error al enviar correo: ' . $e->getMessage()
-            ];
+            error_log("Error al enviar correo: " . $e->getMessage());
+            return ['success' => false, 'message' => 'Error al enviar correo: ' . $e->getMessage()];
+        }
+    }
+    
+    /**
+     * Envío por SMTP (Outlook/Office365) - mismo método que pasevistainter.py
+     */
+    private function enviarCorreoSMTP($to, $toName, $subject, $bodyHTML, $bodyText, $attachments) {
+        $mail = new PHPMailer(true);
+        try {
+            $mail->isSMTP();
+            $mail->Host       = $this->config['smtp_host'];
+            $mail->SMTPAuth   = true;
+            $mail->Username   = $this->config['smtp_user'];
+            $mail->Password   = $this->config['smtp_pass'];
+            $mail->SMTPSecure = $this->config['smtp_secure'] ?? 'tls';
+            $mail->Port       = (int) ($this->config['smtp_port'] ?? 587);
+            $mail->CharSet    = 'UTF-8';
+            $mail->setFrom($this->config['from_email'], $this->config['from_name']);
+            $mail->addAddress($to, $toName ?: '');
+            $mail->addReplyTo($this->config['reply_to_email'] ?? $this->config['from_email'], $this->config['reply_to_name'] ?? '');
+            $mail->isHTML(true);
+            $mail->Subject = $subject;
+            $mail->Body    = $bodyHTML;
+            $mail->AltBody = $bodyText ?: strip_tags($bodyHTML);
+            foreach ($attachments as $path) {
+                if (file_exists($path)) {
+                    $mail->addAttachment($path, basename($path));
+                }
+            }
+            $mail->send();
+            return ['success' => true, 'message' => 'Correo enviado correctamente'];
+        } catch (PHPMailerException $e) {
+            error_log("PHPMailer SMTP: " . $mail->ErrorInfo);
+            return ['success' => false, 'message' => 'Error SMTP: ' . $mail->ErrorInfo];
         }
     }
     

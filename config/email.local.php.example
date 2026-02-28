@@ -7,11 +7,14 @@
  */
 
 return [
-    // Configuración SendGrid API
-    // IMPORTANTE: Reemplaza TU_API_KEY_DE_SENDGRID_AQUI con tu API key real de SendGrid
+    // Método: 'smtp' (Outlook como pasevistainter.py) o 'sendgrid'
+    'driver' => 'smtp',
+    'smtp_host' => 'smtp-mail.outlook.com',
+    'smtp_port' => 587,
+    'smtp_user' => 'notificaciones@grupopcr.com.pa',
+    'smtp_pass' => 'TU_CLAVE_SMTP',
+    'smtp_secure' => 'tls',
     'sendgrid_api_key' => 'TU_API_KEY_DE_SENDGRID_AQUI',
-    
-    // Configuración del remitente (verificado en SendGrid)
     'from_email' => 'notificaciones@grupopcr.com.pa',
     'from_name' => 'Automarket Rent a Car',
     

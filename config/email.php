@@ -25,24 +25,20 @@ if (file_exists($localConfigPath)) {
 
 // Configuración por defecto (usa variables de entorno)
 return [
-    // Configuración SendGrid API
-    // IMPORTANTE: La API key debe configurarse como variable de entorno SENDGRID_API_KEY
-    // O crear un archivo .env.local (que está en .gitignore)
+    // Método de envío: 'smtp' (Outlook/Office365) o 'sendgrid'. Si smtp_host está definido se usa SMTP.
+    'driver' => getEnvOrDefault('EMAIL_DRIVER', 'sendgrid'),
     'sendgrid_api_key' => getEnvOrDefault('SENDGRID_API_KEY', ''),
-    
-    // Configuración del remitente (verificado en SendGrid)
+    'smtp_host' => getEnvOrDefault('SMTP_HOST', ''),
+    'smtp_port' => (int) getEnvOrDefault('SMTP_PORT', '587'),
+    'smtp_user' => getEnvOrDefault('SMTP_USER', ''),
+    'smtp_pass' => getEnvOrDefault('SMTP_PASS', ''),
+    'smtp_secure' => getEnvOrDefault('SMTP_SECURE', 'tls'),
     'from_email' => getEnvOrDefault('SENDGRID_FROM_EMAIL', 'noreply@automarketrentacar.com'),
     'from_name' => getEnvOrDefault('SENDGRID_FROM_NAME', 'Automarket Rent a Car'),
-    
-    // Configuración adicional
     'reply_to_email' => getEnvOrDefault('SENDGRID_REPLY_TO', 'noreply@automarketrentacar.com'),
     'reply_to_name' => getEnvOrDefault('SENDGRID_REPLY_TO_NAME', 'Automarket Rent a Car - Soporte'),
-    
-    // Configuración de la aplicación
     'app_url' => getEnvOrDefault('APP_URL', 'http://localhost:8086'),
     'app_name' => 'Automarket Rent a Car',
-    
-    // Debug (desactivar en producción)
     'debug' => getEnvOrDefault('SENDGRID_DEBUG', 'false') === 'true',
 ];
 
