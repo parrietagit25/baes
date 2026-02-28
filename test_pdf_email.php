@@ -4,6 +4,7 @@
  * Uso: abre test_pdf_email.php en el navegador, escribe un correo y pulsa Enviar.
  * Requiere: config/email.local.php (SMTP o SendGrid) y composer (dompdf, phpmailer o sendgrid).
  */
+error_reporting(E_ALL & ~E_DEPRECATED & ~E_STRICT);
 header('Content-Type: text/html; charset=utf-8');
 $mensaje = '';
 $error = '';
@@ -15,7 +16,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' || isset($_GET['email'])) {
     } else {
         $pdfPath = null;
         try {
-            require_once __DIR__ . '/vendor/autoload.php';
+            $autoload = __DIR__ . '/vendor/autoload.php';
+            if (!is_file($autoload)) {
+                throw new RuntimeException('No existe vendor/autoload.php. Ejecuta en la raíz del proyecto: composer install');
+            }
+            require_once $autoload;
+            if (!class_exists('Dompdf\Dompdf')) {
+                throw new RuntimeException('Dompdf no está instalado. En la raíz del proyecto ejecuta: composer install (o en Docker: docker exec motus_php composer install)');
+            }
             $html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{font-family:DejaVu Sans,sans-serif;padding:20px;} h1{color:#333;} table{border-collapse:collapse;} td,th{border:1px solid #ccc;padding:8px;}</style></head><body>';
             $html .= '<h1>PDF de prueba</h1><p>Generado el ' . date('d/m/Y H:i:s') . '</p>';
             $html .= '<table><tr><th>Campo</th><th>Valor</th></tr>';
