@@ -4,7 +4,6 @@
  * Acceso sin login. Si se accede con ?e=EMAIL_CODIFICADO, al enviar se envía por correo el PDF a ese email.
  */
 $tokenLink = isset($_GET['e']) ? trim($_GET['e']) : '';
-$modoPrueba = isset($_GET['prueba']) && $_GET['prueba'] === '1';
 ?>
 <!doctype html>
 <html lang="es">
@@ -331,11 +330,6 @@ $modoPrueba = isset($_GET['prueba']) && $_GET['prueba'] === '1';
       </div>
     </div>
 
-    <?php if ($modoPrueba): ?>
-    <div style="margin-bottom:12px;padding:12px 16px;background:rgba(78,161,255,.2);border:1px solid rgba(78,161,255,.4);border-radius:12px;color:var(--text);">
-      <strong>Modo prueba:</strong> formulario con datos precargados. Solo ingresa o corrige el correo del cliente y firma al final.
-    </div>
-    <?php endif; ?>
     <form id="wizardForm" novalidate>
       <fieldset data-step="0" class="active">
         <div class="sectionTitle">
@@ -866,7 +860,6 @@ $modoPrueba = isset($_GET['prueba']) && $_GET['prueba'] === '1';
   <script>
     (function(){
       var TOKEN_LINK = "<?php echo $tokenLink !== '' ? addslashes($tokenLink) : ''; ?>";
-      var MODO_PRUEBA = window.location.search.indexOf("prueba=1") !== -1;
       var STORAGE_KEY = "baes_financiamiento_wizard_v1" + (TOKEN_LINK ? "_t_" + TOKEN_LINK.substring(0,8) : "");
       var API_URL = (function(){
         var base = window.location.pathname.replace(/\/[^\/]*$/, "");
@@ -1021,82 +1014,6 @@ $modoPrueba = isset($_GET['prueba']) && $_GET['prueba'] === '1';
         }
       }
 
-      /** Datos de prueba para probar el envío de correo. Solo hay que digitar el correo del cliente. */
-      function getTestData(){
-        return {
-          sucursal: "Sucursal Prueba - Panamá",
-          nombre_gestor: "Gestor Prueba",
-          marca_auto: "Toyota",
-          modelo_auto: "Corolla",
-          anio_auto: "2022",
-          kms_cod_auto: "25000",
-          precio_venta: "18500",
-          abono: "3000",
-          cliente_nombre: "Juan Pérez Prueba",
-          cliente_estado_civil: "Soltero/a",
-          cliente_sexo: "M",
-          cliente_id: "8-123-4567",
-          cliente_nacimiento: "1990-05-15",
-          cliente_edad: "34",
-          cliente_nacionalidad: "Panameña",
-          cliente_dependientes: "0",
-          cliente_correo: "prueba@ejemplo.com",
-          cliente_peso: "75",
-          cliente_estatura: "175",
-          vivienda: "Alquilada",
-          vivienda_monto: "450",
-          prov_dist_corr: "Panamá, Panamá, San Francisco",
-          tel_residencia: "234-5678",
-          barriada_calle_casa: "Calle 50, Edificio Prueba",
-          celular_cliente: "6123-4567",
-          edificio_apto: "Apto 101",
-          correo_residencial: "",
-          empresa_nombre: "Empresa Demo S.A.",
-          empresa_ocupacion: "Analista",
-          empresa_anios: "5",
-          empresa_telefono: "234-0000",
-          empresa_salario: "1200",
-          empresa_direccion: "Zona Libre, Edificio 1",
-          otros_ingresos: "",
-          ocupacion_otros: "",
-          trabajo_anterior: "",
-          tiene_conyuge: false,
-          con_nombre: "",
-          con_estado_civil: "",
-          con_sexo: "",
-          con_id: "",
-          con_nacimiento: "",
-          con_edad: "",
-          con_nacionalidad: "",
-          con_dependientes: "",
-          con_correo: "",
-          con_empresa: "",
-          con_ocupacion: "",
-          con_anios: "",
-          con_tel: "",
-          con_salario: "",
-          con_direccion: "",
-          con_otros_ingresos: "",
-          con_trabajo_anterior: "",
-          refp1_nombre: "María López",
-          refp1_cel: "6789-0123",
-          refp1_dir_res: "Panamá",
-          refp1_dir_lab: "Oficina Central",
-          refp2_nombre: "Carlos Ruiz",
-          refp2_cel: "6789-4567",
-          refp2_dir_res: "Panamá",
-          refp2_dir_lab: "Empresa XYZ",
-          reff1_nombre: "Ana Pérez",
-          reff1_cel: "6123-8901",
-          reff1_dir_res: "Panamá",
-          reff1_dir_lab: "",
-          reff2_nombre: "Luis García",
-          reff2_cel: "6789-2345",
-          reff2_dir_res: "Panamá",
-          reff2_dir_lab: ""
-        };
-      }
-
       function saveDraft(mode){
         var payload = readFormToObject();
         try {
@@ -1240,12 +1157,7 @@ $modoPrueba = isset($_GET['prueba']) && $_GET['prueba'] === '1';
         attachNavButtons();
 
         var draft = loadDraft();
-        var cargarPrueba = MODO_PRUEBA || TOKEN_LINK;
-        if (MODO_PRUEBA) {
-          clearDraft();
-          draft = null;
-        }
-        if(draft && !cargarPrueba){
+        if(draft){
           fillFormFromObject(draft);
           fieldsets.forEach(function(fs){ fs.classList.remove("active"); });
           fieldsets[step].classList.add("active");
@@ -1254,10 +1166,6 @@ $modoPrueba = isset($_GET['prueba']) && $_GET['prueba'] === '1';
           saveState.textContent = "Restaurado";
           showToast("Progreso restaurado");
         } else {
-          if(cargarPrueba){
-            fillFormFromObject(getTestData());
-            showToast("Datos de prueba cargados. Solo ingresa tu correo en el paso 2 y firma al final.", "ok");
-          }
           setChipState();
           calcProgress();
         }
