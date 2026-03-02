@@ -164,16 +164,9 @@ function buildPdfHtmlFinanciamiento($input, $firmaBase64, $nombreCliente) {
         .footer-note{font-size:8px;color:#555;margin-top:14px;line-height:1.3;}
     </style></head><body>';
     $html .= '<div class="pdf-wrap">';
-    $html .= '<table class="header-row"><tr><td class="header-left"><h1 class="pdf-title">GENERALES DEL CLIENTE:</h1>';
-    $html .= '<table class="grid2"><tr>';
-    $html .= '<td style="width:50%"><strong>SUCURSAL:</strong> ' . $h($input['sucursal'] ?? '') . '</td>';
-    $html .= '<td style="width:50%"><strong>MARCA DEL AUTO:</strong> ' . $h($input['marca_auto'] ?? '') . '</td></tr><tr>';
-    $html .= '<td><strong>KMS / COD AUTO:</strong> ' . $h($input['kms_cod_auto'] ?? '') . '</td>';
-    $html .= '<td><strong>MODELO DEL AUTO:</strong> ' . $h($input['modelo_auto'] ?? '') . '</td></tr><tr>';
-    $html .= '<td><strong>NOMBRE DEL GESTOR:</strong> ' . $h($input['nombre_gestor'] ?? '') . '</td>';
-    $html .= '<td><strong>AÑO:</strong> ' . $h($input['anio_auto'] ?? '') . ' &nbsp; <strong>PRECIO DE VENTA:</strong> ' . $h($input['precio_venta'] ?? '') . ' &nbsp; <strong>ABONO:</strong> ' . $h($input['abono'] ?? '') . '</td></tr></table>';
-    $html .= '</td><td class="header-logo">' . ($logoImg !== '' ? $logoImg : '') . '</td></tr></table>';
-
+    if ($logoImg !== '') {
+        $html .= '<table class="header-row"><tr><td style="width:100%;border:none;padding:0;"></td><td class="header-logo" style="border:none;padding:0;vertical-align:top;">' . $logoImg . '</td></tr></table>';
+    }
     $html .= '<div class="banner">Análisis de Perfil para Financiamientos de Bancos</div>';
     $html .= '<table>';
 

@@ -334,64 +334,6 @@ $tokenLink = isset($_GET['e']) ? trim($_GET['e']) : '';
       <fieldset data-step="0" class="active">
         <div class="sectionTitle">
           <div>
-            <h2>Generales del Cliente</h2>
-            <p>Datos del vehículo y del trámite (sucursal, auto, precio, abono, etc.).</p>
-          </div>
-        </div>
-        <div class="grid">
-          <div class="col-6">
-            <label for="sucursal">Sucursal *</label>
-            <input id="sucursal" name="sucursal" required maxlength="80" autocomplete="organization" />
-            <div class="error" data-error-for="sucursal"></div>
-          </div>
-          <div class="col-6">
-            <label for="nombre_gestor">Nombre del gestor *</label>
-            <input id="nombre_gestor" name="nombre_gestor" required maxlength="80" />
-            <div class="error" data-error-for="nombre_gestor"></div>
-          </div>
-          <div class="col-6">
-            <label for="marca_auto">Marca del auto *</label>
-            <input id="marca_auto" name="marca_auto" required maxlength="60" />
-            <div class="error" data-error-for="marca_auto"></div>
-          </div>
-          <div class="col-6">
-            <label for="modelo_auto">Modelo del auto *</label>
-            <input id="modelo_auto" name="modelo_auto" required maxlength="60" />
-            <div class="error" data-error-for="modelo_auto"></div>
-          </div>
-          <div class="col-4">
-            <label for="anio_auto">Año *</label>
-            <input id="anio_auto" name="anio_auto" inputmode="numeric" required pattern="^(19|20)\d{2}$" placeholder="YYYY" />
-            <div class="hint">Ej: 2021</div>
-            <div class="error" data-error-for="anio_auto"></div>
-          </div>
-          <div class="col-4">
-            <label for="kms_cod_auto">KMS / Cód. auto *</label>
-            <input id="kms_cod_auto" name="kms_cod_auto" required maxlength="40" />
-            <div class="error" data-error-for="kms_cod_auto"></div>
-          </div>
-          <div class="col-4">
-            <label for="precio_venta">Precio de venta (USD) *</label>
-            <input id="precio_venta" name="precio_venta" inputmode="decimal" required placeholder="0.00" />
-            <div class="error" data-error-for="precio_venta"></div>
-          </div>
-          <div class="col-4">
-            <label for="abono">Abono (USD)</label>
-            <input id="abono" name="abono" inputmode="decimal" placeholder="0.00" />
-            <div class="error" data-error-for="abono"></div>
-          </div>
-        </div>
-        <div class="rowActions">
-          <div class="chip"><strong>Paso:</strong> 1 / 6</div>
-          <div class="navBtns">
-            <button type="button" class="primary" data-next>Siguiente</button>
-          </div>
-        </div>
-      </fieldset>
-
-      <fieldset data-step="1">
-        <div class="sectionTitle">
-          <div>
             <h2>A. Información del Cliente</h2>
             <p>Datos personales del solicitante.</p>
           </div>
@@ -466,7 +408,7 @@ $tokenLink = isset($_GET['e']) ? trim($_GET['e']) : '';
           </div>
         </div>
         <div class="rowActions">
-          <div class="chip"><strong>Paso:</strong> 2 / 6</div>
+          <div class="chip"><strong>Paso:</strong> 1 / 5</div>
           <div class="navBtns">
             <button type="button" data-prev>Atrás</button>
             <button type="button" class="primary" data-next>Siguiente</button>
@@ -474,7 +416,7 @@ $tokenLink = isset($_GET['e']) ? trim($_GET['e']) : '';
         </div>
       </fieldset>
 
-      <fieldset data-step="2">
+      <fieldset data-step="1">
         <div class="sectionTitle">
           <div>
             <h2>B. Dirección Residencial</h2>
@@ -543,7 +485,7 @@ $tokenLink = isset($_GET['e']) ? trim($_GET['e']) : '';
           </div>
         </div>
         <div class="rowActions">
-          <div class="chip"><strong>Paso:</strong> 3 / 6</div>
+          <div class="chip"><strong>Paso:</strong> 2 / 5</div>
           <div class="navBtns">
             <button type="button" data-prev>Atrás</button>
             <button type="button" class="primary" data-next>Siguiente</button>
@@ -551,7 +493,7 @@ $tokenLink = isset($_GET['e']) ? trim($_GET['e']) : '';
         </div>
       </fieldset>
 
-      <fieldset data-step="3">
+      <fieldset data-step="2">
         <div class="sectionTitle">
           <div>
             <h2>C. Información Laboral</h2>
@@ -606,7 +548,7 @@ $tokenLink = isset($_GET['e']) ? trim($_GET['e']) : '';
           </div>
         </div>
         <div class="rowActions">
-          <div class="chip"><strong>Paso:</strong> 4 / 6</div>
+          <div class="chip"><strong>Paso:</strong> 3 / 5</div>
           <div class="navBtns">
             <button type="button" data-prev>Atrás</button>
             <button type="button" class="primary" data-next>Siguiente</button>
@@ -614,7 +556,7 @@ $tokenLink = isset($_GET['e']) ? trim($_GET['e']) : '';
         </div>
       </fieldset>
 
-      <fieldset data-step="4">
+      <fieldset data-step="3">
         <div class="sectionTitle">
           <div>
             <h2>D. Solicitante adicional y/o Cónyuge</h2>
@@ -728,7 +670,7 @@ $tokenLink = isset($_GET['e']) ? trim($_GET['e']) : '';
           </div>
         </div>
         <div class="rowActions">
-          <div class="chip"><strong>Paso:</strong> 5 / 6</div>
+          <div class="chip"><strong>Paso:</strong> 4 / 5</div>
           <div class="navBtns">
             <button type="button" data-prev>Atrás</button>
             <button type="button" class="primary" data-next>Siguiente</button>
@@ -736,7 +678,7 @@ $tokenLink = isset($_GET['e']) ? trim($_GET['e']) : '';
         </div>
       </fieldset>
 
-      <fieldset data-step="5">
+      <fieldset data-step="4">
         <div class="sectionTitle">
           <div>
             <h2>E. Referencias</h2>
@@ -845,7 +787,7 @@ $tokenLink = isset($_GET['e']) ? trim($_GET['e']) : '';
           </div>
         </div>
         <div class="rowActions">
-          <div class="chip"><strong>Paso:</strong> 6 / 6</div>
+          <div class="chip"><strong>Paso:</strong> 5 / 5</div>
           <div class="navBtns">
             <button type="button" data-prev>Atrás</button>
             <button type="submit" class="primary" id="btnSubmit">Enviar</button>
@@ -876,7 +818,7 @@ $tokenLink = isset($_GET['e']) ? trim($_GET['e']) : '';
       const btnClear = document.getElementById("btnClear");
       const btnSubmit = document.getElementById("btnSubmit");
 
-      const stepLabels = ["Generales", "A. Cliente", "B. Dirección", "C. Laboral", "D. Cónyuge", "E. Referencias"];
+      const stepLabels = ["A. Cliente", "B. Dirección", "C. Laboral", "D. Cónyuge", "E. Referencias"];
       let step = 0;
       let toastTimer = null;
 
@@ -1092,17 +1034,7 @@ $tokenLink = isset($_GET['e']) ? trim($_GET['e']) : '';
           }
         });
 
-        if(stepIndex === 0){
-          ok = validateMoneyField("precio_venta", true) && ok;
-          ok = validateMoneyField("abono", false) && ok;
-          var precio = Number(form.elements["precio_venta"].value || 0);
-          var abono = Number(form.elements["abono"].value || 0);
-          if(!Number.isNaN(precio) && !Number.isNaN(abono) && abono > precio){
-            ok = false;
-            setError("abono", "El abono no puede ser mayor al precio de venta.");
-          }
-        }
-        if(stepIndex === 2){
+        if(stepIndex === 1){
           var vivienda = form.elements["vivienda"] && form.elements["vivienda"].value;
           var monto = form.elements["vivienda_monto"] && form.elements["vivienda_monto"].value;
           if((vivienda === "Alquilada" || vivienda === "Hipotecada") && !monto){
@@ -1112,9 +1044,9 @@ $tokenLink = isset($_GET['e']) ? trim($_GET['e']) : '';
             ok = validateMoneyField("vivienda_monto", false) && ok;
           }
         }
-        if(stepIndex === 3) ok = validateMoneyField("empresa_salario", true) && ok;
-        if(stepIndex === 4 && tieneConyuge) ok = validateMoneyField("con_salario", false) && ok;
-        if(stepIndex === 5){
+        if(stepIndex === 2) ok = validateMoneyField("empresa_salario", true) && ok;
+        if(stepIndex === 3 && tieneConyuge) ok = validateMoneyField("con_salario", false) && ok;
+        if(stepIndex === 4){
           if(TOKEN_LINK){
             var firmaVal = (firmaDataInput && firmaDataInput.value) ? firmaDataInput.value.trim() : "";
             if(!firmaVal){ ok = false; setError("firma", "Debe firmar en el recuadro con el dedo o el mouse."); }
