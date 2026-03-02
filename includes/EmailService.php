@@ -26,6 +26,13 @@ class EmailService {
     
     public function __construct() {
         $this->config = require __DIR__ . '/../config/email.php';
+        // Asegurar nombre correcto (evitar "Automarket Rent a Car" en correos)
+        $nombreCorrecto = 'AutoMarket Seminuevos';
+        foreach (['from_name', 'reply_to_name', 'app_name'] as $key) {
+            if (!empty($this->config[$key]) && (stripos($this->config[$key], 'Rent a Car') !== false || stripos($this->config[$key], 'Automarket Rent') !== false)) {
+                $this->config[$key] = $key === 'reply_to_name' ? $nombreCorrecto . ' - Soporte' : $nombreCorrecto;
+            }
+        }
         $driver = $this->config['driver'] ?? 'sendgrid';
         $smtpHost = $this->config['smtp_host'] ?? '';
         $smtpUser = $this->config['smtp_user'] ?? '';

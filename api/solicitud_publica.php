@@ -311,7 +311,7 @@ if ($token !== '') {
             if ($pdfPath && file_exists($pdfPath)) {
                 $config = require __DIR__ . '/../config/email.php';
                 $fromEmail = $config['from_email'] ?? 'noreply@ejemplo.com';
-                $fromName = $config['from_name'] ?? 'Solicitud de Crédito';
+                $fromName = $config['from_name'] ?? 'AutoMarket Seminuevos';
                 require_once __DIR__ . '/../includes/EmailService.php';
                 $emailService = new EmailService();
                 $asunto = 'Solicitud de Financiamiento completada - ' . $nombre;
