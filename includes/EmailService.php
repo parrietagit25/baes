@@ -257,7 +257,7 @@ class EmailService {
         $bodyText = strip_tags($bodyHTML);
         
         // Obtener asunto del template si está definido
-        $subject = $data['subject'] ?? 'Notificación de Automarket Rent a Car';
+        $subject = $data['subject'] ?? 'Notificación de AutoMarket Seminuevos';
         
         return $this->enviarCorreo($to, $toName, $subject, $bodyHTML, $bodyText);
     }

@@ -89,14 +89,14 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1><?php echo htmlspecialchars($app_name ?? 'Automarket Rent a Car'); ?></h1>
+            <h1><?php echo htmlspecialchars($app_name ?? 'AutoMarket Seminuevos'); ?></h1>
         </div>
         <div class="content">
             <?php echo $content ?? ''; ?>
         </div>
         <div class="footer">
             <p>Este es un correo automático del sistema. Por favor no responda a este mensaje.</p>
-            <p>&copy; <?php echo date('Y'); ?> Automarket Rent a Car. Todos los derechos reservados.</p>
+            <p>&copy; <?php echo date('Y'); ?> AutoMarket Seminuevos. Todos los derechos reservados.</p>
         </div>
     </div>
 </body>

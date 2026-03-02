@@ -3,7 +3,7 @@
 ## Configuración
 
 ✅ **Remitente:** noreply@automarketrentacar.com
-✅ **Nombre:** Automarket Rent a Car
+✅ **Nombre:** AutoMarket Seminuevos
 
 **IMPORTANTE:** La API Key debe configurarse en el archivo `.env` o como variable de entorno del servidor.
 

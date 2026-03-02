@@ -100,8 +100,8 @@ agregar un botón nuevo,
 
 - luego que el banco responde 
 - el cliente decide si acepta la propuesta del banco, se adjunta unos documentos 
--- proforma, esto lo genera automarket lo genera operaciones
--- el banco y automarket pautan una cita de firma para que el cliente firme con el banco esto tiene que estar registrado en el app, si asiste o no
+-- proforma, esto lo genera AutoMarket Seminuevos lo genera operaciones
+-- el banco y AutoMarket Seminuevos pautan una cita de firma para que el cliente firme con el banco esto tiene que estar registrado en el app, si asiste o no
 -- liberación de carta promesa   
 -- el ultimo click del proceso es facturado, ese click tiene que enviar a octo la información 
 nota: hay un tema con la reserva que se hace del auto, 

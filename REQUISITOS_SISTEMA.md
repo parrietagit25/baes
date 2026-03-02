@@ -329,12 +329,12 @@ CREATE TABLE vehiculos_solicitud (
 **Documentos requeridos:**
 
 1. **Proforma**
-   - Generada automáticamente por Automarket
+   - Generada automáticamente por AutoMarket Seminuevos
    - Generada por Operaciones
    - Estado: Pendiente / Generada / Enviada
 
 2. **Cita de Firma**
-   - Banco y Automarket pautan cita
+   - Banco y AutoMarket Seminuevos pautan cita
    - Campo: Fecha y hora de cita
    - Registro de asistencia: ✅ Asistió / ❌ No asistió
    - Notificaciones de recordatorio de cita
