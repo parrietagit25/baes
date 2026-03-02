@@ -179,8 +179,8 @@ function buildPdfHtmlFinanciamiento($input, $firmaBase64, $nombreCliente) {
         'SEXO:' => $h($input['cliente_sexo'] ?? ''),
         'NACIONALIDAD:' => $h($input['cliente_nacionalidad'] ?? ''),
         'DEPENDIENTES:' => $h($input['cliente_dependientes'] ?? ''),
-        'PESO:' => $h($input['cliente_peso'] ?? ''),
-        'ESTATURA:' => $h($input['cliente_estatura'] ?? ''),
+        'PESO (lbs):' => $h($input['cliente_peso'] ?? ''),
+        'ESTATURA (m):' => $h($input['cliente_estatura'] ?? ''),
         'CORREO:' => $h($input['cliente_correo'] ?? ''),
     ]);
 
@@ -235,27 +235,41 @@ function buildPdfHtmlFinanciamiento($input, $firmaBase64, $nombreCliente) {
     $html .= $bloqueSec('E. REFERENCIAS — 2 REF PERSONALES (NO PARIENTES):', [
         '1. NOMBRE COMPLETO:' => $h($input['refp1_nombre'] ?? ''),
         '   DIR. RESIDENCIAL:' => $h($input['refp1_dir_res'] ?? ''),
-        '   DIR. LABORAL:' => $h($input['refp1_dir_lab'] ?? ''),
+        '   LUGAR DONDE LABORA (EMPRESA/MINISTERIO):' => $h($input['refp1_dir_lab'] ?? ''),
         '   CELULAR:' => $h($input['refp1_cel'] ?? ''),
         '2. NOMBRE COMPLETO:' => $h($input['refp2_nombre'] ?? ''),
         '   DIR. RESIDENCIAL:' => $h($input['refp2_dir_res'] ?? ''),
-        '   DIR. LABORAL:' => $h($input['refp2_dir_lab'] ?? ''),
+        '   LUGAR DONDE LABORA (EMPRESA/MINISTERIO):' => $h($input['refp2_dir_lab'] ?? ''),
         '   CELULAR:' => $h($input['refp2_cel'] ?? ''),
     ]);
     $html .= $bloqueSec('2 REF FAMILIARES (QUE NO VIVAN CON USTED):', [
         '1. NOMBRE COMPLETO:' => $h($input['reff1_nombre'] ?? ''),
         '   DIR. RESIDENCIAL:' => $h($input['reff1_dir_res'] ?? ''),
-        '   DIR. LABORAL:' => $h($input['reff1_dir_lab'] ?? ''),
+        '   LUGAR DONDE LABORA (EMPRESA/MINISTERIO):' => $h($input['reff1_dir_lab'] ?? ''),
         '   CELULAR:' => $h($input['reff1_cel'] ?? ''),
         '2. NOMBRE COMPLETO:' => $h($input['reff2_nombre'] ?? ''),
         '   DIR. RESIDENCIAL:' => $h($input['reff2_dir_res'] ?? ''),
-        '   DIR. LABORAL:' => $h($input['reff2_dir_lab'] ?? ''),
+        '   LUGAR DONDE LABORA (EMPRESA/MINISTERIO):' => $h($input['reff2_dir_lab'] ?? ''),
         '   CELULAR:' => $h($input['reff2_cel'] ?? ''),
     ]);
 
     if ($firmaBase64 !== '') {
         $html .= '<tr><td colspan="2" style="background:#eee;padding:6px 8px;font-weight:bold">Firma del solicitante</td></tr>';
         $html .= '<tr><td colspan="2" style="padding:10px;"><img class="firma" src="data:image/png;base64,' . $firmaBase64 . '" alt="Firma"/></td></tr>';
+    }
+    $firmantesExtra = isset($input['firmantes_adicionales']) ? $input['firmantes_adicionales'] : '';
+    if ($firmantesExtra !== '') {
+        $lista = @json_decode($firmantesExtra, true);
+        if (is_array($lista)) {
+            foreach ($lista as $fa) {
+                $nom = isset($fa['nombre']) ? $h($fa['nombre']) : '';
+                $img = isset($fa['firma']) && $fa['firma'] !== '' ? $fa['firma'] : null;
+                if ($nom !== '' && $img !== null) {
+                    $html .= '<tr><td colspan="2" style="background:#eee;padding:6px 8px;font-weight:bold">Firma: ' . $nom . '</td></tr>';
+                    $html .= '<tr><td colspan="2" style="padding:10px;"><img class="firma" src="data:image/png;base64,' . $img . '" alt="Firma ' . $nom . '"/></td></tr>';
+                }
+            }
+        }
     }
     $html .= '</table>';
     $html .= '<p class="footer-note">El solicitante autoriza a PANAMA CAR RENTAL, S.A. y a las instituciones financieras con las que tramite (MULTIBANK, INC., THE BANK OF NOVA SCOTIA (PANAMÁ), S.A., BANCO GENERAL, S.A., GLOBAL BANK CORPORATION, BAC International Bank, Inc., BANISTMO, S.A., BANCO DELTA, S.A., BANESCO (Panamá), S.A., BANISI, S.A., MULTIFINANCIAMIENTOS, S.A., entre otras) a verificar la información proporcionada y a consultar bureaus de crédito según corresponda.</p>';

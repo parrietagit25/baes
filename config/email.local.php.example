@@ -16,15 +16,15 @@ return [
     'smtp_secure' => 'tls',
     'sendgrid_api_key' => 'TU_API_KEY_DE_SENDGRID_AQUI',
     'from_email' => 'notificaciones@grupopcr.com.pa',
-    'from_name' => 'Automarket Rent a Car',
+    'from_name' => 'AutoMarket Seminuevos',
     
     // Configuración adicional
     'reply_to_email' => 'noreply@automarketrentacar.com',
-    'reply_to_name' => 'Automarket Rent a Car - Soporte',
+    'reply_to_name' => 'AutoMarket Seminuevos - Soporte',
     
     // Configuración de la aplicación
     'app_url' => 'http://localhost:8086',
-    'app_name' => 'Automarket Rent a Car',
+    'app_name' => 'AutoMarket Seminuevos',
     
     // Debug (desactivar en producción)
     'debug' => false,

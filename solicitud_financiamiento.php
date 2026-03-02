@@ -397,13 +397,13 @@ $tokenLink = isset($_GET['e']) ? trim($_GET['e']) : '';
             <div class="error" data-error-for="cliente_correo"></div>
           </div>
           <div class="col-3">
-            <label for="cliente_peso">Peso</label>
-            <input id="cliente_peso" name="cliente_peso" inputmode="decimal" placeholder="kg" />
+            <label for="cliente_peso">Peso (lbs)</label>
+            <input id="cliente_peso" name="cliente_peso" inputmode="decimal" placeholder="lbs" />
             <div class="error" data-error-for="cliente_peso"></div>
           </div>
           <div class="col-3">
-            <label for="cliente_estatura">Estatura</label>
-            <input id="cliente_estatura" name="cliente_estatura" inputmode="decimal" placeholder="cm" />
+            <label for="cliente_estatura">Estatura (m)</label>
+            <input id="cliente_estatura" name="cliente_estatura" inputmode="decimal" placeholder="Ej: 1.75" step="0.01" />
             <div class="error" data-error-for="cliente_estatura"></div>
           </div>
         </div>
@@ -703,7 +703,7 @@ $tokenLink = isset($_GET['e']) ? trim($_GET['e']) : '';
             <div class="error" data-error-for="refp1_dir_res"></div>
           </div>
           <div class="col-6">
-            <label for="refp1_dir_lab">Personal 1 - Dirección laboral</label>
+            <label for="refp1_dir_lab">Personal 1 - Lugar donde Labora (Nombre de la empresa/Ministerio)</label>
             <input id="refp1_dir_lab" name="refp1_dir_lab" maxlength="140" />
             <div class="error" data-error-for="refp1_dir_lab"></div>
           </div>
@@ -723,7 +723,7 @@ $tokenLink = isset($_GET['e']) ? trim($_GET['e']) : '';
             <div class="error" data-error-for="refp2_dir_res"></div>
           </div>
           <div class="col-6">
-            <label for="refp2_dir_lab">Personal 2 - Dirección laboral</label>
+            <label for="refp2_dir_lab">Personal 2 - Lugar donde Labora (Nombre de la empresa/Ministerio)</label>
             <input id="refp2_dir_lab" name="refp2_dir_lab" maxlength="140" />
             <div class="error" data-error-for="refp2_dir_lab"></div>
           </div>
@@ -744,7 +744,7 @@ $tokenLink = isset($_GET['e']) ? trim($_GET['e']) : '';
             <div class="error" data-error-for="reff1_dir_res"></div>
           </div>
           <div class="col-6">
-            <label for="reff1_dir_lab">Familiar 1 - Dirección laboral</label>
+            <label for="reff1_dir_lab">Familiar 1 - Lugar donde Labora (Nombre de la empresa/Ministerio)</label>
             <input id="reff1_dir_lab" name="reff1_dir_lab" maxlength="140" />
             <div class="error" data-error-for="reff1_dir_lab"></div>
           </div>
@@ -764,24 +764,30 @@ $tokenLink = isset($_GET['e']) ? trim($_GET['e']) : '';
             <div class="error" data-error-for="reff2_dir_res"></div>
           </div>
           <div class="col-6">
-            <label for="reff2_dir_lab">Familiar 2 - Dirección laboral</label>
+            <label for="reff2_dir_lab">Familiar 2 - Lugar donde Labora (Nombre de la empresa/Ministerio)</label>
             <input id="reff2_dir_lab" name="reff2_dir_lab" maxlength="140" />
             <div class="error" data-error-for="reff2_dir_lab"></div>
           </div>
           <div class="col-12" style="margin-top:14px">
             <label class="d-block mb-2"><strong>Firma con el dedo (obligatorio)</strong></label>
-            <p class="subtitle mb-2" style="font-size:12px;color:var(--muted)">Firme en el recuadro con el dedo o el mouse. Luego confirme abajo.</p>
-            <div class="signature-wrap" style="border:2px solid rgba(255,255,255,.2);border-radius:12px;background:rgba(0,0,0,.2);position:relative;touch-action:none;">
-              <canvas id="firmaCanvas" width="400" height="160" style="display:block;width:100%;max-width:400px;height:160px;cursor:crosshair;border-radius:10px;"></canvas>
-              <button type="button" id="btnLimpiarFirma" class="btn btn-sm" style="position:absolute;top:8px;right:8px;background:rgba(255,255,255,.15);color:var(--text);border:1px solid var(--line);">Limpiar firma</button>
+            <p class="subtitle mb-2" style="font-size:12px;color:var(--muted)">Firme en todo el recuadro con el dedo o el mouse. Luego confirme abajo.</p>
+            <div class="signature-wrap" style="border:2px solid rgba(255,255,255,.2);border-radius:12px;background:rgba(0,0,0,.2);touch-action:none;overflow:hidden;">
+              <canvas id="firmaCanvas" width="500" height="180" style="display:block;width:100%;height:180px;cursor:crosshair;border-radius:10px;touch-action:none;"></canvas>
+            </div>
+            <div style="margin-top:8px;">
+              <button type="button" id="btnLimpiarFirma" class="btn btn-sm" style="background:rgba(255,255,255,.15);color:var(--text);border:1px solid var(--line);">Limpiar firma</button>
             </div>
             <input type="hidden" id="firmaData" name="firma" />
             <div class="error" data-error-for="firma"></div>
           </div>
-          <div class="col-12" style="margin-top:10px">
+          <div id="firmantesAdicionalesContainer" class="col-12" style="margin-top:16px"></div>
+          <div class="col-12" style="margin-top:8px">
+            <button type="button" id="btnAgregarFirmante" class="btn btn-sm" style="background:var(--accent);color:#fff;border:0;">Agregar otro firmante</button>
+          </div>
+          <div class="col-12" style="margin-top:14px">
             <label class="chip" style="display:flex;gap:10px;align-items:center;justify-content:flex-start">
               <input type="checkbox" id="acepta" name="acepta" required />
-              Confirmo que la información es correcta y autorizo el uso para análisis de crédito *
+              Confirmo que la información es correcta y autorizo el uso para análisis de crédito (obligatorio) *
             </label>
             <div class="error" data-error-for="acepta"></div>
           </div>
@@ -822,33 +828,111 @@ $tokenLink = isset($_GET['e']) ? trim($_GET['e']) : '';
       let step = 0;
       let toastTimer = null;
 
-      // Firma: canvas
+      // Firma: canvas principal (todo el recuadro usable; botón Limpiar fuera del área de firma)
       var canvas = document.getElementById("firmaCanvas");
       var firmaDataInput = document.getElementById("firmaData");
       var btnLimpiarFirma = document.getElementById("btnLimpiarFirma");
-      if (canvas) {
-        var ctx = canvas.getContext("2d");
-        var drawing = false;
-        var lastX = 0, lastY = 0;
+      function setupSignatureCanvas(canvasEl, dataInput){
+        if(!canvasEl || !canvasEl.getContext) return;
+        var ctx = canvasEl.getContext("2d");
+        var drawing = false, lastX = 0, lastY = 0;
         ctx.strokeStyle = "#eaf0ff";
         ctx.lineWidth = 2;
         ctx.lineCap = "round";
         function getPos(e){
-          var r = canvas.getBoundingClientRect();
-          var scaleX = canvas.width / r.width, scaleY = canvas.height / r.height;
+          var r = canvasEl.getBoundingClientRect();
+          var scaleX = canvasEl.width / r.width, scaleY = canvasEl.height / r.height;
           var clientX = e.touches ? e.touches[0].clientX : e.clientX;
           var clientY = e.touches ? e.touches[0].clientY : e.clientY;
           return { x: (clientX - r.left) * scaleX, y: (clientY - r.top) * scaleY };
         }
         function start(e){ if (!e.touches) e.preventDefault(); drawing = true; var p = getPos(e); lastX = p.x; lastY = p.y; }
         function move(e){ e.preventDefault(); if (!drawing) return; var p = getPos(e); ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(p.x, p.y); ctx.stroke(); lastX = p.x; lastY = p.y; }
-        function end(e){ if (!e.changedTouches) e.preventDefault(); drawing = false; if (firmaDataInput) firmaDataInput.value = canvas.toDataURL("image/png").replace(/^data:image\/png;base64,/, ""); }
-        canvas.addEventListener("mousedown", start); canvas.addEventListener("mousemove", move); canvas.addEventListener("mouseup", end); canvas.addEventListener("mouseleave", end);
-        canvas.addEventListener("touchstart", start, { passive: true });
-        canvas.addEventListener("touchmove", move, { passive: false });
-        canvas.addEventListener("touchend", end, { passive: true });
-        if (btnLimpiarFirma) btnLimpiarFirma.addEventListener("click", function(){ ctx.clearRect(0, 0, canvas.width, canvas.height); if (firmaDataInput) firmaDataInput.value = ""; });
+        function end(e){ if (!e.changedTouches) e.preventDefault(); drawing = false; if (dataInput) dataInput.value = canvasEl.toDataURL("image/png").replace(/^data:image\/png;base64,/, ""); }
+        canvasEl.addEventListener("mousedown", start);
+        canvasEl.addEventListener("mousemove", move);
+        canvasEl.addEventListener("mouseup", end);
+        canvasEl.addEventListener("mouseleave", end);
+        canvasEl.addEventListener("touchstart", start, { passive: true });
+        canvasEl.addEventListener("touchmove", move, { passive: false });
+        canvasEl.addEventListener("touchend", end, { passive: true });
       }
+      if (canvas) setupSignatureCanvas(canvas, firmaDataInput);
+      if (btnLimpiarFirma) btnLimpiarFirma.addEventListener("click", function(){
+        if (canvas) { var ctx = canvas.getContext("2d"); ctx.clearRect(0, 0, canvas.width, canvas.height); }
+        if (firmaDataInput) firmaDataInput.value = "";
+      });
+
+      // Firmantes adicionales
+      var firmantesAdicionales = [];
+      var firmantesContainer = document.getElementById("firmantesAdicionalesContainer");
+      var btnAgregarFirmante = document.getElementById("btnAgregarFirmante");
+      function addFirmanteBlock(){
+        var nombre = prompt("Nombre del firmante adicional:");
+        if (nombre == null || String(nombre).trim() === "") return;
+        nombre = String(nombre).trim();
+        var id = "fa_" + Date.now() + "_" + Math.random().toString(36).slice(2,6);
+        var block = document.createElement("div");
+        block.className = "firmante-adicional-block";
+        block.style.cssText = "margin-top:14px;padding:14px;border:1px solid var(--line);border-radius:12px;background:rgba(0,0,0,.15);";
+        var lbl = document.createElement("label");
+        lbl.className = "d-block";
+        lbl.style.marginBottom = "6px";
+        lbl.innerHTML = "<strong>Firmante: </strong>";
+        var strong = lbl.querySelector("strong");
+        strong.appendChild(document.createTextNode(nombre));
+        block.appendChild(lbl);
+        var nombreInput = document.createElement("input");
+        nombreInput.type = "hidden";
+        nombreInput.name = "fa_nombre_" + id;
+        nombreInput.setAttribute("data-fa-nombre", "");
+        nombreInput.value = nombre;
+        block.appendChild(nombreInput);
+        var wrap = document.createElement("div");
+        wrap.style.cssText = "border:2px solid rgba(255,255,255,.2);border-radius:8px;margin:8px 0;overflow:hidden;touch-action:none;";
+        var can = document.createElement("canvas");
+        can.setAttribute("data-fa-canvas", "");
+        can.width = 500;
+        can.height = 140;
+        can.style.cssText = "display:block;width:100%;height:140px;cursor:crosshair;";
+        wrap.appendChild(can);
+        block.appendChild(wrap);
+        var firmaInput = document.createElement("input");
+        firmaInput.type = "hidden";
+        firmaInput.name = "fa_firma_" + id;
+        firmaInput.setAttribute("data-fa-firma", "");
+        block.appendChild(firmaInput);
+        var btnWrap = document.createElement("div");
+        btnWrap.style.marginTop = "6px";
+        var btnLimpiar = document.createElement("button");
+        btnLimpiar.type = "button";
+        btnLimpiar.className = "btn btn-sm btn-limpiar-fa";
+        btnLimpiar.setAttribute("data-fa-id", id);
+        btnLimpiar.style.cssText = "background:rgba(255,255,255,.15);color:var(--text);border:1px solid var(--line);margin-right:8px;";
+        btnLimpiar.textContent = "Limpiar";
+        var btnQuitar = document.createElement("button");
+        btnQuitar.type = "button";
+        btnQuitar.className = "btn btn-sm btn-quitar-fa";
+        btnQuitar.setAttribute("data-fa-id", id);
+        btnQuitar.style.cssText = "background:var(--danger);color:#fff;border:0;";
+        btnQuitar.textContent = "Quitar firmante";
+        btnWrap.appendChild(btnLimpiar);
+        btnWrap.appendChild(btnQuitar);
+        block.appendChild(btnWrap);
+        firmantesContainer.appendChild(block);
+        setupSignatureCanvas(can, firmaInput);
+        can.addEventListener("mouseup", function(){ firmaInput.value = can.toDataURL("image/png").replace(/^data:image\/png;base64,/, ""); });
+        can.addEventListener("touchend", function(){ firmaInput.value = can.toDataURL("image/png").replace(/^data:image\/png;base64,/, ""); });
+        block.querySelector(".btn-limpiar-fa").addEventListener("click", function(){
+          var ctx = can.getContext("2d");
+          ctx.clearRect(0, 0, can.width, can.height);
+          firmaInput.value = "";
+        });
+        block.querySelector(".btn-quitar-fa").addEventListener("click", function(){
+          block.remove();
+        });
+      }
+      if (btnAgregarFirmante) btnAgregarFirmante.addEventListener("click", addFirmanteBlock);
 
       function showToast(msg, type){
         toast.textContent = msg;
@@ -1137,6 +1221,15 @@ $tokenLink = isset($_GET['e']) ? trim($_GET['e']) : '';
           delete payload.acepta;
           if(TOKEN_LINK) payload.token = TOKEN_LINK;
           if(firmaDataInput && firmaDataInput.value) payload.firma = firmaDataInput.value;
+          var faBlocks = document.querySelectorAll(".firmante-adicional-block");
+          var faList = [];
+          faBlocks.forEach(function(blk){
+            var nomInp = blk.querySelector("input[data-fa-nombre]");
+            var firmaInp = blk.querySelector("input[data-fa-firma]");
+            if (nomInp && firmaInp && nomInp.value && firmaInp.value) faList.push({ nombre: nomInp.value, firma: firmaInp.value });
+          });
+          if (faList.length) payload.firmantes_adicionales = JSON.stringify(faList);
+          Object.keys(payload).forEach(function(k){ if (k.indexOf("fa_nombre_") === 0 || k.indexOf("fa_firma_") === 0) delete payload[k]; });
 
           btnSubmit.disabled = true;
           btnSubmit.textContent = "Enviando…";

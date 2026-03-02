@@ -34,11 +34,11 @@ return [
     'smtp_pass' => getEnvOrDefault('SMTP_PASS', ''),
     'smtp_secure' => getEnvOrDefault('SMTP_SECURE', 'tls'),
     'from_email' => getEnvOrDefault('SENDGRID_FROM_EMAIL', 'noreply@automarketrentacar.com'),
-    'from_name' => getEnvOrDefault('SENDGRID_FROM_NAME', 'Automarket Rent a Car'),
+    'from_name' => getEnvOrDefault('SENDGRID_FROM_NAME', 'AutoMarket Seminuevos'),
     'reply_to_email' => getEnvOrDefault('SENDGRID_REPLY_TO', 'noreply@automarketrentacar.com'),
-    'reply_to_name' => getEnvOrDefault('SENDGRID_REPLY_TO_NAME', 'Automarket Rent a Car - Soporte'),
+    'reply_to_name' => getEnvOrDefault('SENDGRID_REPLY_TO_NAME', 'AutoMarket Seminuevos - Soporte'),
     'app_url' => getEnvOrDefault('APP_URL', 'http://localhost:8086'),
-    'app_name' => 'Automarket Rent a Car',
+    'app_name' => 'AutoMarket Seminuevos',
     'debug' => getEnvOrDefault('SENDGRID_DEBUG', 'false') === 'true',
 ];
 
