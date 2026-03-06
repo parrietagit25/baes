@@ -215,6 +215,15 @@ function crearSolicitud() {
             $generoVal = null;
         }
         
+        // Campos fecha y decimal: vacío -> null (MySQL no acepta '' en DATE/DECIMAL)
+        $vacíoANull = function($v) { $v = trim((string)($v ?? '')); return $v === '' ? null : $v; };
+        $estabilidadLaboral = $vacíoANull($_POST['estabilidad_laboral'] ?? null);
+        $fechaConstitucion = $vacíoANull($_POST['fecha_constitucion'] ?? null);
+        $ingreso = $vacíoANull($_POST['ingreso'] ?? null);
+        $precioEspecial = $vacíoANull($_POST['precio_especial'] ?? null);
+        $abonoPorcentaje = $vacíoANull($_POST['abono_porcentaje'] ?? null);
+        $abonoMonto = $vacíoANull($_POST['abono_monto'] ?? null);
+        
         $stmt->execute([
             $_SESSION['user_id'],
             $convertirNumero($_POST['banco_id'] ?? null),
@@ -236,21 +245,21 @@ function crearSolicitud() {
             isset($_POST['casado']) ? 1 : 0,
             $convertirNumero($_POST['hijos'] ?? null, 0),
             $_POST['perfil_financiero'],
-            $_POST['ingreso'] ?? null,
+            $ingreso,
             $_POST['tiempo_laborar'] ?? null,
             $_POST['profesion'] ?? null,
             $_POST['ocupacion'] ?? null,
             $_POST['nombre_empresa_negocio'] ?? null,
-            $_POST['estabilidad_laboral'] ?? null,
-            $_POST['fecha_constitucion'] ?? null,
+            $estabilidadLaboral,
+            $fechaConstitucion,
             $_POST['continuidad_laboral'] ?? null,
             $_POST['marca_auto'] ?? null,
             $_POST['modelo_auto'] ?? null,
             $convertirNumero($_POST['año_auto'] ?? null),
             $convertirNumero($_POST['kilometraje'] ?? null),
-            $_POST['precio_especial'] ?? null,
-            $_POST['abono_porcentaje'] ?? null,
-            $_POST['abono_monto'] ?? null,
+            $precioEspecial,
+            $abonoPorcentaje,
+            $abonoMonto,
             $_POST['comentarios_gestor'] ?? null
         ]);
         
@@ -273,8 +282,13 @@ function crearSolicitud() {
         ]);
         
     } catch (PDOException $e) {
+        error_log('crearSolicitud PDO: ' . $e->getMessage());
         http_response_code(500);
-        echo json_encode(['success' => false, 'message' => 'Error al crear solicitud']);
+        $msg = 'Error al crear solicitud';
+        if (getenv('APP_DEBUG') === '1' || (defined('APP_DEBUG') && APP_DEBUG)) {
+            $msg .= ': ' . $e->getMessage();
+        }
+        echo json_encode(['success' => false, 'message' => $msg]);
     }
 }
 
