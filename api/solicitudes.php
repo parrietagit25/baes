@@ -342,6 +342,10 @@ function actualizarSolicitud() {
         // Campos numéricos que deben convertirse a NULL si están vacíos
         $camposNumericos = ['edad', 'hijos', 'año_auto', 'kilometraje', 'plazo', 'banco_id', 'vendedor_id'];
         
+        // Valores permitidos para genero (enum en BD)
+        $generoPermitidos = ['Masculino', 'Femenino', 'Otro'];
+        $mapGenero = ['M' => 'Masculino', 'F' => 'Femenino', 'm' => 'Masculino', 'f' => 'Femenino'];
+        
         foreach ($camposPermitidos as $campo) {
             if (isset($_POST[$campo])) {
                 $valor = $_POST[$campo];
@@ -352,6 +356,18 @@ function actualizarSolicitud() {
                         $valor = null;
                     } else {
                         $valor = (int)$valor;
+                    }
+                }
+                
+                // genero: enum solo acepta Masculino, Femenino, Otro. Vacío o inválido -> NULL
+                if ($campo === 'genero') {
+                    $valor = trim((string)$valor);
+                    if ($valor === '') {
+                        $valor = null;
+                    } elseif (isset($mapGenero[$valor])) {
+                        $valor = $mapGenero[$valor];
+                    } elseif (!in_array($valor, $generoPermitidos, true)) {
+                        $valor = null;
                     }
                 }
                 
