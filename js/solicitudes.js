@@ -440,8 +440,16 @@ function cargarInfoSolicitudAdjuntos(solicitudId) {
     });
 }
 
+// Evitar doble envío mientras se guarda
+var guardarSolicitudEnCurso = false;
+
 // Función para guardar solicitud
 function guardarSolicitud() {
+    if (guardarSolicitudEnCurso) {
+        console.log('Guardado ya en curso, ignorando doble clic');
+        return;
+    }
+    guardarSolicitudEnCurso = true;
     console.log('=== GUARDANDO SOLICITUD ===');
     
     // Verificar que el formulario existe
@@ -469,6 +477,7 @@ function guardarSolicitud() {
     }
     
     if (camposFaltantes.length > 0) {
+        guardarSolicitudEnCurso = false;
         console.error('❌ ERROR: Campos requeridos faltantes:', camposFaltantes);
         mostrarAlerta('Por favor, complete los siguientes campos requeridos:\n\n• ' + camposFaltantes.join('\n• '), 'warning');
         
@@ -502,6 +511,7 @@ function guardarSolicitud() {
     
     // Validar que el formulario sea válido (HTML5 validation)
     if (!form[0].checkValidity()) {
+        guardarSolicitudEnCurso = false;
         console.error('❌ ERROR: El formulario no es válido (validación HTML5)');
         form[0].reportValidity();
         return;
@@ -536,6 +546,7 @@ function guardarSolicitud() {
         contentType: false,
         dataType: 'json',
         success: function(response) {
+            guardarSolicitudEnCurso = false;
             console.log('✅ Respuesta del servidor:', response);
             submitButton.prop('disabled', false).html(originalText);
             
@@ -553,6 +564,7 @@ function guardarSolicitud() {
             }
         },
         error: function(xhr, status, error) {
+            guardarSolicitudEnCurso = false;
             console.error('❌ ERROR AJAX:', error);
             console.error('Status:', status);
             console.error('Response:', xhr.responseText);
