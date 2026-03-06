@@ -203,6 +203,18 @@ function crearSolicitud() {
             return is_numeric($valor) ? (int)$valor : $default;
         };
         
+        // genero: enum solo acepta Masculino, Femenino, Otro o NULL
+        $generoVal = trim((string)($_POST['genero'] ?? ''));
+        $generoPermitidos = ['Masculino', 'Femenino', 'Otro'];
+        $mapGenero = ['M' => 'Masculino', 'F' => 'Femenino', 'm' => 'Masculino', 'f' => 'Femenino'];
+        if ($generoVal === '') {
+            $generoVal = null;
+        } elseif (isset($mapGenero[$generoVal])) {
+            $generoVal = $mapGenero[$generoVal];
+        } elseif (!in_array($generoVal, $generoPermitidos, true)) {
+            $generoVal = null;
+        }
+        
         $stmt->execute([
             $_SESSION['user_id'],
             $convertirNumero($_POST['banco_id'] ?? null),
@@ -210,7 +222,7 @@ function crearSolicitud() {
             $_POST['nombre_cliente'],
             $_POST['cedula'],
             $convertirNumero($_POST['edad'] ?? null),
-            $_POST['genero'] ?? null,
+            $generoVal,
             $_POST['direccion'] ?? null,
             $_POST['provincia'] ?? null,
             $_POST['distrito'] ?? null,
