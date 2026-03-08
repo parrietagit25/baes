@@ -56,12 +56,23 @@ function guardarVehiculos() {
     
     try {
         $solicitud_id = $_POST['solicitud_id'] ?? null;
-        $vehiculos = json_decode($_POST['vehiculos'], true);
+        $vehiculos = json_decode($_POST['vehiculos'] ?? '[]', true);
         
         if (!$solicitud_id) {
             echo json_encode(['success' => false, 'message' => 'ID de solicitud requerido']);
             return;
         }
+        
+        if (!is_array($vehiculos)) {
+            $vehiculos = [];
+        }
+        
+        // Convertir vacíos a NULL para columnas numéricas/decimal (evita "Incorrect decimal value: ''")
+        $normalizar = function($v, $esDecimal = false) {
+            if ($v === null || $v === '') return null;
+            if ($esDecimal) return is_numeric($v) ? $v : null;
+            return is_numeric($v) ? (int)$v : null;
+        };
         
         // Eliminar vehículos existentes
         $stmt = $pdo->prepare("DELETE FROM vehiculos_solicitud WHERE solicitud_id = ?");
@@ -76,13 +87,13 @@ function guardarVehiculos() {
         foreach ($vehiculos as $index => $vehiculo) {
             $stmt->execute([
                 $solicitud_id,
-                $vehiculo['marca'] ?? null,
-                $vehiculo['modelo'] ?? null,
-                $vehiculo['anio'] ?? null,
-                $vehiculo['kilometraje'] ?? null,
-                $vehiculo['precio'] ?? null,
-                $vehiculo['abono_porcentaje'] ?? null,
-                $vehiculo['abono_monto'] ?? null,
+                trim((string)($vehiculo['marca'] ?? '')) ?: null,
+                trim((string)($vehiculo['modelo'] ?? '')) ?: null,
+                $normalizar($vehiculo['anio'] ?? null),
+                $normalizar($vehiculo['kilometraje'] ?? null),
+                $normalizar($vehiculo['precio'] ?? null, true),
+                $normalizar($vehiculo['abono_porcentaje'] ?? null, true),
+                $normalizar($vehiculo['abono_monto'] ?? null, true),
                 $index + 1
             ]);
         }
@@ -90,6 +101,7 @@ function guardarVehiculos() {
         echo json_encode(['success' => true, 'message' => 'Vehículos guardados correctamente']);
         
     } catch (PDOException $e) {
+        error_log('vehiculos_solicitud guardar: ' . $e->getMessage());
         http_response_code(500);
         echo json_encode(['success' => false, 'message' => 'Error al guardar vehículos']);
     }

@@ -1927,8 +1927,15 @@ function guardarVehiculos(solicitudId) {
                 mostrarAlerta('Error al guardar vehículos: ' + response.message, 'danger');
             }
         },
-        error: function() {
-            mostrarAlerta('Error de conexión al guardar vehículos', 'danger');
+        error: function(xhr) {
+            let msg = 'Error de conexión al guardar vehículos';
+            if (xhr.responseText) {
+                try {
+                    const data = JSON.parse(xhr.responseText);
+                    if (data.message) msg = 'Error al guardar vehículos: ' + data.message;
+                } catch (e) { /* mantener msg por defecto */ }
+            }
+            mostrarAlerta(msg, 'danger');
         }
     });
 }
