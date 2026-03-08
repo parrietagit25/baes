@@ -202,23 +202,23 @@ function asignarUsuarioBanco($pdo) {
     $estadoActual = $stmt->fetchColumn();
     registrarHistorialSolicitud($pdo, $solicitud_id, $_SESSION['user_id'], 'asignacion_banco', $contenido_nota, $estadoActual, 'En Revisión Banco');
     
-    // Enviar notificación por correo al banco asignado (solo si email_helper está disponible)
+    // Enviar notificación por correo al banco asignado (opcional; errores no deben afectar la respuesta)
     try {
-        require_once __DIR__ . '/../includes/email_helper.php';
-        $sql_solicitud = "SELECT * FROM solicitudes_credito WHERE id = ?";
-        $stmt = $pdo->prepare($sql_solicitud);
-        $stmt->execute([$solicitud_id]);
-        $solicitud = $stmt->fetch();
-        
-        if ($solicitud) {
-            $resultadoEmail = notificarBancoNuevaSolicitud($solicitud_id, $usuario_banco_id);
-            if (!$resultadoEmail['success']) {
-                error_log("No se pudo enviar correo al banco asignado: " . $resultadoEmail['message']);
+        if (file_exists(__DIR__ . '/../includes/email_helper.php')) {
+            require_once __DIR__ . '/../includes/email_helper.php';
+            $sql_solicitud = "SELECT * FROM solicitudes_credito WHERE id = ?";
+            $stmt = $pdo->prepare($sql_solicitud);
+            $stmt->execute([$solicitud_id]);
+            $solicitud = $stmt->fetch();
+            if ($solicitud) {
+                $resultadoEmail = notificarBancoNuevaSolicitud($solicitud_id, $usuario_banco_id);
+                if (!$resultadoEmail['success']) {
+                    error_log("No se pudo enviar correo al banco asignado: " . ($resultadoEmail['message'] ?? ''));
+                }
             }
         }
-    } catch (Exception $e) {
-        // Si no se puede cargar email_helper (Composer no instalado), continuar sin enviar correo
-        error_log("No se pudo cargar email_helper: " . $e->getMessage());
+    } catch (Throwable $e) {
+        error_log("Notificación banco (asignar usuario): " . $e->getMessage());
     }
     
     echo json_encode(['success' => true, 'message' => 'Usuario asignado correctamente y solicitud enviada a revisión bancaria']);

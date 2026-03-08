@@ -1453,6 +1453,16 @@ function asignarUsuarioBanco(solicitudId, usuarioId) {
             }
         },
         error: function(xhr, status, error) {
+            // Si el servidor devolvió JSON con success: true (p. ej. tras error en envío de correo), tratar como éxito
+            try {
+                const data = JSON.parse(xhr.responseText || '{}');
+                if (data.success) {
+                    mostrarAlerta(data.message || 'Usuario asignado correctamente', 'success');
+                    cargarUsuariosAsignados(solicitudId);
+                    limpiarFormularioUsuario();
+                    return;
+                }
+            } catch (e) { /* no es JSON válido */ }
             console.error('Error al asignar usuario:', error);
             console.error('Status:', status);
             console.error('Response:', xhr.responseText);
