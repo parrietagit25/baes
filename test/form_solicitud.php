@@ -97,8 +97,12 @@ $gestorId = isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : ($gestores
                 <option value="Femenino">Femenino</option>
                 <option value="Otro">Otro</option>
             </select>
-            <label>perfil_financiero</label>
-            <input type="text" name="perfil_financiero" value="A" required maxlength="100">
+            <label>perfil_financiero (ENUM: Asalariado, Jubilado, Independiente)</label>
+            <select name="perfil_financiero" required>
+                <option value="Asalariado" selected>Asalariado</option>
+                <option value="Jubilado">Jubilado</option>
+                <option value="Independiente">Independiente</option>
+            </select>
             <label>casado (checkbox = 1)</label>
             <input type="checkbox" name="casado" value="1">
             <label>hijos</label>
