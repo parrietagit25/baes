@@ -365,8 +365,10 @@ function actualizarSolicitud() {
             'comentarios_fi', 'comentarios_ejecutivo_banco', 'estado'
         ];
         
-        // Campos numéricos que deben convertirse a NULL si están vacíos
+        // Campos numéricos (enteros) que deben convertirse a NULL si están vacíos
         $camposNumericos = ['edad', 'hijos', 'año_auto', 'kilometraje', 'plazo', 'banco_id', 'vendedor_id'];
+        // Columnas DECIMAL/DATE: vacío -> NULL (MySQL no acepta '' en estos tipos)
+        $camposDecimalOFecha = ['ingreso', 'precio_especial', 'abono_porcentaje', 'abono_monto', 'abono_banco', 'estabilidad_laboral', 'fecha_constitucion'];
         
         // Valores permitidos para genero (enum en BD)
         $generoPermitidos = ['Masculino', 'Femenino', 'Otro'];
@@ -382,6 +384,14 @@ function actualizarSolicitud() {
                         $valor = null;
                     } else {
                         $valor = (int)$valor;
+                    }
+                }
+                
+                // DECIMAL/DATE: vacío -> NULL (evita "Incorrect decimal value: ''")
+                if (in_array($campo, $camposDecimalOFecha)) {
+                    $valor = trim((string)$valor);
+                    if ($valor === '') {
+                        $valor = null;
                     }
                 }
                 
