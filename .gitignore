@@ -2,6 +2,7 @@
 Petro.pem
 user.txt
 .env
+financiamiento/config_db.php
 *.env
 .env.local
 .env.production

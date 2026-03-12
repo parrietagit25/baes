@@ -1,13 +1,25 @@
 <?php
 // Configuración de la base de datos
-$host = 'localhost';
-$dbname = 'solicitud_credito';
-$username = 'root';
-$password = '';
+// Dentro de Docker: conectar al servicio MySQL por nombre (motus_db)
+// Fuera de Docker (XAMPP): localhost con credenciales locales
+$isDocker = file_exists('/.dockerenv');
+if ($isDocker) {
+    $host = 'motus_db';
+    $port = '3306';
+    $dbname = 'motus_baes';
+    $username = 'motus_user';
+    $password = 'motus_pass_2024';
+} else {
+    $host = 'localhost';
+    $port = '3306';
+    $dbname = 'solicitud_credito';
+    $username = 'root';
+    $password = '';
+}
 $charset = 'utf8mb4';
 
-// DSN (Data Source Name)
-$dsn = "mysql:host=$host;dbname=$dbname;charset=$charset";
+// DSN: usar TCP (host:port) para evitar socket "No such file or directory"
+$dsn = "mysql:host=$host;port=$port;dbname=$dbname;charset=$charset";
 
 // Opciones de PDO
 $options = [

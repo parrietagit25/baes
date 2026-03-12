@@ -9,7 +9,7 @@ $baseUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : '
 $path = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/');
 if ($path && $path !== '\\') $baseUrl .= $path;
 $baseUrl = rtrim($baseUrl, '/');
-$formUrl = $baseUrl . '/solicitud_financiamiento.php';
+$formUrl = $baseUrl . '/';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email_destino'])) {
     $email = trim($_POST['email_destino']);

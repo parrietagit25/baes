@@ -3,7 +3,9 @@
  * Formulario público de Solicitud de Financiamiento (Wizard).
  * Acceso sin login. Si se accede con ?e=EMAIL_CODIFICADO, al enviar se envía por correo el PDF a ese email.
  */
+require_once __DIR__ . '/config.php';
 $tokenLink = isset($_GET['e']) ? trim($_GET['e']) : '';
+$apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== '' ? FINANCIAMIENTO_API_URL : '';
 ?>
 <!doctype html>
 <html lang="es">
@@ -813,10 +815,14 @@ $tokenLink = isset($_GET['e']) ? trim($_GET['e']) : '';
     (function(){
       var TOKEN_LINK = "<?php echo $tokenLink !== '' ? addslashes($tokenLink) : ''; ?>";
       var STORAGE_KEY = "baes_financiamiento_wizard_v1" + (TOKEN_LINK ? "_t_" + TOKEN_LINK.substring(0,8) : "");
-      var API_URL = (function(){
-        var base = window.location.pathname.replace(/\/[^\/]*$/, "");
-        return window.location.origin + (base ? base + "/" : "/") + "api/solicitud_publica.php";
-      })();
+      var API_URL = <?php echo $apiUrlConfig !== '' ? json_encode($apiUrlConfig) : 'null'; ?>;
+      if (!API_URL) {
+        API_URL = (function(){
+          var path = window.location.pathname;
+          var base = path.replace(/\/financiamiento\/?.*$/, "") || "/";
+          return window.location.origin + (base === "/" ? "" : base) + "/api/solicitud_publica.php";
+        })();
+      }
 
       const form = document.getElementById("wizardForm");
       const fieldsets = Array.from(form.querySelectorAll("fieldset"));
