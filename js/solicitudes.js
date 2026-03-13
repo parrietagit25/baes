@@ -56,6 +56,72 @@ $(document).ready(function() {
     
     // Configurar funcionalidad de usuarios banco
     configurarUsuariosBanco();
+
+    // Autos disponibles (modal): carga y buscador en vivo
+    var autosDisponiblesData = [];
+    $('#autosDisponiblesModal').on('shown.bs.modal', function() {
+        $('#autosDisponiblesBuscar').val('');
+        $('#autosDisponiblesLista').empty();
+        $('#autosDisponiblesCargando').show();
+        $('#autosDisponiblesVacio').hide();
+        $.getJSON('api/autos_disponibles.php', function(res) {
+            $('#autosDisponiblesCargando').hide();
+            autosDisponiblesData = (res && res.success && res.data) ? res.data : [];
+            renderAutosDisponibles(autosDisponiblesData);
+        }).fail(function() {
+            $('#autosDisponiblesCargando').hide();
+            autosDisponiblesData = [];
+            renderAutosDisponibles([]);
+        });
+    });
+    $('#autosDisponiblesBuscar').on('input', function() {
+        var q = ($(this).val() || '').trim().toLowerCase();
+        if (!q) {
+            renderAutosDisponibles(autosDisponiblesData);
+            return;
+        }
+        var filtered = autosDisponiblesData.filter(function(item) {
+            var make = (item.Make || '').toLowerCase();
+            var model = (item.Model || '').toLowerCase();
+            var year = (item.Year || '').toString();
+            var vin = (item.VIN || '').toLowerCase();
+            var unit = (item.Unit || '').toLowerCase();
+            return make.indexOf(q) !== -1 || model.indexOf(q) !== -1 ||
+                   year.indexOf(q) !== -1 || vin.indexOf(q) !== -1 || unit.indexOf(q) !== -1;
+        });
+        renderAutosDisponibles(filtered);
+    });
+
+    function renderAutosDisponibles(items) {
+        var $lista = $('#autosDisponiblesLista');
+        var $vacio = $('#autosDisponiblesVacio');
+        $lista.empty();
+        if (!items || items.length === 0) {
+            $vacio.show();
+            return;
+        }
+        $vacio.hide();
+        items.forEach(function(item) {
+            var price = item.Price != null ? '$' + Number(item.Price).toLocaleString('es-PA') : 'N/D';
+            var img = (item.Photo && item.Photo.trim()) ? item.Photo.trim() : '';
+            var imgHtml = img ? '<img src="' + img.replace(/"/g, '&quot;') + '" class="card-img-top" style="height:120px;object-fit:cover" alt="">' : '<div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height:120px"><i class="fas fa-car fa-2x text-muted"></i></div>';
+            var card = '<div class="col-sm-6 col-md-4 col-lg-3">' +
+                '<div class="card h-100 shadow-sm">' + imgHtml +
+                '<div class="card-body p-2">' +
+                '<div class="small fw-bold">' + escapeHtml(item.Make || '') + ' ' + escapeHtml(item.Model || '') + '</div>' +
+                '<div class="small text-muted">' + escapeHtml(item.Year || '') + '</div>' +
+                '<div class="small">Precio: ' + price + '</div>' +
+                '<div class="small text-muted">' + escapeHtml(item.Transmission || '') + '</div>' +
+                '</div></div></div>';
+            $lista.append(card);
+        });
+    }
+    function escapeHtml(s) {
+        if (!s) return '';
+        var div = document.createElement('div');
+        div.textContent = s;
+        return div.innerHTML;
+    }
     
     // Contador de caracteres para comentarios
     $('#comentarios_gestor').on('input', function() {

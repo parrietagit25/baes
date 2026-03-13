@@ -202,6 +202,9 @@ if ($isBanco && !$isAdmin) {
                             <button class="btn btn-info" data-bs-toggle="modal" data-bs-target="#infoModal">
                                 <i class="fas fa-info-circle me-2"></i>Info
                             </button>
+                            <button type="button" class="btn btn-primary" id="btnAutosDisponibles" data-bs-toggle="modal" data-bs-target="#autosDisponiblesModal">
+                                <i class="fas fa-car me-2"></i>Autos disponibles
+                            </button>
                         </div>
                         <?php endif; ?>
                     </div>
@@ -957,6 +960,39 @@ if ($isBanco && !$isAdmin) {
                     <button type="button" class="btn btn-success" data-bs-dismiss="modal" data-bs-toggle="modal" data-bs-target="#solicitudModal" onclick="limpiarFormularioSolicitud()">
                         <i class="fas fa-plus me-2"></i>Crear Solicitud
                     </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Autos disponibles (Automarket_Invs_web) -->
+    <div class="modal fade" id="autosDisponiblesModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                    <h5 class="modal-title text-white">
+                        <i class="fas fa-car me-2"></i>Autos disponibles
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Buscar por marca, modelo, año o VIN</label>
+                        <input type="text" class="form-control" id="autosDisponiblesBuscar" placeholder="Escriba para filtrar...">
+                    </div>
+                    <div id="autosDisponiblesLista" class="row g-3">
+                        <!-- Se llena por JS -->
+                    </div>
+                    <div id="autosDisponiblesCargando" class="text-center py-4 text-muted">
+                        <div class="spinner-border" role="status"></div>
+                        <p class="mt-2 mb-0">Cargando inventario...</p>
+                    </div>
+                    <div id="autosDisponiblesVacio" class="text-center py-4 text-muted" style="display: none;">
+                        No hay vehículos que coincidan con la búsqueda.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
                 </div>
             </div>
         </div>
