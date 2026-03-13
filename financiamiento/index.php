@@ -710,13 +710,13 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
             <div class="error" data-error-for="refp1_dir_lab"></div>
           </div>
           <div class="col-6">
-            <label for="refp2_nombre">Personal 2 - Nombre completo *</label>
-            <input id="refp2_nombre" name="refp2_nombre" required maxlength="90" />
+            <label for="refp2_nombre">Personal 2 - Nombre completo</label>
+            <input id="refp2_nombre" name="refp2_nombre" maxlength="90" />
             <div class="error" data-error-for="refp2_nombre"></div>
           </div>
           <div class="col-6">
-            <label for="refp2_cel">Personal 2 - Celular *</label>
-            <input id="refp2_cel" name="refp2_cel" required inputmode="tel" />
+            <label for="refp2_cel">Personal 2 - Celular</label>
+            <input id="refp2_cel" name="refp2_cel" inputmode="tel" />
             <div class="error" data-error-for="refp2_cel"></div>
           </div>
           <div class="col-6">
@@ -731,13 +731,13 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           </div>
           <div class="col-12" style="margin-top:6px"><div class="chip done"><strong>Familiares (2)</strong></div></div>
           <div class="col-6">
-            <label for="reff1_nombre">Familiar 1 - Nombre completo *</label>
-            <input id="reff1_nombre" name="reff1_nombre" required maxlength="90" />
+            <label for="reff1_nombre">Familiar 1 - Nombre completo</label>
+            <input id="reff1_nombre" name="reff1_nombre" maxlength="90" />
             <div class="error" data-error-for="reff1_nombre"></div>
           </div>
           <div class="col-6">
-            <label for="reff1_cel">Familiar 1 - Celular *</label>
-            <input id="reff1_cel" name="reff1_cel" required inputmode="tel" />
+            <label for="reff1_cel">Familiar 1 - Celular</label>
+            <input id="reff1_cel" name="reff1_cel" inputmode="tel" />
             <div class="error" data-error-for="reff1_cel"></div>
           </div>
           <div class="col-6">
@@ -751,13 +751,13 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
             <div class="error" data-error-for="reff1_dir_lab"></div>
           </div>
           <div class="col-6">
-            <label for="reff2_nombre">Familiar 2 - Nombre completo *</label>
-            <input id="reff2_nombre" name="reff2_nombre" required maxlength="90" />
+            <label for="reff2_nombre">Familiar 2 - Nombre completo</label>
+            <input id="reff2_nombre" name="reff2_nombre" maxlength="90" />
             <div class="error" data-error-for="reff2_nombre"></div>
           </div>
           <div class="col-6">
-            <label for="reff2_cel">Familiar 2 - Celular *</label>
-            <input id="reff2_cel" name="reff2_cel" required inputmode="tel" />
+            <label for="reff2_cel">Familiar 2 - Celular</label>
+            <input id="reff2_cel" name="reff2_cel" inputmode="tel" />
             <div class="error" data-error-for="reff2_cel"></div>
           </div>
           <div class="col-6">
