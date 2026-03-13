@@ -107,7 +107,10 @@ function obtenerSolicitudes() {
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         $solicitudes = $stmt->fetchAll();
-        
+        foreach ($solicitudes as &$s) {
+            if (array_key_exists('ano_auto', $s)) $s['año_auto'] = $s['ano_auto'];
+        }
+        unset($s);
         echo json_encode(['success' => true, 'data' => $solicitudes]);
         
     } catch (PDOException $e) {
@@ -128,7 +131,9 @@ function obtenerSolicitud($id) {
         ");
         $stmt->execute([$id]);
         $solicitud = $stmt->fetch();
-        
+        if ($solicitud && array_key_exists('ano_auto', $solicitud)) {
+            $solicitud['año_auto'] = $solicitud['ano_auto'];
+        }
         if ($solicitud) {
             // Obtener notas de la solicitud
             $stmt = $pdo->prepare("
@@ -190,7 +195,7 @@ function crearSolicitud() {
                 direccion, provincia, distrito, corregimiento, barriada, casa_edif,
                 numero_casa_apto, telefono, email, email_pipedrive, casado, hijos, perfil_financiero,
                 ingreso, tiempo_laborar, profesion, ocupacion, nombre_empresa_negocio, estabilidad_laboral,
-                fecha_constitucion, continuidad_laboral, marca_auto, modelo_auto, año_auto, kilometraje,
+                fecha_constitucion, continuidad_laboral, marca_auto, modelo_auto, ano_auto, kilometraje,
                 precio_especial, abono_porcentaje, abono_monto, comentarios_gestor
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
@@ -255,7 +260,7 @@ function crearSolicitud() {
             $_POST['continuidad_laboral'] ?? null,
             $_POST['marca_auto'] ?? null,
             $_POST['modelo_auto'] ?? null,
-            $convertirNumero($_POST['año_auto'] ?? null),
+            $convertirNumero($_POST['año_auto'] ?? $_POST['ano_auto'] ?? null),
             $convertirNumero($_POST['kilometraje'] ?? null),
             $precioEspecial,
             $abonoPorcentaje,
@@ -359,7 +364,7 @@ function actualizarSolicitud() {
             'hijos', 'perfil_financiero', 'ingreso', 'tiempo_laborar',
             'profesion', 'ocupacion', 'nombre_empresa_negocio', 'estabilidad_laboral',
             'fecha_constitucion', 'continuidad_laboral',
-            'marca_auto', 'modelo_auto', 'año_auto', 'kilometraje',
+            'marca_auto', 'modelo_auto', 'ano_auto', 'kilometraje',
             'precio_especial', 'abono_porcentaje', 'abono_monto',
             'comentarios_gestor', 'ejecutivo_banco', 'respuesta_banco',
             'letra', 'plazo', 'abono_banco', 'promocion',
@@ -369,7 +374,7 @@ function actualizarSolicitud() {
         ];
         
         // Campos numéricos (enteros) que deben convertirse a NULL si están vacíos
-        $camposNumericos = ['edad', 'hijos', 'año_auto', 'kilometraje', 'plazo', 'banco_id', 'vendedor_id'];
+        $camposNumericos = ['edad', 'hijos', 'ano_auto', 'kilometraje', 'plazo', 'banco_id', 'vendedor_id'];
         // Columnas DECIMAL/DATE: vacío -> NULL (MySQL no acepta '' en estos tipos)
         $camposDecimalOFecha = ['ingreso', 'precio_especial', 'abono_porcentaje', 'abono_monto', 'abono_banco', 'estabilidad_laboral', 'fecha_constitucion'];
         
@@ -378,8 +383,10 @@ function actualizarSolicitud() {
         $mapGenero = ['M' => 'Masculino', 'F' => 'Femenino', 'm' => 'Masculino', 'f' => 'Femenino'];
         
         foreach ($camposPermitidos as $campo) {
-            if (isset($_POST[$campo])) {
-                $valor = $_POST[$campo];
+            // En el formulario el campo puede llamarse año_auto (con ñ) pero la columna en BD es ano_auto
+            $postKey = ($campo === 'ano_auto' && isset($_POST['año_auto'])) ? 'año_auto' : $campo;
+            if (isset($_POST[$postKey])) {
+                $valor = $_POST[$postKey];
                 
                 // Convertir campos numéricos vacíos a NULL
                 if (in_array($campo, $camposNumericos)) {

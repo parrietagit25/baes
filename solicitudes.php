@@ -324,7 +324,7 @@ if ($isBanco && !$isAdmin) {
                                                 </button>
                                             </td>
                                             <?php endif; ?>
-                                            <td><?php echo htmlspecialchars($solicitud['marca_auto'] ?? '-'); ?> <?php echo htmlspecialchars($solicitud['modelo_auto'] ?? ''); ?> <?php echo $solicitud['año_auto'] ?? ''; ?></td>
+                                            <td><?php echo htmlspecialchars($solicitud['marca_auto'] ?? '-'); ?> <?php echo htmlspecialchars($solicitud['modelo_auto'] ?? ''); ?> <?php echo $solicitud['ano_auto'] ?? $solicitud['año_auto'] ?? ''; ?></td>
                                             <td>
                                                 <?php if ($isAdmin): ?>
                                                     <?php 
