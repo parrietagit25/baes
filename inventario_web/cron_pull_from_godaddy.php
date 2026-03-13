@@ -14,8 +14,8 @@ if (php_sapi_name() === 'cli') {
 
 require_once __DIR__ . '/config.php';
 
-// URL del endpoint de exportación en GoDaddy (debe devolver JSON array de vehículos)
-$godaddy_export_url = getenv('GODADDY_EXPORT_URL') ?: 'https://automarketpanama.com/api/api_web_export.php';
+// URL del endpoint de exportación en GoDaddy. ?table=web = tabla principal (donde están los 79 registros); sin él exporta _temp (suele estar vacía después del pase).
+$godaddy_export_url = getenv('GODADDY_EXPORT_URL') ?: 'https://automarketpanama.com/api/api_web_export.php?table=web';
 $export_token = getenv('GODADDY_EXPORT_TOKEN') ?: INVENTARIO_WEB_TOKEN;
 
 $logFile = @fopen(INVENTARIO_WEB_LOG, 'a');
