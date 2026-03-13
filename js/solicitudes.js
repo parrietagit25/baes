@@ -65,7 +65,7 @@ $(document).ready(function() {
             $('#tablaAutosDisponibles tbody').empty();
         }
         $.ajax({
-            url: 'api/autos_disponibles.php',
+            url: '/api/autos_disponibles.php',
             type: 'GET',
             dataType: 'json',
             success: function(response) {
