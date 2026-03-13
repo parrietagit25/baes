@@ -57,55 +57,59 @@ $(document).ready(function() {
     // Configurar funcionalidad de usuarios banco
     configurarUsuariosBanco();
 
-    // Autos disponibles (modal): DataTable que carga datos por AJAX (tabla Automarket_Invs_web)
-    var tablaAutosDisponibles = null;
+    // Autos disponibles (modal): mismo patrón que solicitudes — $.ajax y luego DataTable con los datos
     $('#autosDisponiblesModal').on('shown.bs.modal', function() {
         $('#autosDisponiblesError').addClass('d-none').empty();
-        var apiUrl = (typeof window.AUTOS_DISPONIBLES_API !== 'undefined' && window.AUTOS_DISPONIBLES_API)
-            ? window.AUTOS_DISPONIBLES_API
-            : (window.location.pathname.replace(/\/[^/]*$/, '') || '') + '/api/autos_disponibles.php';
         if ($.fn.DataTable.isDataTable('#tablaAutosDisponibles')) {
-            tablaAutosDisponibles = $('#tablaAutosDisponibles').DataTable();
-            tablaAutosDisponibles.ajax.url(apiUrl).load();
-            return;
+            $('#tablaAutosDisponibles').DataTable().destroy();
+            $('#tablaAutosDisponibles tbody').empty();
         }
-        tablaAutosDisponibles = $('#tablaAutosDisponibles').DataTable({
-            ajax: {
-                url: apiUrl,
-                dataSrc: function(json) {
-                    if (json && json.success === false && json.message) {
-                        $('#autosDisponiblesError').text(json.message).removeClass('d-none');
-                        return [];
-                    }
-                    return (json && json.data) ? json.data : [];
+        $.ajax({
+            url: 'api/autos_disponibles.php',
+            type: 'GET',
+            dataType: 'json',
+            success: function(response) {
+                if (response && response.success === false && response.message) {
+                    $('#autosDisponiblesError').text(response.message).removeClass('d-none');
+                    return;
                 }
+                var datos = (response && response.data) ? response.data : [];
+                $('#tablaAutosDisponibles').DataTable({
+                    data: datos,
+                    columns: [
+                        {
+                            data: 'Photo',
+                            orderable: false,
+                            searchable: false,
+                            render: function(d) {
+                                if (d && String(d).trim()) return '<img src="' + String(d).replace(/"/g, '&quot;') + '" style="height:50px;object-fit:cover" alt="">';
+                                return '<span class="text-muted"><i class="fas fa-car"></i></span>';
+                            }
+                        },
+                        { data: 'Make' },
+                        { data: 'Model' },
+                        { data: 'Year' },
+                        {
+                            data: 'Price',
+                            render: function(d) {
+                                return d != null && d !== '' ? '$' + Number(d).toLocaleString('es-PA') : 'N/D';
+                            }
+                        },
+                        { data: 'Transmission' }
+                    ],
+                    order: [[1, 'asc']],
+                    pageLength: 25,
+                    language: {
+                        url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json',
+                        emptyTable: 'No hay vehículos en el inventario.'
+                    }
+                });
             },
-            columns: [
-                {
-                    data: 'Photo',
-                    orderable: false,
-                    searchable: false,
-                    render: function(d) {
-                        if (d && String(d).trim()) return '<img src="' + String(d).replace(/"/g, '&quot;') + '" style="height:50px;object-fit:cover" alt="">';
-                        return '<span class="text-muted"><i class="fas fa-car"></i></span>';
-                    }
-                },
-                { data: 'Make' },
-                { data: 'Model' },
-                { data: 'Year' },
-                {
-                    data: 'Price',
-                    render: function(d) {
-                        return d != null && d !== '' ? '$' + Number(d).toLocaleString('es-PA') : 'N/D';
-                    }
-                },
-                { data: 'Transmission' }
-            ],
-            order: [[1, 'asc']],
-            pageLength: 25,
-            language: {
-                url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json',
-                emptyTable: 'No hay vehículos en el inventario.'
+            error: function(xhr) {
+                var msg = 'No se pudo cargar el inventario.';
+                if (xhr.status === 401) msg = 'Sesión expirada.';
+                else if (xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
+                $('#autosDisponiblesError').text(msg).removeClass('d-none');
             }
         });
     });
