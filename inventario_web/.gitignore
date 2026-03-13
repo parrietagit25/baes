@@ -1,3 +1,5 @@
 script_log_desde_python.txt
 Error_subida.txt
+cron_pull.log
+cron_pasar.log
 *.log
