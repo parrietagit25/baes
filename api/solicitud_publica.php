@@ -458,7 +458,7 @@ if (is_file($configPath) && is_file($historialPath)) {
                         telefono, telefono_principal, email, direccion, provincia, distrito, corregimiento,
                         barriada, casa_edif, numero_casa_apto, casado, hijos, perfil_financiero,
                         ingreso, tiempo_laborar, ocupacion, nombre_empresa_negocio,
-                        marca_auto, modelo_auto, ano_auto, kilometraje, precio_especial, abono_monto,
+                        marca_auto, modelo_auto, ao_auto, kilometraje, precio_especial, abono_monto,
                         comentarios_gestor
                     ) VALUES (?, 'Natural', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ");
