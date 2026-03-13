@@ -2203,7 +2203,7 @@ if ($isBanco && !$isAdmin) {
           </div>
       </div>
   
-      <script src="js/solicitudes.js"></script>
-      <script src="js/adjuntos.js"></script>
+      <script src="js/solicitudes.js?v=<?php echo file_exists(__DIR__ . '/js/solicitudes.js') ? filemtime(__DIR__ . '/js/solicitudes.js') : time(); ?>"></script>
+      <script src="js/adjuntos.js?v=<?php echo file_exists(__DIR__ . '/js/adjuntos.js') ? filemtime(__DIR__ . '/js/adjuntos.js') : time(); ?>"></script>
   </body>
   </html>
