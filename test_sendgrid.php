@@ -33,7 +33,7 @@ try {
     $bodyText = "Este es un correo de PRUEBA enviado desde test_sendgrid.php.\n"
         . "Si recibes este mensaje, la configuración de correo está funcionando.\n";
 
-    $result = $emailService->enviarCorreo($to, '', $subject, $bodyHtml, $bodyText, []);
+    $result = $emailService->enviarCorreo($to, $subject, $bodyHtml, '', $bodyText, []);
 
     echo "Resultado enviarCorreo:\n";
     var_export($result);

@@ -53,12 +53,18 @@ class EmailService {
     
     /**
      * Envía un correo genérico (SMTP Outlook o SendGrid)
+     * @param string $to Destinatario
+     * @param string $subject Asunto
+     * @param string $bodyHTML Cuerpo HTML
+     * @param string $toName Nombre del destinatario (opcional)
+     * @param string $bodyText Cuerpo texto plano (opcional)
+     * @param array $attachments Rutas de archivos a adjuntar (opcional)
      */
     public function enviarCorreo(
         $to,
-        $toName = '',
         $subject,
         $bodyHTML,
+        $toName = '',
         $bodyText = '',
         $attachments = []
     ) {
@@ -266,7 +272,7 @@ class EmailService {
         // Obtener asunto del template si está definido
         $subject = $data['subject'] ?? 'Notificación de AutoMarket Seminuevos';
         
-        return $this->enviarCorreo($to, $toName, $subject, $bodyHTML, $bodyText);
+        return $this->enviarCorreo($to, $subject, $bodyHTML, $toName, $bodyText, []);
     }
     
     /**

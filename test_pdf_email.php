@@ -42,7 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' || isset($_GET['email'])) {
             $emailService = new EmailService();
             $asunto = 'Prueba PDF y correo - ' . date('d/m/Y H:i');
             $cuerpo = '<p>Adjunto PDF de prueba.</p><p>Si recibes este correo, el envío está funcionando.</p>';
-            $result = $emailService->enviarCorreo($email, '', $asunto, $cuerpo, strip_tags($cuerpo), [$pdfPath]);
+            $result = $emailService->enviarCorreo($email, $asunto, $cuerpo, '', strip_tags($cuerpo), [$pdfPath]);
             @unlink($pdfPath);
 
             if (!empty($result['success'])) {

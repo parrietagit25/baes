@@ -316,7 +316,7 @@ if ($token !== '') {
                 $emailService = new EmailService();
                 $asunto = 'Solicitud de Financiamiento completada - ' . $nombre;
                 $cuerpo = '<p>Se ha recibido una solicitud de financiamiento completada.</p><p><strong>Cliente:</strong> ' . htmlspecialchars($nombre) . '</p><p>Ver adjunto PDF con todos los datos y la firma.</p>';
-                $result = $emailService->enviarCorreo($emailDestino, '', $asunto, $cuerpo, strip_tags($cuerpo), [$pdfPath]);
+                $result = $emailService->enviarCorreo($emailDestino, $asunto, $cuerpo, '', strip_tags($cuerpo), [$pdfPath]);
                 @unlink($pdfPath);
                 $emailEnviado = !empty($result['success']);
             }
