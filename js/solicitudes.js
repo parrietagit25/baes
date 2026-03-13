@@ -57,9 +57,10 @@ $(document).ready(function() {
     // Configurar funcionalidad de usuarios banco
     configurarUsuariosBanco();
 
-    // Autos disponibles (modal): DataTable que carga datos por AJAX
+    // Autos disponibles (modal): DataTable que carga datos por AJAX (tabla Automarket_Invs_web)
     var tablaAutosDisponibles = null;
     $('#autosDisponiblesModal').on('shown.bs.modal', function() {
+        $('#autosDisponiblesError').addClass('d-none').empty();
         var apiUrl = (typeof window.AUTOS_DISPONIBLES_API !== 'undefined' && window.AUTOS_DISPONIBLES_API)
             ? window.AUTOS_DISPONIBLES_API
             : (window.location.pathname.replace(/\/[^/]*$/, '') || '') + '/api/autos_disponibles.php';
@@ -72,7 +73,11 @@ $(document).ready(function() {
             ajax: {
                 url: apiUrl,
                 dataSrc: function(json) {
-                    return (json && json.success && json.data) ? json.data : [];
+                    if (json && json.success === false && json.message) {
+                        $('#autosDisponiblesError').text(json.message).removeClass('d-none');
+                        return [];
+                    }
+                    return (json && json.data) ? json.data : [];
                 }
             },
             columns: [

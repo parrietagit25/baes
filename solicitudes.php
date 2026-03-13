@@ -976,6 +976,7 @@ if ($isBanco && !$isAdmin) {
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
+                    <div id="autosDisponiblesError" class="alert alert-danger d-none mb-2" role="alert"></div>
                     <table id="tablaAutosDisponibles" class="table table-striped table-hover w-100" style="width:100%">
                         <thead>
                             <tr>
