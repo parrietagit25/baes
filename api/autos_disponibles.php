@@ -19,8 +19,8 @@ set_time_limit(15);
 $debug = defined('APP_DEBUG') && APP_DEBUG;
 
 try {
-    // Solo los 6 campos de Automarket_Invs_web que usa el modal
-    $sql = "SELECT Year, Transmission, Make, Price, Model, Photo
+    // Campos para el modal (incl. Unit para el link Impel por unidad/placa)
+    $sql = "SELECT Year, Transmission, Make, Price, Model, Photo, Unit, LicensePlate
             FROM `Automarket_Invs_web`
             ORDER BY Make, Model
             LIMIT 500";
@@ -30,6 +30,8 @@ try {
     foreach ($rows as &$r) {
         $r['Price'] = $r['Price'] !== null ? (float) $r['Price'] : null;
         $r['Photo'] = isset($r['Photo']) ? (string) $r['Photo'] : '';
+        $r['Unit'] = isset($r['Unit']) ? (string) $r['Unit'] : '';
+        $r['LicensePlate'] = isset($r['LicensePlate']) ? (string) $r['LicensePlate'] : '';
     }
     unset($r);
 

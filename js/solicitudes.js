@@ -78,11 +78,16 @@ $(document).ready(function() {
                     data: datos,
                     columns: [
                         {
-                            data: 'Photo',
+                            data: null,
                             orderable: false,
                             searchable: false,
-                            render: function(d) {
-                                if (d && String(d).trim()) return '<img src="' + String(d).replace(/"/g, '&quot;') + '" style="height:50px;object-fit:cover" alt="">';
+                            render: function(row) {
+                                var photo = row.Photo && String(row.Photo).trim() ? row.Photo : '';
+                                var unit = (row.Unit && String(row.Unit).trim()) ? row.Unit : (row.LicensePlate && String(row.LicensePlate).trim()) ? row.LicensePlate : '';
+                                var placa = (row.LicensePlate && String(row.LicensePlate).trim()) ? row.LicensePlate : unit;
+                                if (photo) {
+                                    return '<a href="#" class="ver-imagen-vehiculo d-inline-block" data-photo="' + String(photo).replace(/"/g, '&quot;') + '" data-unit="' + String(unit).replace(/"/g, '&quot;') + '" data-placa="' + String(placa).replace(/"/g, '&quot;') + '" title="Ver imagen"><img src="' + String(photo).replace(/"/g, '&quot;') + '" style="height:50px;object-fit:cover;cursor:pointer" alt=""></a>';
+                                }
                                 return '<span class="text-muted"><i class="fas fa-car"></i></span>';
                             }
                         },
@@ -119,7 +124,20 @@ $(document).ready(function() {
             $('#tablaAutosDisponibles tbody').empty();
         }
     });
-    
+
+    // Click en imagen de autos disponibles: abrir modal con imagen grande y link Impel (por placa/unidad)
+    $(document).on('click', '#tablaAutosDisponibles .ver-imagen-vehiculo', function(e) {
+        e.preventDefault();
+        var photo = $(this).data('photo') || '';
+        var placa = $(this).data('placa') || $(this).data('unit') || '';
+        var segmento = String(placa).toLowerCase().trim();
+        var urlImpel = 'https://spins.impel.io/automarketpanama/' + (segmento ? encodeURIComponent(segmento) : '');
+        $('#imagenVehiculoGrande').attr('src', photo);
+        var $link = $('#imagenVehiculoLinkImpel').attr('href', urlImpel);
+        if (segmento) { $link.removeClass('d-none').show(); } else { $link.addClass('d-none').hide(); }
+        $('#imagenVehiculoModal').modal('show');
+    });
+
     // Contador de caracteres para comentarios
     $('#comentarios_gestor').on('input', function() {
         const maxLength = 1000;

@@ -998,6 +998,26 @@ if ($isBanco && !$isAdmin) {
         </div>
     </div>
 
+    <!-- Modal imagen vehículo ampliada + link Impel -->
+    <div class="modal fade" id="imagenVehiculoModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h6 class="modal-title">Imagen del vehículo</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <img id="imagenVehiculoGrande" src="" alt="Vehículo" class="img-fluid rounded" style="max-height:70vh; width:auto;">
+                    <div class="mt-3">
+                        <a id="imagenVehiculoLinkImpel" href="#" target="_blank" rel="noopener" class="btn btn-sm btn-primary">
+                            <i class="fas fa-external-link-alt me-1"></i> Ver en Impel
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal de Detalles -->
     <div class="modal fade" id="detallesModal" tabindex="-1">
         <div class="modal-dialog modal-xl">
