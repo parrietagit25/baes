@@ -965,7 +965,7 @@ if ($isBanco && !$isAdmin) {
         </div>
     </div>
 
-    <!-- Modal Autos disponibles (Automarket_Invs_web) -->
+    <!-- Modal Autos disponibles (Automarket_Invs_web) - DataTable -->
     <div class="modal fade" id="autosDisponiblesModal" tabindex="-1">
         <div class="modal-dialog modal-xl">
             <div class="modal-content">
@@ -976,20 +976,19 @@ if ($isBanco && !$isAdmin) {
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label">Buscar por marca, modelo, año o VIN</label>
-                        <input type="text" class="form-control" id="autosDisponiblesBuscar" placeholder="Escriba para filtrar...">
-                    </div>
-                    <div id="autosDisponiblesLista" class="row g-3">
-                        <!-- Se llena por JS -->
-                    </div>
-                    <div id="autosDisponiblesCargando" class="text-center py-4 text-muted">
-                        <div class="spinner-border" role="status"></div>
-                        <p class="mt-2 mb-0">Cargando inventario...</p>
-                    </div>
-                    <div id="autosDisponiblesVacio" class="text-center py-4 text-muted" style="display: none;">
-                        No hay vehículos que coincidan con la búsqueda.
-                    </div>
+                    <table id="tablaAutosDisponibles" class="table table-striped table-hover w-100" style="width:100%">
+                        <thead>
+                            <tr>
+                                <th>Imagen</th>
+                                <th>Marca</th>
+                                <th>Modelo</th>
+                                <th>Año</th>
+                                <th>Precio</th>
+                                <th>Transmisión</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>

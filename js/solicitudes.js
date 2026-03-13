@@ -57,97 +57,59 @@ $(document).ready(function() {
     // Configurar funcionalidad de usuarios banco
     configurarUsuariosBanco();
 
-    // Autos disponibles (modal): carga y buscador en vivo
-    var autosDisponiblesData = [];
+    // Autos disponibles (modal): DataTable que carga datos por AJAX
+    var tablaAutosDisponibles = null;
     $('#autosDisponiblesModal').on('shown.bs.modal', function() {
-        $('#autosDisponiblesBuscar').val('');
-        $('#autosDisponiblesLista').empty();
-        $('#autosDisponiblesCargando').show();
-        $('#autosDisponiblesVacio').hide();
         var apiUrl = (typeof window.AUTOS_DISPONIBLES_API !== 'undefined' && window.AUTOS_DISPONIBLES_API)
             ? window.AUTOS_DISPONIBLES_API
             : (window.location.pathname.replace(/\/[^/]*$/, '') || '') + '/api/autos_disponibles.php';
-        var loadingDone = false;
-        var timerSafeguard = setTimeout(function() {
-            if (loadingDone) return;
-            loadingDone = true;
-            $('#autosDisponiblesCargando').hide();
-            $('#autosDisponiblesLista').html('<div class="col-12"><div class="alert alert-warning mb-0">No se pudo cargar el inventario. Compruebe la conexión o intente de nuevo.</div></div>');
-            $('#autosDisponiblesVacio').hide();
-        }, 16000);
-        $.ajax({
-            url: apiUrl,
-            type: 'GET',
-            dataType: 'json',
-            timeout: 12000
-        }).done(function(res) {
-            if (loadingDone) return;
-            autosDisponiblesData = (res && res.success && res.data) ? res.data : [];
-            renderAutosDisponibles(autosDisponiblesData);
-        }).fail(function(xhr) {
-            if (loadingDone) return;
-            autosDisponiblesData = [];
-            var msg = 'No se pudo cargar el inventario.';
-            if (xhr.status === 404) msg = 'No se encontró el servicio de inventario.';
-            else if (xhr.status === 401) msg = 'Sesión expirada. Cierre y vuelva a entrar.';
-            else if (xhr.status > 0) msg = 'Error ' + xhr.status + '. No se pudo cargar el inventario.';
-            $('#autosDisponiblesLista').html('<div class="col-12"><div class="alert alert-warning mb-0">' + msg + '</div></div>');
-            $('#autosDisponiblesVacio').hide();
-            renderAutosDisponibles([]);
-        }).always(function() {
-            loadingDone = true;
-            clearTimeout(timerSafeguard);
-            $('#autosDisponiblesCargando').hide();
-        });
-    });
-    $('#autosDisponiblesBuscar').on('input', function() {
-        var q = ($(this).val() || '').trim().toLowerCase();
-        if (!q) {
-            renderAutosDisponibles(autosDisponiblesData);
+        if ($.fn.DataTable.isDataTable('#tablaAutosDisponibles')) {
+            tablaAutosDisponibles = $('#tablaAutosDisponibles').DataTable();
+            tablaAutosDisponibles.ajax.url(apiUrl).load();
             return;
         }
-        var filtered = autosDisponiblesData.filter(function(item) {
-            var make = (item.Make || '').toLowerCase();
-            var model = (item.Model || '').toLowerCase();
-            var year = (item.Year || '').toString();
-            var vin = (item.VIN || '').toLowerCase();
-            var unit = (item.Unit || '').toLowerCase();
-            return make.indexOf(q) !== -1 || model.indexOf(q) !== -1 ||
-                   year.indexOf(q) !== -1 || vin.indexOf(q) !== -1 || unit.indexOf(q) !== -1;
+        tablaAutosDisponibles = $('#tablaAutosDisponibles').DataTable({
+            ajax: {
+                url: apiUrl,
+                dataSrc: function(json) {
+                    return (json && json.success && json.data) ? json.data : [];
+                }
+            },
+            columns: [
+                {
+                    data: 'Photo',
+                    orderable: false,
+                    searchable: false,
+                    render: function(d) {
+                        if (d && String(d).trim()) return '<img src="' + String(d).replace(/"/g, '&quot;') + '" style="height:50px;object-fit:cover" alt="">';
+                        return '<span class="text-muted"><i class="fas fa-car"></i></span>';
+                    }
+                },
+                { data: 'Make' },
+                { data: 'Model' },
+                { data: 'Year' },
+                {
+                    data: 'Price',
+                    render: function(d) {
+                        return d != null && d !== '' ? '$' + Number(d).toLocaleString('es-PA') : 'N/D';
+                    }
+                },
+                { data: 'Transmission' }
+            ],
+            order: [[1, 'asc']],
+            pageLength: 25,
+            language: {
+                url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json',
+                emptyTable: 'No hay vehículos en el inventario.'
+            }
         });
-        renderAutosDisponibles(filtered);
     });
-
-    function renderAutosDisponibles(items) {
-        var $lista = $('#autosDisponiblesLista');
-        var $vacio = $('#autosDisponiblesVacio');
-        $lista.empty();
-        if (!items || items.length === 0) {
-            $vacio.show();
-            return;
+    $('#autosDisponiblesModal').on('hidden.bs.modal', function() {
+        if ($.fn.DataTable.isDataTable('#tablaAutosDisponibles')) {
+            $('#tablaAutosDisponibles').DataTable().destroy();
+            $('#tablaAutosDisponibles tbody').empty();
         }
-        $vacio.hide();
-        items.forEach(function(item) {
-            var price = item.Price != null ? '$' + Number(item.Price).toLocaleString('es-PA') : 'N/D';
-            var img = (item.Photo && item.Photo.trim()) ? item.Photo.trim() : '';
-            var imgHtml = img ? '<img src="' + img.replace(/"/g, '&quot;') + '" class="card-img-top" style="height:120px;object-fit:cover" alt="">' : '<div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height:120px"><i class="fas fa-car fa-2x text-muted"></i></div>';
-            var card = '<div class="col-sm-6 col-md-4 col-lg-3">' +
-                '<div class="card h-100 shadow-sm">' + imgHtml +
-                '<div class="card-body p-2">' +
-                '<div class="small fw-bold">' + escapeHtml(item.Make || '') + ' ' + escapeHtml(item.Model || '') + '</div>' +
-                '<div class="small text-muted">' + escapeHtml(item.Year || '') + '</div>' +
-                '<div class="small">Precio: ' + price + '</div>' +
-                '<div class="small text-muted">' + escapeHtml(item.Transmission || '') + '</div>' +
-                '</div></div></div>';
-            $lista.append(card);
-        });
-    }
-    function escapeHtml(s) {
-        if (!s) return '';
-        var div = document.createElement('div');
-        div.textContent = s;
-        return div.innerHTML;
-    }
+    });
     
     // Contador de caracteres para comentarios
     $('#comentarios_gestor').on('input', function() {
