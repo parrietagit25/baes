@@ -553,7 +553,9 @@ function guardarSolicitud() {
                     mostrarAlertaFinGuardado(solicitudId, nuevaSolicitudId);
                 }
             } else {
-                mostrarAlerta('Error al guardar solicitud: ' + (response.message || 'Error desconocido'), 'danger');
+                let msg = 'Error al guardar solicitud: ' + (response.message || 'Error desconocido');
+                if (response.error_detail) msg += '\n\nDetalle: ' + response.error_detail;
+                mostrarAlerta(msg, 'danger');
             }
         },
         error: function(xhr, status, error) {
@@ -566,9 +568,8 @@ function guardarSolicitud() {
             let mensaje = 'Error de conexión al guardar solicitud';
             try {
                 const errorResponse = JSON.parse(xhr.responseText);
-                if (errorResponse.message) {
-                    mensaje = errorResponse.message;
-                }
+                if (errorResponse.message) mensaje = errorResponse.message;
+                if (errorResponse.error_detail) mensaje += '\n\nDetalle: ' + errorResponse.error_detail;
             } catch (e) {
                 // Si no se puede parsear, usar el mensaje por defecto
             }
