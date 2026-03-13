@@ -58,6 +58,10 @@ services:
       - DB_NAME=${MYSQL_DATABASE:-motus_baes}
       - DB_USER=${MYSQL_USER:-motus_user}
       - DB_PASS=${MYSQL_PASSWORD:-motus_pass_2024}
+      # SendGrid (el .env del host debe tener SENDGRID_API_KEY=SG.xxx...)
+      - SENDGRID_API_KEY=${SENDGRID_API_KEY:-}
+      - SENDGRID_FROM_EMAIL=${SENDGRID_FROM_EMAIL:-noreply.automarket@automarket.com.pa}
+      - SENDGRID_FROM_NAME=${SENDGRID_FROM_NAME:-AutoMarket}
 
 volumes:
   motus_db_data:

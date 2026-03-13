@@ -25,6 +25,16 @@ if (!$to) {
     exit;
 }
 
+// Diagnóstico: ¿PHP ve la API Key?
+$key = getenv('SENDGRID_API_KEY');
+if ($key === false || $key === '') {
+    if (file_exists(__DIR__ . '/config/email.local.php')) {
+        $c = require __DIR__ . '/config/email.local.php';
+        $key = is_array($c) ? ($c['sendgrid_api_key'] ?? '') : '';
+    }
+}
+echo "API Key: " . (strlen($key) > 10 ? "Sí (longitud " . strlen($key) . ")" : "NO - añade SENDGRID_API_KEY al .env y reinicia el contenedor") . "\n\n";
+
 try {
     $emailService = new EmailService();
     $subject = 'Prueba SendGrid - Motus / Financiamiento';
