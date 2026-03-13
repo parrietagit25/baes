@@ -327,87 +327,100 @@ if ($token !== '') {
     }
 }
 
-// 2a) Guardar en financiamiento_registros (motus_financiamiento). Solo requiere config_db.php — así funciona aunque no exista config/database.php
+// 2a) Guardar en financiamiento_registros. Usa financiamiento/config_db.php o, si no existe, config/database.php (misma base motus_baes).
+$pdoReg = null;
 $configDbPath = __DIR__ . '/../financiamiento/config_db.php';
 if (is_file($configDbPath)) {
     try {
         require_once $configDbPath;
         $pdoReg = isset($pdo_financiamiento) && $pdo_financiamiento instanceof PDO ? $pdo_financiamiento : null;
-        if ($pdoReg) {
-            $v = function($key, $trim = true) use ($input) {
-                $x = $input[$key] ?? null;
-                if ($x === null || $x === '') return null;
-                return $trim ? trim((string)$x) : $x;
-            };
-            $vNum = function($key) use ($input) {
-                $x = $input[$key] ?? null;
-                if ($x === null || $x === '') return null;
-                return is_numeric($x) ? (float)$x : null;
-            };
-            $vInt = function($key) use ($input) {
-                $x = $input[$key] ?? null;
-                if ($x === null || $x === '') return null;
-                return is_numeric($x) ? (int)$x : null;
-            };
-            $vDate = function($key) use ($input) {
-                $x = trim((string)($input[$key] ?? ''));
-                if ($x === '') return null;
-                return $x;
-            };
-            $stmtReg = $pdoReg->prepare("
-                INSERT INTO financiamiento_registros (
-                    token_email, ip,
-                    cliente_nombre, cliente_estado_civil, cliente_sexo, cliente_id, cliente_nacimiento, cliente_edad,
-                    cliente_nacionalidad, cliente_dependientes, cliente_correo, cliente_peso, cliente_estatura,
-                    vivienda, vivienda_monto, prov_dist_corr, tel_residencia, barriada_calle_casa, celular_cliente,
-                    edificio_apto, correo_residencial,
-                    empresa_nombre, empresa_ocupacion, empresa_anios, empresa_telefono, empresa_salario, empresa_direccion,
-                    otros_ingresos, ocupacion_otros, trabajo_anterior,
-                    tiene_conyuge, con_nombre, con_estado_civil, con_sexo, con_id, con_nacimiento, con_edad,
-                    con_nacionalidad, con_dependientes, con_correo, con_empresa, con_ocupacion, con_anios, con_tel,
-                    con_salario, con_direccion, con_otros_ingresos, con_trabajo_anterior,
-                    refp1_nombre, refp1_cel, refp1_dir_res, refp1_dir_lab,
-                    refp2_nombre, refp2_cel, refp2_dir_res, refp2_dir_lab,
-                    reff1_nombre, reff1_cel, reff1_dir_res, reff1_dir_lab,
-                    reff2_nombre, reff2_cel, reff2_dir_res, reff2_dir_lab,
-                    marca_auto, modelo_auto, anio_auto, kms_cod_auto, precio_venta, abono,
-                    sucursal, nombre_gestor, comentarios_gestor, firma, firmantes_adicionales
-                ) VALUES (
-                    ?, ?,
-                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                    ?, ?, ?, ?, ?, ?,
-                    ?, ?,
-                    ?, ?, ?, ?, ?, ?,
-                    ?, ?, ?,
-                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                    ?, ?, ?, ?,
-                    ?, ?, ?, ?,
-                    ?, ?, ?, ?,
-                    ?, ?, ?, ?,
-                    ?, ?, ?, ?, ?, ?,
-                    ?, ?, ?, ?, ?
-                )
-            ");
-            $stmtReg->execute([
-                $token ?: null, $_SERVER['REMOTE_ADDR'] ?? null,
-                $v('cliente_nombre'), $v('cliente_estado_civil'), $v('cliente_sexo'), $v('cliente_id'), $vDate('cliente_nacimiento'), $vInt('cliente_edad'),
-                $v('cliente_nacionalidad'), $vInt('cliente_dependientes'), $v('cliente_correo'), $vNum('cliente_peso'), $vNum('cliente_estatura'),
-                $v('vivienda'), $vNum('vivienda_monto'), $v('prov_dist_corr'), $v('tel_residencia'), $v('barriada_calle_casa'), $v('celular_cliente'),
-                $v('edificio_apto'), $v('correo_residencial'),
-                $v('empresa_nombre'), $v('empresa_ocupacion'), $v('empresa_anios'), $v('empresa_telefono'), $vNum('empresa_salario'), $v('empresa_direccion'),
-                $v('otros_ingresos'), $v('ocupacion_otros'), $v('trabajo_anterior'),
-                !empty($input['tiene_conyuge']) ? 1 : 0,
-                $v('con_nombre'), $v('con_estado_civil'), $v('con_sexo'), $v('con_id'), $vDate('con_nacimiento'), $vInt('con_edad'),
-                $v('con_nacionalidad'), $vInt('con_dependientes'), $v('con_correo'), $v('con_empresa'), $v('con_ocupacion'), $v('con_anios'), $v('con_tel'),
-                $vNum('con_salario'), $v('con_direccion'), $v('con_otros_ingresos'), $v('con_trabajo_anterior'),
-                $v('refp1_nombre'), $v('refp1_cel'), $v('refp1_dir_res'), $v('refp1_dir_lab'),
-                $v('refp2_nombre'), $v('refp2_cel'), $v('refp2_dir_res'), $v('refp2_dir_lab'),
-                $v('reff1_nombre'), $v('reff1_cel'), $v('reff1_dir_res'), $v('reff1_dir_lab'),
-                $v('reff2_nombre'), $v('reff2_cel'), $v('reff2_dir_res'), $v('reff2_dir_lab'),
-                $v('marca_auto'), $v('modelo_auto'), $vInt('anio_auto'), $vInt('kms_cod_auto'), $vNum('precio_venta'), $vNum('abono'),
-                $v('sucursal'), $v('nombre_gestor'), $v('comentarios_gestor'), $firmaBase64 ?: null, isset($input['firmantes_adicionales']) ? $input['firmantes_adicionales'] : null
-            ]);
-        }
+    } catch (Throwable $e) {
+        logSolPub('financiamiento config_db: ' . $e->getMessage());
+    }
+}
+if (!$pdoReg && is_file(__DIR__ . '/../config/database.php')) {
+    try {
+        require_once __DIR__ . '/../config/database.php';
+        $pdoReg = isset($pdo) && $pdo instanceof PDO ? $pdo : null;
+    } catch (Throwable $e) {
+        logSolPub('financiamiento database: ' . $e->getMessage());
+    }
+}
+if ($pdoReg) {
+    try {
+        $v = function($key, $trim = true) use ($input) {
+            $x = $input[$key] ?? null;
+            if ($x === null || $x === '') return null;
+            return $trim ? trim((string)$x) : $x;
+        };
+        $vNum = function($key) use ($input) {
+            $x = $input[$key] ?? null;
+            if ($x === null || $x === '') return null;
+            return is_numeric($x) ? (float)$x : null;
+        };
+        $vInt = function($key) use ($input) {
+            $x = $input[$key] ?? null;
+            if ($x === null || $x === '') return null;
+            return is_numeric($x) ? (int)$x : null;
+        };
+        $vDate = function($key) use ($input) {
+            $x = trim((string)($input[$key] ?? ''));
+            if ($x === '') return null;
+            return $x;
+        };
+        $stmtReg = $pdoReg->prepare("
+            INSERT INTO financiamiento_registros (
+                token_email, ip,
+                cliente_nombre, cliente_estado_civil, cliente_sexo, cliente_id, cliente_nacimiento, cliente_edad,
+                cliente_nacionalidad, cliente_dependientes, cliente_correo, cliente_peso, cliente_estatura,
+                vivienda, vivienda_monto, prov_dist_corr, tel_residencia, barriada_calle_casa, celular_cliente,
+                edificio_apto, correo_residencial,
+                empresa_nombre, empresa_ocupacion, empresa_anios, empresa_telefono, empresa_salario, empresa_direccion,
+                otros_ingresos, ocupacion_otros, trabajo_anterior,
+                tiene_conyuge, con_nombre, con_estado_civil, con_sexo, con_id, con_nacimiento, con_edad,
+                con_nacionalidad, con_dependientes, con_correo, con_empresa, con_ocupacion, con_anios, con_tel,
+                con_salario, con_direccion, con_otros_ingresos, con_trabajo_anterior,
+                refp1_nombre, refp1_cel, refp1_dir_res, refp1_dir_lab,
+                refp2_nombre, refp2_cel, refp2_dir_res, refp2_dir_lab,
+                reff1_nombre, reff1_cel, reff1_dir_res, reff1_dir_lab,
+                reff2_nombre, reff2_cel, reff2_dir_res, reff2_dir_lab,
+                marca_auto, modelo_auto, anio_auto, kms_cod_auto, precio_venta, abono,
+                sucursal, nombre_gestor, comentarios_gestor, firma, firmantes_adicionales
+            ) VALUES (
+                ?, ?,
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?, ?,
+                ?, ?,
+                ?, ?, ?, ?, ?, ?,
+                ?, ?, ?,
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?,
+                ?, ?, ?, ?,
+                ?, ?, ?, ?,
+                ?, ?, ?, ?,
+                ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?
+            )
+        ");
+        $stmtReg->execute([
+            $token ?: null, $_SERVER['REMOTE_ADDR'] ?? null,
+            $v('cliente_nombre'), $v('cliente_estado_civil'), $v('cliente_sexo'), $v('cliente_id'), $vDate('cliente_nacimiento'), $vInt('cliente_edad'),
+            $v('cliente_nacionalidad'), $vInt('cliente_dependientes'), $v('cliente_correo'), $vNum('cliente_peso'), $vNum('cliente_estatura'),
+            $v('vivienda'), $vNum('vivienda_monto'), $v('prov_dist_corr'), $v('tel_residencia'), $v('barriada_calle_casa'), $v('celular_cliente'),
+            $v('edificio_apto'), $v('correo_residencial'),
+            $v('empresa_nombre'), $v('empresa_ocupacion'), $v('empresa_anios'), $v('empresa_telefono'), $vNum('empresa_salario'), $v('empresa_direccion'),
+            $v('otros_ingresos'), $v('ocupacion_otros'), $v('trabajo_anterior'),
+            !empty($input['tiene_conyuge']) ? 1 : 0,
+            $v('con_nombre'), $v('con_estado_civil'), $v('con_sexo'), $v('con_id'), $vDate('con_nacimiento'), $vInt('con_edad'),
+            $v('con_nacionalidad'), $vInt('con_dependientes'), $v('con_correo'), $v('con_empresa'), $v('con_ocupacion'), $v('con_anios'), $v('con_tel'),
+            $vNum('con_salario'), $v('con_direccion'), $v('con_otros_ingresos'), $v('con_trabajo_anterior'),
+            $v('refp1_nombre'), $v('refp1_cel'), $v('refp1_dir_res'), $v('refp1_dir_lab'),
+            $v('refp2_nombre'), $v('refp2_cel'), $v('refp2_dir_res'), $v('refp2_dir_lab'),
+            $v('reff1_nombre'), $v('reff1_cel'), $v('reff1_dir_res'), $v('reff1_dir_lab'),
+            $v('reff2_nombre'), $v('reff2_cel'), $v('reff2_dir_res'), $v('reff2_dir_lab'),
+            $v('marca_auto'), $v('modelo_auto'), $vInt('anio_auto'), $vInt('kms_cod_auto'), $vNum('precio_venta'), $vNum('abono'),
+            $v('sucursal'), $v('nombre_gestor'), $v('comentarios_gestor'), $firmaBase64 ?: null, isset($input['firmantes_adicionales']) ? $input['firmantes_adicionales'] : null
+        ]);
     } catch (PDOException $e) {
         logSolPub('financiamiento_registros: ' . $e->getMessage());
     } catch (Throwable $e) {

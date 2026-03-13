@@ -1,32 +1,26 @@
 <?php
 /**
- * Configuración local de email (NO SUBIR A GIT)
- * 
- * Copia este archivo a config/email.local.php y configura tus credenciales
- * Este archivo está en .gitignore y no se subirá al repositorio
+ * Configuración local de email con SendGrid (NO SUBIR A GIT)
+ *
+ * 1) Copia este archivo y renómbralo a:  config/email.local.php
+ * 2) Pega tu API Key de SendGrid en 'sendgrid_api_key' (abajo).
+ *
+ * Dónde obtener la API Key:
+ *   - Entra a https://app.sendgrid.com → Settings → API Keys → Create API Key
+ *   - Dale un nombre (ej: "Motus Financiamiento") y permisos de "Mail Send"
+ *   - Copia la key y pégala abajo (solo se muestra una vez).
+ *
+ * Remitente: noreply.automarket@automarket.com.pa
+ * En SendGrid debes verificar este dominio o este correo como remitente autorizado.
  */
-
 return [
-    // Método: 'smtp' (Outlook como pasevistainter.py) o 'sendgrid'
-    'driver' => 'smtp',
-    'smtp_host' => 'smtp-mail.outlook.com',
-    'smtp_port' => 587,
-    'smtp_user' => 'notificaciones@grupopcr.com.pa',
-    'smtp_pass' => 'TU_CLAVE_SMTP',
-    'smtp_secure' => 'tls',
-    'sendgrid_api_key' => 'TU_API_KEY_DE_SENDGRID_AQUI',
-    'from_email' => 'notificaciones@grupopcr.com.pa',
-    'from_name' => 'AutoMarket Seminuevos',
-    
-    // Configuración adicional
-    'reply_to_email' => 'noreply@automarketrentacar.com',
-    'reply_to_name' => 'AutoMarket Seminuevos - Soporte',
-    
-    // Configuración de la aplicación
+    'driver' => 'sendgrid',
+    'sendgrid_api_key' => 'SG.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',  // ← PON AQUÍ TU API KEY DE SENDGRID
+    'from_email' => 'noreply.automarket@automarket.com.pa',
+    'from_name' => 'AutoMarket',
+    'reply_to_email' => 'noreply.automarket@automarket.com.pa',
+    'reply_to_name' => 'AutoMarket - Soporte',
     'app_url' => 'http://localhost:8086',
-    'app_name' => 'AutoMarket Seminuevos',
-    
-    // Debug (desactivar en producción)
+    'app_name' => 'AutoMarket',
     'debug' => false,
 ];
-
