@@ -64,22 +64,39 @@ $(document).ready(function() {
         $('#autosDisponiblesLista').empty();
         $('#autosDisponiblesCargando').show();
         $('#autosDisponiblesVacio').hide();
+        var apiUrl = (typeof window.AUTOS_DISPONIBLES_API !== 'undefined' && window.AUTOS_DISPONIBLES_API)
+            ? window.AUTOS_DISPONIBLES_API
+            : (window.location.pathname.replace(/\/[^/]*$/, '') || '') + '/api/autos_disponibles.php';
+        var loadingDone = false;
+        var timerSafeguard = setTimeout(function() {
+            if (loadingDone) return;
+            loadingDone = true;
+            $('#autosDisponiblesCargando').hide();
+            $('#autosDisponiblesLista').html('<div class="col-12"><div class="alert alert-warning mb-0">No se pudo cargar el inventario. Compruebe la conexión o intente de nuevo.</div></div>');
+            $('#autosDisponiblesVacio').hide();
+        }, 16000);
         $.ajax({
-            url: 'api/autos_disponibles.php',
+            url: apiUrl,
             type: 'GET',
             dataType: 'json',
-            timeout: 15000
+            timeout: 12000
         }).done(function(res) {
+            if (loadingDone) return;
             autosDisponiblesData = (res && res.success && res.data) ? res.data : [];
             renderAutosDisponibles(autosDisponiblesData);
         }).fail(function(xhr) {
+            if (loadingDone) return;
             autosDisponiblesData = [];
             var msg = 'No se pudo cargar el inventario.';
             if (xhr.status === 404) msg = 'No se encontró el servicio de inventario.';
             else if (xhr.status === 401) msg = 'Sesión expirada. Cierre y vuelva a entrar.';
+            else if (xhr.status > 0) msg = 'Error ' + xhr.status + '. No se pudo cargar el inventario.';
             $('#autosDisponiblesLista').html('<div class="col-12"><div class="alert alert-warning mb-0">' + msg + '</div></div>');
+            $('#autosDisponiblesVacio').hide();
             renderAutosDisponibles([]);
         }).always(function() {
+            loadingDone = true;
+            clearTimeout(timerSafeguard);
             $('#autosDisponiblesCargando').hide();
         });
     });
