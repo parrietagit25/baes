@@ -352,6 +352,26 @@ CREATE TABLE `notas_solicitud` (
 INSERT INTO `notas_solicitud` VALUES (162,76,NULL,1,NULL,'Actualización','Lead Importado','Lead importado desde Pipedrive (Lead ID: ac7d52e0-73d7-11ec-878f-7fc0005ee0ad, Persona ID: 76046)','2026-02-11 22:01:19'),(163,77,NULL,1,NULL,'Actualización','Lead Importado','Lead importado desde Pipedrive (Lead ID: ac7d52e0-73d7-11ec-878f-7fc0005ee0ad, Persona ID: 76046)','2026-02-11 22:02:46'),(164,77,NULL,1,NULL,'Actualización','Solicitud enviada a revisión bancaria','Solicitud asignada al usuario banco: Itzel Rodriguez (Banco Nacional de Panamá). Estado cambiado a \'En Revisión Banco\'.','2026-02-27 16:58:36'),(177,90,NULL,22,NULL,'Actualización','Lead Importado','Lead importado desde Pipedrive (Lead ID: bf791320-e136-11ed-b425-87e40197cf1f, Persona ID: 103019)','2026-03-06 16:32:12');
 
 -- -----------------------------------------------------------------------------
+-- 13b. HISTORIAL_SOLICITUD (depende de solicitudes_credito, usuarios)
+-- -----------------------------------------------------------------------------
+DROP TABLE IF EXISTS `historial_solicitud`;
+CREATE TABLE `historial_solicitud` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `solicitud_id` int NOT NULL,
+  `usuario_id` int NOT NULL,
+  `tipo_accion` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'creacion, cambio_estado, documento_agregado, asignacion_banco, actualizacion_datos, evaluacion_banco',
+  `descripcion` text COLLATE utf8mb4_unicode_ci NOT NULL,
+  `estado_anterior` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `estado_nuevo` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `fecha_creacion` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_solicitud` (`solicitud_id`),
+  KEY `idx_usuario` (`usuario_id`),
+  KEY `idx_fecha` (`fecha_creacion`),
+  KEY `idx_tipo` (`tipo_accion`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- -----------------------------------------------------------------------------
 -- 14. USUARIO_ROLES (depende de usuarios, roles)
 -- -----------------------------------------------------------------------------
 DROP TABLE IF EXISTS `usuario_roles`;
@@ -406,6 +426,9 @@ ALTER TABLE `notas_solicitud` ADD CONSTRAINT `fk_nota_usuario_banco` FOREIGN KEY
 ALTER TABLE `notas_solicitud` ADD CONSTRAINT `fk_nota_vehiculo` FOREIGN KEY (`vehiculo_id`) REFERENCES `vehiculos_solicitud` (`id`) ON DELETE CASCADE;
 ALTER TABLE `notas_solicitud` ADD CONSTRAINT `notas_solicitud_ibfk_1` FOREIGN KEY (`solicitud_id`) REFERENCES `solicitudes_credito` (`id`) ON DELETE CASCADE;
 ALTER TABLE `notas_solicitud` ADD CONSTRAINT `notas_solicitud_ibfk_2` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`) ON DELETE CASCADE;
+
+ALTER TABLE `historial_solicitud` ADD CONSTRAINT `historial_solicitud_ibfk_1` FOREIGN KEY (`solicitud_id`) REFERENCES `solicitudes_credito` (`id`) ON DELETE CASCADE;
+ALTER TABLE `historial_solicitud` ADD CONSTRAINT `historial_solicitud_ibfk_2` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`) ON DELETE CASCADE;
 
 ALTER TABLE `usuario_roles` ADD CONSTRAINT `usuario_roles_ibfk_1` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`) ON DELETE CASCADE;
 ALTER TABLE `usuario_roles` ADD CONSTRAINT `usuario_roles_ibfk_2` FOREIGN KEY (`rol_id`) REFERENCES `roles` (`id`) ON DELETE CASCADE;

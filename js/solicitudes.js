@@ -460,7 +460,9 @@ function guardarSolicitud() {
         return;
     }
     
-    // Validar campos requeridos manualmente
+    // FormData con lo que realmente se enviará (validamos esto para evitar desfase con el DOM)
+    const formData = new FormData(form[0]);
+    
     const camposRequeridos = {
         'tipo_persona': 'Tipo de Persona',
         'nombre_cliente': 'Nombre del Cliente',
@@ -470,8 +472,9 @@ function guardarSolicitud() {
     
     let camposFaltantes = [];
     for (let campo in camposRequeridos) {
-        const valor = $(`#${campo}`).val();
-        if (!valor || valor.trim() === '') {
+        const valor = formData.get(campo);
+        const str = (valor != null && typeof valor === 'string') ? valor.trim() : '';
+        if (!str) {
             camposFaltantes.push(camposRequeridos[campo]);
         }
     }
@@ -481,31 +484,23 @@ function guardarSolicitud() {
         console.error('❌ ERROR: Campos requeridos faltantes:', camposFaltantes);
         mostrarAlerta('Por favor, complete los siguientes campos requeridos:\n\n• ' + camposFaltantes.join('\n• '), 'warning');
         
-        // Resaltar campos faltantes
         for (let campo in camposRequeridos) {
-            const valor = $(`#${campo}`).val();
-            if (!valor || valor.trim() === '') {
-                $(`#${campo}`).addClass('is-invalid');
-                setTimeout(() => {
-                    $(`#${campo}`).removeClass('is-invalid');
-                }, 3000);
-            }
+            const valor = formData.get(campo);
+            const str = (valor != null && typeof valor === 'string') ? valor.trim() : '';
+            if (!str) $(`#${campo}`).addClass('is-invalid');
         }
+        setTimeout(function() {
+            for (let c in camposRequeridos) { $(`#${c}`).removeClass('is-invalid'); }
+        }, 3000);
         
-        // Hacer scroll al primer campo faltante
-        if (camposFaltantes.length > 0) {
-            const primerCampo = Object.keys(camposRequeridos).find(campo => {
-                const valor = $(`#${campo}`).val();
-                return !valor || valor.trim() === '';
-            });
-            if (primerCampo) {
-                $(`#${primerCampo}`).focus();
-                $('html, body').animate({
-                    scrollTop: $(`#${primerCampo}`).offset().top - 100
-                }, 500);
-            }
+        const primerCampo = Object.keys(camposRequeridos).find(function(campo) {
+            const v = formData.get(campo);
+            return !(v != null && typeof v === 'string' && v.trim() !== '');
+        });
+        if (primerCampo) {
+            $(`#${primerCampo}`).focus();
+            $('html, body').animate({ scrollTop: $(`#${primerCampo}`).offset().top - 100 }, 500);
         }
-        
         return;
     }
     
@@ -516,8 +511,6 @@ function guardarSolicitud() {
         form[0].reportValidity();
         return;
     }
-    
-    const formData = new FormData(form[0]);
     const solicitudId = $('#solicitud_id').val();
     
     console.log('Solicitud ID:', solicitudId);

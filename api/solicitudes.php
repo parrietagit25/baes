@@ -285,7 +285,8 @@ function crearSolicitud() {
         error_log('crearSolicitud PDO: ' . $e->getMessage());
         http_response_code(500);
         $msg = 'Error al crear solicitud';
-        if (getenv('APP_DEBUG') === '1' || (defined('APP_DEBUG') && APP_DEBUG)) {
+        $debug = (getenv('APP_DEBUG') === '1' || getenv('APP_DEBUG') === 'true' || (defined('APP_DEBUG') && APP_DEBUG));
+        if ($debug) {
             $msg .= ': ' . $e->getMessage();
         }
         echo json_encode(['success' => false, 'message' => $msg]);

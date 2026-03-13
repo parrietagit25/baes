@@ -1,7 +1,11 @@
 <?php
 // Configuración de la base de datos
+// En producción (Digital Ocean, etc.) defina APP_DEBUG en el entorno o póngalo aquí a true para ver errores SQL en la respuesta.
+if (!defined('APP_DEBUG')) {
+    define('APP_DEBUG', getenv('APP_DEBUG') === '1' || getenv('APP_DEBUG') === 'true');
+}
 // Dentro de Docker: conectar al servicio MySQL por nombre (motus_db)
-// Fuera de Docker (XAMPP): localhost con credenciales locales
+// Fuera de Docker (XAMPP / Digital Ocean): usar localhost o el host del managed DB
 $isDocker = file_exists('/.dockerenv');
 if ($isDocker) {
     $host = 'motus_db';
