@@ -64,14 +64,23 @@ $(document).ready(function() {
         $('#autosDisponiblesLista').empty();
         $('#autosDisponiblesCargando').show();
         $('#autosDisponiblesVacio').hide();
-        $.getJSON('api/autos_disponibles.php', function(res) {
-            $('#autosDisponiblesCargando').hide();
+        $.ajax({
+            url: 'api/autos_disponibles.php',
+            type: 'GET',
+            dataType: 'json',
+            timeout: 15000
+        }).done(function(res) {
             autosDisponiblesData = (res && res.success && res.data) ? res.data : [];
             renderAutosDisponibles(autosDisponiblesData);
-        }).fail(function() {
-            $('#autosDisponiblesCargando').hide();
+        }).fail(function(xhr) {
             autosDisponiblesData = [];
+            var msg = 'No se pudo cargar el inventario.';
+            if (xhr.status === 404) msg = 'No se encontró el servicio de inventario.';
+            else if (xhr.status === 401) msg = 'Sesión expirada. Cierre y vuelva a entrar.';
+            $('#autosDisponiblesLista').html('<div class="col-12"><div class="alert alert-warning mb-0">' + msg + '</div></div>');
             renderAutosDisponibles([]);
+        }).always(function() {
+            $('#autosDisponiblesCargando').hide();
         });
     });
     $('#autosDisponiblesBuscar').on('input', function() {

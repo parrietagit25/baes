@@ -14,10 +14,12 @@ if (!isset($_SESSION['user_id'])) {
 
 require_once __DIR__ . '/../config/database.php';
 
+set_time_limit(15);
+
 try {
     $search = isset($_GET['q']) ? trim($_GET['q']) : '';
     $sql = "SELECT Make, Model, Price, PriceTax, Transmission, Photo, VIN, Unit, Year
-            FROM Automarket_Invs_web
+            FROM `Automarket_Invs_web`
             WHERE 1=1";
     $params = [];
     if ($search !== '') {
@@ -31,7 +33,6 @@ try {
     $stmt->execute($params);
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // Formatear precio y URL de imagen
     foreach ($rows as &$r) {
         $r['Price'] = $r['Price'] !== null ? (float) $r['Price'] : null;
         $r['PriceTax'] = $r['PriceTax'] !== null ? (float) $r['PriceTax'] : null;
@@ -41,6 +42,5 @@ try {
 
     echo json_encode(['success' => true, 'data' => $rows]);
 } catch (PDOException $e) {
-    // Tabla puede no existir en algunos entornos
     echo json_encode(['success' => true, 'data' => []]);
 }
