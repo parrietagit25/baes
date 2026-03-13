@@ -289,37 +289,49 @@ function buildPdfHtmlFinanciamiento($input, $firmaBase64, $nombreCliente) {
 $solicitudId = 0;
 $emailEnviado = false;
 
-// 1) Enviar PDF por correo si hay token (no requiere base de datos)
+// 1) Envío de correos financiamiento: PDF al vendedor (token) y copia al cliente (cliente_correo)
+$emailDestinoVendedor = null;
 if ($token !== '') {
+    $decoded = @base64_decode(str_replace(['-', '_'], ['+', '/'], $token), true);
+    if ($decoded === false) $decoded = @base64_decode($token, true);
+    if (is_string($decoded) && filter_var($decoded, FILTER_VALIDATE_EMAIL)) {
+        $emailDestinoVendedor = $decoded;
+    }
+}
+$emailCliente = isset($input['cliente_correo']) && filter_var(trim($input['cliente_correo']), FILTER_VALIDATE_EMAIL) ? trim($input['cliente_correo']) : null;
+
+if ($emailDestinoVendedor !== null || $emailCliente !== null) {
     try {
-        $emailDestino = @base64_decode(str_replace(['-', '_'], ['+', '/'], $token), true);
-        if ($emailDestino === false) $emailDestino = @base64_decode($token, true);
-        if (is_string($emailDestino) && filter_var($emailDestino, FILTER_VALIDATE_EMAIL)) {
-            $pdfPath = null;
-            if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
-                require_once __DIR__ . '/../vendor/autoload.php';
-                if (class_exists('Dompdf\Dompdf')) {
-                    $html = buildPdfHtmlFinanciamiento($input, $firmaBase64, $nombre);
-                    $dompdf = new \Dompdf\Dompdf(['isRemoteEnabled' => true]);
-                    $dompdf->loadHtml($html, 'UTF-8');
-                    $dompdf->setPaper('A4', 'portrait');
-                    $dompdf->render();
-                    $pdfPath = sys_get_temp_dir() . '/sol_fin_' . uniqid('', true) . '.pdf';
-                    file_put_contents($pdfPath, $dompdf->output());
-                }
+        $pdfPath = null;
+        if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
+            require_once __DIR__ . '/../vendor/autoload.php';
+            if (class_exists('Dompdf\Dompdf')) {
+                $html = buildPdfHtmlFinanciamiento($input, $firmaBase64, $nombre);
+                $dompdf = new \Dompdf\Dompdf(['isRemoteEnabled' => true]);
+                $dompdf->loadHtml($html, 'UTF-8');
+                $dompdf->setPaper('A4', 'portrait');
+                $dompdf->render();
+                $pdfPath = sys_get_temp_dir() . '/sol_fin_' . uniqid('', true) . '.pdf';
+                file_put_contents($pdfPath, $dompdf->output());
             }
-            if ($pdfPath && file_exists($pdfPath)) {
-                $config = require __DIR__ . '/../config/email.php';
-                $fromEmail = $config['from_email'] ?? 'noreply@ejemplo.com';
-                $fromName = $config['from_name'] ?? 'AutoMarket Seminuevos';
-                require_once __DIR__ . '/../includes/EmailService.php';
-                $emailService = new EmailService();
-                $asunto = 'Solicitud de Financiamiento completada - ' . $nombre;
-                $cuerpo = '<p>Se ha recibido una solicitud de financiamiento completada.</p><p><strong>Cliente:</strong> ' . htmlspecialchars($nombre) . '</p><p>Ver adjunto PDF con todos los datos y la firma.</p>';
-                $result = $emailService->enviarCorreo($emailDestino, $asunto, $cuerpo, '', strip_tags($cuerpo), [$pdfPath]);
-                @unlink($pdfPath);
+        }
+        if ($pdfPath && file_exists($pdfPath)) {
+            require_once __DIR__ . '/../includes/EmailService.php';
+            $emailService = new EmailService();
+            $asuntoVendedor = 'Solicitud de Financiamiento completada - ' . $nombre;
+            $cuerpoVendedor = '<p>Se ha recibido una solicitud de financiamiento completada.</p><p><strong>Cliente:</strong> ' . htmlspecialchars($nombre) . '</p><p>Ver adjunto PDF con todos los datos y la firma.</p>';
+            $asuntoCliente = 'Recibimos su Solicitud de Financiamiento - AutoMarket';
+            $cuerpoCliente = '<p>Estimado/a ' . htmlspecialchars($nombre) . ',</p><p>Hemos recibido correctamente su solicitud de financiamiento. Adjunto encontrará una copia en PDF.</p><p>Nos pondremos en contacto a la brevedad.</p><p>— AutoMarket</p>';
+
+            if ($emailDestinoVendedor !== null) {
+                $result = $emailService->enviarCorreo($emailDestinoVendedor, $asuntoVendedor, $cuerpoVendedor, '', strip_tags($cuerpoVendedor), [$pdfPath]);
                 $emailEnviado = !empty($result['success']);
             }
+            if ($emailCliente !== null && $emailCliente !== $emailDestinoVendedor) {
+                $resultCliente = $emailService->enviarCorreo($emailCliente, $asuntoCliente, $cuerpoCliente, '', strip_tags($cuerpoCliente), [$pdfPath]);
+                if (!empty($resultCliente['success'])) $emailEnviado = true;
+            }
+            @unlink($pdfPath);
         }
     } catch (Exception $e) {
         error_log('solicitud_publica email: ' . $e->getMessage());
@@ -505,7 +517,7 @@ if (ob_get_level()) ob_end_clean();
 echo json_encode([
     'success' => true,
     'message' => $emailEnviado
-        ? 'Solicitud enviada correctamente. Hemos enviado una copia por correo al vendedor.'
+        ? 'Solicitud enviada correctamente. Se ha enviado una copia por correo.'
         : 'Solicitud enviada correctamente. Nos pondremos en contacto contigo.',
     'data' => ['id' => $solicitudId]
 ]);
