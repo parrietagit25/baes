@@ -457,6 +457,19 @@ if ($isBanco && !$isAdmin) {
                     <div class="modal-body">
                         <input type="hidden" id="solicitud_id" name="id">
                         
+                        <!-- Cargar desde Sol Financiamiento -->
+                        <div class="mb-3 p-3 rounded" style="background: #f0f4f8;">
+                            <label for="cliente_financiamiento_input" class="form-label">
+                                <i class="fas fa-file-invoice-dollar me-1"></i>Cargar desde Sol Financiamiento
+                            </label>
+                            <div class="position-relative">
+                                <input type="text" class="form-control" id="cliente_financiamiento_input" 
+                                       placeholder="Buscar por nombre, cédula o correo..." autocomplete="off">
+                                <div id="cliente_financiamiento_lista" class="list-group position-absolute w-100 shadow-sm" style="z-index: 1050; display: none; max-height: 220px; overflow-y: auto;"></div>
+                            </div>
+                            <small class="text-muted">Seleccione un cliente que haya llenado el formulario de financiamiento para prellenar esta solicitud.</small>
+                        </div>
+                        
                         <!-- Pestañas -->
                         <ul class="nav nav-tabs" id="solicitudTabs" role="tablist">
                             <li class="nav-item" role="presentation">

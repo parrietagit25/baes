@@ -13,7 +13,9 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 $userRoles = $_SESSION['user_roles'] ?? [];
-if (!in_array('ROLE_ADMIN', $userRoles) && !in_array('ROLE_GESTOR', $userRoles)) {
+$puedeAcceder = in_array('ROLE_ADMIN', $userRoles) || in_array('ROLE_GESTOR', $userRoles)
+    || in_array('ROLE_BANCO', $userRoles) || in_array('ROLE_VENDEDOR', $userRoles);
+if (!$puedeAcceder) {
     http_response_code(403);
     echo json_encode(['success' => false, 'message' => 'Acceso denegado']);
     exit;
@@ -32,6 +34,21 @@ try {
         } else {
             echo json_encode(['success' => false, 'message' => 'Registro no encontrado']);
         }
+        exit;
+    }
+
+    if (isset($_GET['busqueda']) && trim((string)$_GET['busqueda']) !== '') {
+        $term = '%' . trim($_GET['busqueda']) . '%';
+        $stmt = $pdo->prepare("
+            SELECT id, cliente_nombre, cliente_id, cliente_correo, celular_cliente
+            FROM financiamiento_registros
+            WHERE cliente_nombre LIKE ? OR cliente_id LIKE ? OR cliente_correo LIKE ? OR celular_cliente LIKE ?
+            ORDER BY fecha_creacion DESC
+            LIMIT 20
+        ");
+        $stmt->execute([$term, $term, $term, $term]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        echo json_encode(['success' => true, 'data' => $rows]);
         exit;
     }
 

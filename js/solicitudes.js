@@ -138,6 +138,31 @@ $(document).ready(function() {
         $('#imagenVehiculoModal').modal('show');
     });
 
+    // Cargar desde Sol Financiamiento: autocompletado y prellenado
+    $('#cliente_financiamiento_input').on('input', function() {
+        clearTimeout(clienteFinanciamientoBusquedaTimer);
+        clienteFinanciamientoBusquedaTimer = setTimeout(buscarClienteFinanciamiento, 300);
+    });
+    $('#cliente_financiamiento_input').on('focus', function() {
+        if ($('#cliente_financiamiento_lista').children().length) $('#cliente_financiamiento_lista').show();
+    });
+    $(document).on('click', '#cliente_financiamiento_lista a[data-id]', function(e) {
+        e.preventDefault();
+        var id = $(this).data('id');
+        $('#cliente_financiamiento_lista').hide();
+        $.get('api/sol_financiamiento.php', { id: id }, function(res) {
+            if (res.success && res.data) prefillFormularioDesdeFinanciamiento(res.data);
+            else mostrarAlerta('No se pudo cargar el registro.', 'danger');
+        }).fail(function() {
+            mostrarAlerta('Error al cargar el registro.', 'danger');
+        });
+    });
+    $(document).on('click', function(e) {
+        if (!$(e.target).closest('#cliente_financiamiento_input, #cliente_financiamiento_lista').length) {
+            $('#cliente_financiamiento_lista').hide();
+        }
+    });
+
     // Contador de caracteres para comentarios
     $('#comentarios_gestor').on('input', function() {
         const maxLength = 1000;
@@ -434,6 +459,10 @@ function limpiarFormularioSolicitud() {
     $('#solicitudModalLabel').html('<i class="fas fa-file-alt me-2"></i>Nueva Solicitud de Crédito');
     $('#contador_comentarios').text('1000');
     
+    // Cargar desde Sol Financiamiento
+    $('#cliente_financiamiento_input').val('');
+    $('#cliente_financiamiento_lista').hide().empty();
+    
     // Resetear botones
     $('#btnCerrarDespuesAdjuntos').hide();
     $('button[type="submit"]').show();
@@ -443,6 +472,93 @@ function limpiarFormularioSolicitud() {
     
     // Ocultar pestaña "Cita y Firma" al crear nueva solicitud
     $('#cita-firma-tab-li').hide();
+}
+
+// ==================== Cargar desde Sol Financiamiento ====================
+var clienteFinanciamientoBusquedaTimer = null;
+
+function buscarClienteFinanciamiento() {
+    var term = $('#cliente_financiamiento_input').val().trim();
+    var $lista = $('#cliente_financiamiento_lista');
+    if (term.length < 2) {
+        $lista.hide().empty();
+        return;
+    }
+    $.get('api/sol_financiamiento.php', { busqueda: term }, function(res) {
+        if (!res.success || !res.data || res.data.length === 0) {
+            $lista.html('<div class="list-group-item text-muted">Sin resultados</div>').show();
+            return;
+        }
+        var html = '';
+        res.data.forEach(function(item) {
+            var texto = [item.cliente_nombre, item.cliente_id, item.cliente_correo].filter(Boolean).join(' — ');
+            html += '<a href="javascript:void(0)" class="list-group-item list-group-item-action" data-id="' + item.id + '">' + escapeHtml(texto) + '</a>';
+        });
+        $lista.html(html).show();
+    }).fail(function() {
+        $lista.html('<div class="list-group-item text-danger">Error al buscar</div>').show();
+    });
+}
+
+function escapeHtml(s) {
+    if (!s) return '';
+    var div = document.createElement('div');
+    div.textContent = s;
+    return div.innerHTML;
+}
+
+function prefillFormularioDesdeFinanciamiento(d) {
+    if (!d) return;
+    function set(id, val) {
+        if (val === null || val === undefined) return;
+        var v = String(val).trim();
+        var $el = $('#' + id);
+        if ($el.length === 0) return;
+        if ($el.is('input[type="checkbox"]')) {
+            $el.prop('checked', v === '1' || v === 1 || v === true);
+        } else {
+            $el.val(v);
+        }
+    }
+    set('nombre_cliente', d.cliente_nombre);
+    set('cedula', d.cliente_id);
+    set('edad', d.cliente_edad);
+    set('genero', d.cliente_sexo === 'M' || d.cliente_sexo === 'Masculino' ? 'Masculino' : (d.cliente_sexo === 'F' || d.cliente_sexo === 'Femenino' ? 'Femenino' : d.cliente_sexo));
+    set('telefono', d.celular_cliente || d.tel_residencia);
+    set('email', d.cliente_correo);
+    set('casado', d.tiene_conyuge);
+    set('hijos', d.cliente_dependientes);
+    set('direccion', [d.prov_dist_corr, d.barriada_calle_casa].filter(Boolean).join(' '));
+    set('casa_edif', d.edificio_apto);
+    set('ingreso', d.empresa_salario);
+    set('tiempo_laborar', d.empresa_anios);
+    set('profesion', d.empresa_ocupacion);
+    set('ocupacion', d.empresa_ocupacion);
+    set('nombre_empresa_negocio', d.empresa_nombre);
+    set('continuidad_laboral', d.trabajo_anterior);
+    set('comentarios_gestor', d.comentarios_gestor);
+    if (d.prov_dist_corr) {
+        var partes = String(d.prov_dist_corr).split(/[,\/]/).map(function(p) { return p.trim(); }).filter(Boolean);
+        if (partes.length >= 1) set('provincia', partes[0]);
+        if (partes.length >= 2) set('distrito', partes[1]);
+        if (partes.length >= 3) set('corregimiento', partes[2]);
+    }
+    if (d.marca_auto || d.modelo_auto || d.precio_venta || d.anio_auto) {
+        vehiculosList = [{
+            id: null,
+            marca: d.marca_auto || '',
+            modelo: d.modelo_auto || '',
+            anio: d.anio_auto || '',
+            kilometraje: d.kms_cod_auto || '',
+            precio: d.precio_venta || '',
+            abono_porcentaje: '',
+            abono_monto: d.abono || ''
+        }];
+        renderizarVehiculos();
+    }
+    $('#cliente_financiamiento_input').val('');
+    $('#cliente_financiamiento_lista').hide().empty();
+    mostrarAlerta('Datos cargados desde Sol Financiamiento. Revise y complete los campos que falten.', 'success');
 }
 
 // Función para abrir modal de adjuntos
