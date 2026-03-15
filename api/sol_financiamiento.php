@@ -52,12 +52,17 @@ try {
         exit;
     }
 
-    $stmt = $pdo->query("
+    $limite = isset($_GET['limite']) && ctype_digit($_GET['limite']) ? (int)$_GET['limite'] : 0;
+    $sql = "
         SELECT id, fecha_creacion, cliente_nombre, cliente_id, cliente_correo, celular_cliente,
                empresa_nombre, empresa_salario, marca_auto, modelo_auto, anio_auto, precio_venta
         FROM financiamiento_registros
         ORDER BY fecha_creacion DESC
-    ");
+    ";
+    if ($limite > 0) {
+        $sql .= " LIMIT " . min($limite, 1000);
+    }
+    $stmt = $pdo->query($sql);
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
     echo json_encode(['success' => true, 'data' => $rows]);
 } catch (PDOException $e) {

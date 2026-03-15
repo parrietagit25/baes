@@ -138,29 +138,19 @@ $(document).ready(function() {
         $('#imagenVehiculoModal').modal('show');
     });
 
-    // Cargar desde Sol Financiamiento: autocompletado y prellenado
-    $('#cliente_financiamiento_input').on('input', function() {
-        clearTimeout(clienteFinanciamientoBusquedaTimer);
-        clienteFinanciamientoBusquedaTimer = setTimeout(buscarClienteFinanciamiento, 300);
+    // Cargar desde Sol Financiamiento: select con clientes registrados
+    $('#solicitudModal').on('show.bs.modal', function() {
+        cargarClientesFinanciamientoSelect();
     });
-    $('#cliente_financiamiento_input').on('focus', function() {
-        if ($('#cliente_financiamiento_lista').children().length) $('#cliente_financiamiento_lista').show();
-    });
-    $(document).on('click', '#cliente_financiamiento_lista a[data-id]', function(e) {
-        e.preventDefault();
-        var id = $(this).data('id');
-        $('#cliente_financiamiento_lista').hide();
+    $('#cliente_financiamiento_select').on('change', function() {
+        var id = $(this).val();
+        if (!id) return;
         $.get('api/sol_financiamiento.php', { id: id }, function(res) {
             if (res.success && res.data) prefillFormularioDesdeFinanciamiento(res.data);
             else mostrarAlerta('No se pudo cargar el registro.', 'danger');
         }).fail(function() {
             mostrarAlerta('Error al cargar el registro.', 'danger');
         });
-    });
-    $(document).on('click', function(e) {
-        if (!$(e.target).closest('#cliente_financiamiento_input, #cliente_financiamiento_lista').length) {
-            $('#cliente_financiamiento_lista').hide();
-        }
     });
 
     // Contador de caracteres para comentarios
@@ -459,9 +449,8 @@ function limpiarFormularioSolicitud() {
     $('#solicitudModalLabel').html('<i class="fas fa-file-alt me-2"></i>Nueva Solicitud de Crédito');
     $('#contador_comentarios').text('1000');
     
-    // Cargar desde Sol Financiamiento
-    $('#cliente_financiamiento_input').val('');
-    $('#cliente_financiamiento_lista').hide().empty();
+    // Cargar desde Sol Financiamiento (select)
+    $('#cliente_financiamiento_select').val('');
     
     // Resetear botones
     $('#btnCerrarDespuesAdjuntos').hide();
@@ -474,29 +463,17 @@ function limpiarFormularioSolicitud() {
     $('#cita-firma-tab-li').hide();
 }
 
-// ==================== Cargar desde Sol Financiamiento ====================
-var clienteFinanciamientoBusquedaTimer = null;
+// ==================== Cargar desde Sol Financiamiento (select) ====================
 
-function buscarClienteFinanciamiento() {
-    var term = $('#cliente_financiamiento_input').val().trim();
-    var $lista = $('#cliente_financiamiento_lista');
-    if (term.length < 2) {
-        $lista.hide().empty();
-        return;
-    }
-    $.get('api/sol_financiamiento.php', { busqueda: term }, function(res) {
-        if (!res.success || !res.data || res.data.length === 0) {
-            $lista.html('<div class="list-group-item text-muted">Sin resultados</div>').show();
-            return;
-        }
-        var html = '';
+function cargarClientesFinanciamientoSelect() {
+    var $sel = $('#cliente_financiamiento_select');
+    $sel.find('option:not(:first)').remove();
+    $.get('api/sol_financiamiento.php', { limite: 500 }, function(res) {
+        if (!res.success || !res.data) return;
         res.data.forEach(function(item) {
             var texto = [item.cliente_nombre, item.cliente_id, item.cliente_correo].filter(Boolean).join(' — ');
-            html += '<a href="javascript:void(0)" class="list-group-item list-group-item-action" data-id="' + item.id + '">' + escapeHtml(texto) + '</a>';
+            $sel.append($('<option></option>').val(item.id).text(texto));
         });
-        $lista.html(html).show();
-    }).fail(function() {
-        $lista.html('<div class="list-group-item text-danger">Error al buscar</div>').show();
     });
 }
 
@@ -556,8 +533,7 @@ function prefillFormularioDesdeFinanciamiento(d) {
         }];
         renderizarVehiculos();
     }
-    $('#cliente_financiamiento_input').val('');
-    $('#cliente_financiamiento_lista').hide().empty();
+    $('#cliente_financiamiento_select').val('');
     mostrarAlerta('Datos cargados desde Sol Financiamiento. Revise y complete los campos que falten.', 'success');
 }
 
