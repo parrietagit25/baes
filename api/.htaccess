@@ -1,0 +1,4 @@
+# Asegurar que POST esté permitido para subida de adjuntos
+<IfModule mod_rewrite.c>
+    RewriteEngine Off
+</IfModule>
