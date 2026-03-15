@@ -4,24 +4,56 @@ El **403 Forbidden** no lo devuelve la aplicación: lo devuelve **Apache** (mod_
 
 ---
 
-## 1. Si usas **nginx** como proxy delante de Docker
+## 1. Si usas **nginx** como proxy delante de Docker (caso más habitual)
 
-Edita la configuración del `server` o `location` que sirve `motus.automarket.com.pa` y asegúrate de:
+### Pasos exactos en el servidor
 
-- Permitir **POST** (no solo GET).
-- Aumentar el tamaño máximo del body para subida de archivos.
+1. **Conectar por SSH** al servidor donde está nginx (ej. donde corre `motus.automarket.com.pa`).
 
-Ejemplo:
+2. **Localizar el archivo de configuración** del sitio, por ejemplo:
+   ```bash
+   sudo grep -l "motus.automarket.com.pa\|motus.grupopcr" /etc/nginx/sites-enabled/* 2>/dev/null
+   # o listar:
+   ls -la /etc/nginx/sites-available/
+   ```
+
+3. **Editar ese archivo** (sustituir por el nombre que te salga):
+   ```bash
+   sudo nano /etc/nginx/sites-available/motus.automarket.com.pa
+   ```
+
+4. **Añadir o comprobar** estas líneas:
+   - Dentro del bloque `server { ... }`: **`client_max_body_size 20M;`**
+   - Dentro del bloque `location / { ... }`: **`client_max_body_size 20M;`**  
+   Si ya existe `proxy_pass`, solo añade las dos líneas de `client_max_body_size`. Nginx por defecto permite POST; el 403 suele ser por límite de cuerpo.
+
+5. **Comprobar y recargar nginx:**
+   ```bash
+   sudo nginx -t && sudo systemctl reload nginx
+   ```
+
+6. **Probar de nuevo** la subida de archivos en la web.
+
+### Archivo de ejemplo completo
+
+En el repo hay un ejemplo listo para copiar: **`docs/nginx-ejemplo-motussubida.conf`**. Puedes usarlo como referencia o copiarlo al servidor y ajustar `server_name` y `proxy_pass` (puerto 8086 si el contenedor PHP está en ese puerto):
+
+```bash
+# En el servidor, desde la carpeta del proyecto:
+sudo cp docs/nginx-ejemplo-motussubida.conf /etc/nginx/sites-available/motus.automarket.com.pa
+# Ajustar server_name, SSL y proxy_pass si hace falta, luego:
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+Ejemplo mínimo de lo que debe tener el `server`:
 
 ```nginx
 server {
     server_name motus.automarket.com.pa;
-    # ...
-
     client_max_body_size 20M;
 
     location / {
-        proxy_pass http://172.18.0.x:80;   # o el nombre del servicio Docker
+        proxy_pass http://127.0.0.1:8086;   # o la IP:puerto de motus_php
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -29,12 +61,6 @@ server {
         client_max_body_size 20M;
     }
 }
-```
-
-Reinicia nginx:
-
-```bash
-sudo nginx -t && sudo systemctl reload nginx
 ```
 
 ---
