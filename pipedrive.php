@@ -95,6 +95,9 @@ require_once 'includes/validar_acceso.php';
                             <button class="btn btn-success" onclick="sincronizarLeads()">
                                 <i class="fas fa-sync me-2"></i>Sincronizar Leads
                             </button>
+                            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#autosDisponiblesModal">
+                                <i class="fas fa-car me-2"></i>Autos disponibles
+                            </button>
                         </div>
                     </div>
 
@@ -705,6 +708,138 @@ require_once 'includes/validar_acceso.php';
                 $(this).remove();
             });
         }
+
+        // Autos disponibles (modal): cargar inventario al abrir
+        $('#autosDisponiblesModal').on('shown.bs.modal', function() {
+            $('#autosDisponiblesError').addClass('d-none').empty();
+            if ($.fn.DataTable.isDataTable('#tablaAutosDisponibles')) {
+                $('#tablaAutosDisponibles').DataTable().destroy();
+                $('#tablaAutosDisponibles tbody').empty();
+            }
+            $.ajax({
+                url: 'api/autos_disponibles.php',
+                type: 'GET',
+                dataType: 'json',
+                success: function(response) {
+                    if (response && response.success === false && response.message) {
+                        $('#autosDisponiblesError').text(response.message).removeClass('d-none');
+                        return;
+                    }
+                    var datos = (response && response.data) ? response.data : [];
+                    $('#tablaAutosDisponibles').DataTable({
+                        data: datos,
+                        columns: [
+                            {
+                                data: null,
+                                orderable: false,
+                                searchable: false,
+                                render: function(row) {
+                                    var photo = row.Photo && String(row.Photo).trim() ? row.Photo : '';
+                                    var unit = (row.Unit && String(row.Unit).trim()) ? row.Unit : (row.LicensePlate && String(row.LicensePlate).trim()) ? row.LicensePlate : '';
+                                    var placa = (row.LicensePlate && String(row.LicensePlate).trim()) ? row.LicensePlate : unit;
+                                    if (photo) {
+                                        return '<a href="#" class="ver-imagen-vehiculo-pd d-inline-block" data-photo="' + String(photo).replace(/"/g, '&quot;') + '" data-unit="' + String(unit).replace(/"/g, '&quot;') + '" data-placa="' + String(placa).replace(/"/g, '&quot;') + '" title="Ver imagen"><img src="' + String(photo).replace(/"/g, '&quot;') + '" style="height:50px;object-fit:cover;cursor:pointer" alt=""></a>';
+                                    }
+                                    return '<span class="text-muted"><i class="fas fa-car"></i></span>';
+                                }
+                            },
+                            { data: 'Make' },
+                            { data: 'Model' },
+                            { data: 'Year' },
+                            {
+                                data: 'Price',
+                                render: function(d) {
+                                    return d != null && d !== '' ? '$' + Number(d).toLocaleString('es-PA') : 'N/D';
+                                }
+                            },
+                            { data: 'Transmission' }
+                        ],
+                        order: [[1, 'asc']],
+                        pageLength: 25,
+                        language: {
+                            url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json',
+                            emptyTable: 'No hay vehículos en el inventario.'
+                        }
+                    });
+                },
+                error: function(xhr) {
+                    var msg = 'No se pudo cargar el inventario.';
+                    if (xhr.status === 401) msg = 'Sesión expirada.';
+                    else if (xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
+                    $('#autosDisponiblesError').text(msg).removeClass('d-none');
+                }
+            });
+        });
+        $('#autosDisponiblesModal').on('hidden.bs.modal', function() {
+            if ($.fn.DataTable.isDataTable('#tablaAutosDisponibles')) {
+                $('#tablaAutosDisponibles').DataTable().destroy();
+                $('#tablaAutosDisponibles tbody').empty();
+            }
+        });
+        $(document).on('click', '#tablaAutosDisponibles .ver-imagen-vehiculo-pd', function(e) {
+            e.preventDefault();
+            var photo = $(this).data('photo') || '';
+            var placa = $(this).data('placa') || $(this).data('unit') || '';
+            var segmento = String(placa).toLowerCase().trim();
+            var urlImpel = 'https://spins.impel.io/automarketpanama/' + (segmento ? encodeURIComponent(segmento) : '');
+            $('#imagenVehiculoGrandePd').attr('src', photo);
+            $('#imagenVehiculoLinkImpelPd').attr('href', urlImpel);
+            if (segmento) { $('#imagenVehiculoLinkImpelPd').removeClass('d-none').show(); } else { $('#imagenVehiculoLinkImpelPd').addClass('d-none').hide(); }
+            $('#imagenVehiculoModalPd').modal('show');
+        });
     </script>
+
+    <!-- Modal Autos disponibles (Automarket_Invs_web) -->
+    <div class="modal fade" id="autosDisponiblesModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                    <h5 class="modal-title text-white">
+                        <i class="fas fa-car me-2"></i>Autos disponibles
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="autosDisponiblesError" class="alert alert-danger d-none mb-2" role="alert"></div>
+                    <table id="tablaAutosDisponibles" class="table table-striped table-hover w-100" style="width:100%">
+                        <thead>
+                            <tr>
+                                <th>Imagen</th>
+                                <th>Marca</th>
+                                <th>Modelo</th>
+                                <th>Año</th>
+                                <th>Precio</th>
+                                <th>Transmisión</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal imagen vehículo ampliada + link Impel -->
+    <div class="modal fade" id="imagenVehiculoModalPd" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h6 class="modal-title">Imagen del vehículo</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <img id="imagenVehiculoGrandePd" src="" alt="Vehículo" class="img-fluid rounded" style="max-height:70vh; width:auto;">
+                    <div class="mt-3">
+                        <a id="imagenVehiculoLinkImpelPd" href="#" target="_blank" rel="noopener" class="btn btn-sm btn-primary">
+                            <i class="fas fa-external-link-alt me-1"></i> Ver en Impel
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
