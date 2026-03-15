@@ -110,7 +110,28 @@ docker exec motus_php apache2ctl graceful
 
 ---
 
-## 3. Comprobar qué devuelve el 403
+## 3. Archivo de prueba (diagnóstico rápido)
+
+En el proyecto hay una prueba para ver en qué punto falla:
+
+1. **Abre en el navegador** (misma URL donde falla la subida):  
+   `https://motus.automarket.com.pa/test_upload.html`
+
+2. **Ejecuta en orden:**
+   - **Probar GET** → Si sale HTTP 200 y "GET llegó a PHP", la ruta `/api/` responde.
+   - **Probar POST (sin archivo)** → Si sale 200, nginx/Apache permiten POST.
+   - **Subir archivo de prueba** → Si aquí sale **403**, el bloqueo es al enviar archivo (nginx o Apache). Si sale **200**, el servidor permite subir y el problema puede ser solo en `adjuntos.php` (por ejemplo sesión o otra regla).
+
+3. **Interpretación:**
+   - GET 403 o no carga → problema de ruta o de nginx antes de PHP.
+   - GET 200, POST sin archivo 403 → POST bloqueado en general.
+   - GET 200, POST sin archivo 200, **POST con archivo 403** → bloqueo por subida (tamaño, multipart o proxy). Revisar `client_max_body_size`, `proxy_request_buffering off` y Apache.
+
+**Eliminar en producción** cuando ya no lo necesites: `api/test_upload.php` y `test_upload.html`.
+
+---
+
+## 4. Comprobar qué devuelve el 403
 
 Para ver si la respuesta 403 la envía **nginx** o **Apache**:
 
@@ -122,7 +143,7 @@ Si en los logs de Apache **no** aparece la petición POST a `adjuntos.php`, el 4
 
 ---
 
-## 4. Resumen
+## 5. Resumen
 
 | Origen del 403 | Qué hacer |
 |----------------|-----------|

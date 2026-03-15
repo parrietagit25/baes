@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prueba subida – diagnóstico 403</title>
+    <style>
+        body { font-family: sans-serif; max-width: 700px; margin: 2rem auto; padding: 0 1rem; }
+        h1 { font-size: 1.25rem; }
+        .bloque { margin: 1.5rem 0; padding: 1rem; border: 1px solid #ccc; border-radius: 6px; }
+        button, input[type="submit"] { padding: 0.5rem 1rem; margin: 0.25rem 0.25rem 0 0; cursor: pointer; }
+        pre { background: #f5f5f5; padding: 1rem; overflow: auto; font-size: 12px; border-radius: 4px; }
+        .ok { color: green; }
+        .error { color: #c00; }
+        .info { color: #666; font-size: 0.9rem; margin-top: 0.5rem; }
+    </style>
+</head>
+<body>
+    <h1>Prueba de subida – identificar error 403</h1>
+    <p class="info">Base URL: <strong id="baseUrl"></strong></p>
+
+    <div class="bloque">
+        <h2>1. GET a /api/test_upload.php</h2>
+        <p>Comprueba que las peticiones llegan a PHP.</p>
+        <button type="button" id="btnGet">Probar GET</button>
+        <pre id="resultGet">(sin ejecutar)</pre>
+    </div>
+
+    <div class="bloque">
+        <h2>2. POST sin archivo</h2>
+        <p>Comprueba que nginx/Apache permiten POST.</p>
+        <button type="button" id="btnPost">Probar POST (sin archivo)</button>
+        <pre id="resultPost">(sin ejecutar)</pre>
+    </div>
+
+    <div class="bloque">
+        <h2>3. POST con archivo (multipart)</h2>
+        <p>Si aquí da <strong>403</strong>, el bloqueo es por subida de archivo (nginx/Apache). Si da <strong>200</strong>, el problema puede ser solo en adjuntos.php (sesión, ruta, etc.).</p>
+        <form id="formUpload">
+            <input type="file" name="archivo" id="archivo" accept=".txt,.pdf,.jpg,.jpeg,.png">
+            <input type="submit" value="Subir archivo de prueba">
+        </form>
+        <pre id="resultUpload">(sin ejecutar)</pre>
+    </div>
+
+    <div class="bloque">
+        <h2>Resumen</h2>
+        <ul>
+            <li><strong>GET 200</strong> → La ruta /api/ responde.</li>
+            <li><strong>POST sin archivo 200</strong> → POST permitido.</li>
+            <li><strong>POST con archivo 403</strong> → Nginx o Apache bloquean la subida (client_max_body_size, proxy_request_buffering, ModSecurity, etc.).</li>
+            <li><strong>POST con archivo 200</strong> → El servidor permite subir; si adjuntos.php sigue con 403, revisar sesión o otra regla solo para esa URL.</li>
+        </ul>
+    </div>
+
+    <script>
+        const base = window.location.origin;
+        document.getElementById('baseUrl').textContent = base;
+
+        const apiTest = base + '/api/test_upload.php';
+
+        function show(el, text, isError) {
+            const pre = document.getElementById(el);
+            pre.textContent = text;
+            pre.className = isError ? 'error' : 'ok';
+        }
+
+        document.getElementById('btnGet').onclick = function () {
+            show('resultGet', 'Cargando...');
+            fetch(apiTest, { method: 'GET' })
+                .then(r => r.json().then(j => ({ status: r.status, body: j })).catch(() => ({ status: r.status, body: r.statusText })))
+                .then(({ status, body }) => show('resultGet', 'HTTP ' + status + '\n' + JSON.stringify(body, null, 2), status >= 400))
+                .catch(e => show('resultGet', 'Error: ' + e.message, true));
+        };
+
+        document.getElementById('btnPost').onclick = function () {
+            show('resultPost', 'Cargando...');
+            fetch(apiTest, { method: 'POST', body: 'test=1', headers: { 'Content-Type': 'application/x-www-form-urlencoded' } })
+                .then(r => r.json().then(j => ({ status: r.status, body: j })).catch(() => ({ status: r.status, body: 'No JSON' })))
+                .then(({ status, body }) => show('resultPost', 'HTTP ' + status + '\n' + JSON.stringify(body, null, 2), status >= 400))
+                .catch(e => show('resultPost', 'Error: ' + e.message, true));
+        };
+
+        document.getElementById('formUpload').onsubmit = function (e) {
+            e.preventDefault();
+            const pre = document.getElementById('resultUpload');
+            const fileInput = document.getElementById('archivo');
+            if (!fileInput.files.length) {
+                show('resultUpload', 'Elige un archivo primero.');
+                return;
+            }
+            pre.textContent = 'Subiendo...';
+            const fd = new FormData();
+            fd.append('archivo', fileInput.files[0]);
+            fetch(apiTest, { method: 'POST', body: fd })
+                .then(r => {
+                    const isJson = (r.headers.get('content-type') || '').includes('json');
+                    return (isJson ? r.json() : r.text()).then(body => ({ status: r.status, body }));
+                })
+                .then(({ status, body }) => {
+                    const text = typeof body === 'string' ? body : JSON.stringify(body, null, 2);
+                    show('resultUpload', 'HTTP ' + status + '\n' + text, status >= 400);
+                })
+                .catch(e => show('resultUpload', 'Error: ' + e.message, true));
+        };
+    </script>
+</body>
+</html>
