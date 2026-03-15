@@ -157,8 +157,8 @@ window.mostrarAdjuntos = function(adjuntos) {
                     </div>
                 </div>
                 <div>
-                    <button type="button" class="btn btn-sm btn-outline-secondary me-1" onclick="verTextoExtraido(${adjunto.id})" title="Ver texto extraído (OCR)">
-                        <i class="fas fa-file-alt"></i> Texto
+                    <button type="button" class="btn btn-sm btn-outline-info me-1" onclick="verTextoExtraido(${adjunto.id})" title="Ver texto extraído por OCR del documento">
+                        <i class="fas fa-file-alt me-1"></i>Ver texto extraído
                     </button>
                     <button type="button" class="btn btn-sm btn-outline-primary me-1" onclick="descargarAdjunto(${adjunto.id})" title="Descargar">
                         <i class="fas fa-download"></i>
