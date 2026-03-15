@@ -102,6 +102,8 @@ window.subirAdjunto = function() {
             var msg = 'Error al subir archivos. ';
             if (xhr.status === 0) {
                 msg += 'No hay respuesta del servidor (¿proxy/CORS o conexión cerrada?). Revisa que el proxy permita POST y body grande (client_max_body_size 20M).';
+            } else if (xhr.status === 403) {
+                msg += 'El servidor (nginx/Apache) bloqueó la subida (403). Revisa: nginx → client_max_body_size 20M y permitir POST; Apache → ModSecurity o LimitRequestBody. Ver docs/FIX_403_SUBIDA_ADJUNTOS.md';
             } else if (xhr.status === 413) {
                 msg += 'Archivo(s) demasiado grandes (413). Aumenta client_max_body_size en nginx y upload_max_filesize en PHP.';
             } else if (xhr.status === 502 || xhr.status === 504) {
