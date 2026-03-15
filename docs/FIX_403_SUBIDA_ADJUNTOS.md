@@ -10,29 +10,34 @@ El **403 Forbidden** no lo devuelve la aplicación: lo devuelve **Apache** (mod_
 
 1. **Conectar por SSH** al servidor donde está nginx (ej. donde corre `motus.automarket.com.pa`).
 
-2. **Localizar el archivo de configuración** del sitio, por ejemplo:
+2. **Editar el archivo correcto de nginx.** En tu servidor el archivo suele llamarse **`motus`** (no `motus.automarket.com.pa`). Comprueba con:
    ```bash
-   sudo grep -l "motus.automarket.com.pa\|motus.grupopcr" /etc/nginx/sites-enabled/* 2>/dev/null
-   # o listar:
-   ls -la /etc/nginx/sites-available/
+   ls /etc/nginx/sites-available/
+   # Si ves "motus" y "default", el de la app es "motus"
+   sudo nano /etc/nginx/sites-available/motus
    ```
 
-3. **Editar ese archivo** (sustituir por el nombre que te salga):
+3. **Comprueba** que en `sites-enabled` está enlazado el mismo archivo:
    ```bash
-   sudo nano /etc/nginx/sites-available/motus.automarket.com.pa
+   ls -la /etc/nginx/sites-enabled/
    ```
 
-4. **Añadir o comprobar** estas líneas:
-   - Dentro del bloque `server { ... }`: **`client_max_body_size 20M;`**
-   - Dentro del bloque `location / { ... }`: **`client_max_body_size 20M;`**  
-   Si ya existe `proxy_pass`, solo añade las dos líneas de `client_max_body_size`. Nginx por defecto permite POST; el 403 suele ser por límite de cuerpo.
+4. **Añadir o comprobar** estas líneas en el `server` que tiene `listen 443 ssl` y `location /`:
+   - Justo después de `server_name motus.automarket.com.pa;`: **`client_max_body_size 20M;`**
+   - Dentro de `location / { ... }`: **`client_max_body_size 20M;`** y **`proxy_request_buffering off;`** (ayuda a que la subida no se rechace).
 
 5. **Comprobar y recargar nginx:**
    ```bash
    sudo nginx -t && sudo systemctl reload nginx
    ```
 
-6. **Probar de nuevo** la subida de archivos en la web.
+6. **Si sigue el 403:** Reconstruir el contenedor PHP para que Apache use la config de subida (en el repo: `docker/apache-uploads.conf`):
+   ```bash
+   cd /home/ubuntu/motus/baes   # o la ruta de tu proyecto
+   docker-compose build --no-cache motus_php && docker-compose up -d motus_php
+   ```
+
+7. **Probar de nuevo** la subida de archivos en la web.
 
 ### Archivo de ejemplo completo
 

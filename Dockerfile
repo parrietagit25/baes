@@ -22,6 +22,9 @@ RUN apt-get update && apt-get install -y \
 # Habilitar mod_rewrite para Apache
 RUN a2enmod rewrite
 
+# Permitir subida de archivos grandes (evitar 403 por límite de Apache)
+COPY docker/apache-uploads.conf /etc/apache2/conf-enabled/uploads.conf
+
 # Configurar Apache para permitir .htaccess
 RUN echo '<Directory /var/www/html>' >> /etc/apache2/apache2.conf \
     && echo '    AllowOverride All' >> /etc/apache2/apache2.conf \
