@@ -30,6 +30,8 @@ $isGestor = in_array('ROLE_GESTOR', $userRoles);
         .card { border: none; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.08); }
         .detalle-seccion { margin-bottom: 1rem; }
         .detalle-seccion h6 { color: #495057; border-bottom: 1px solid #dee2e6; padding-bottom: 0.25rem; }
+        .firma-wrap { margin-top: 0.5rem; padding: 10px; background: #f8f9fa; border-radius: 8px; border: 1px solid #dee2e6; display: inline-block; }
+        .img-firma { max-width: 320px; max-height: 140px; display: block; }
     </style>
 </head>
 <body>
@@ -139,6 +141,7 @@ $isGestor = in_array('ROLE_GESTOR', $userRoles);
                         'Vehículo': ['marca_auto','modelo_auto','anio_auto','kms_cod_auto','precio_venta','abono'],
                         'Otros': ['sucursal','nombre_gestor','comentarios_gestor','fecha_creacion','ip']
                     };
+                    // Excluir firma de "Otros" (se muestra como imagen abajo)
                     var html = '';
                     var labels = { cliente_nombre:'Nombre', cliente_estado_civil:'Estado civil', cliente_sexo:'Sexo', cliente_id:'Cédula', cliente_nacimiento:'Nacimiento', cliente_edad:'Edad', cliente_nacionalidad:'Nacionalidad', cliente_dependientes:'Dependientes', cliente_correo:'Correo', cliente_peso:'Peso', cliente_estatura:'Estatura', vivienda:'Vivienda', vivienda_monto:'Monto', prov_dist_corr:'Prov/Dist/Corr', tel_residencia:'Tel residencia', barriada_calle_casa:'Dirección', celular_cliente:'Celular', edificio_apto:'Edificio/Apto', correo_residencial:'Correo residencial', empresa_nombre:'Empresa', empresa_ocupacion:'Ocupación', empresa_anios:'Años', empresa_telefono:'Tel', empresa_salario:'Salario', empresa_direccion:'Dirección', otros_ingresos:'Otros ingresos', ocupacion_otros:'Ocupación otros', trabajo_anterior:'Trabajo anterior', tiene_conyuge:'Tiene cónyuge', con_nombre:'Nombre', con_id:'Cédula', con_empresa:'Empresa', con_ocupacion:'Ocupación', con_salario:'Salario', con_correo:'Correo', refp1_nombre:'Ref personal 1', refp1_cel:'Cel', refp2_nombre:'Ref personal 2', refp2_cel:'Cel', reff1_nombre:'Ref familiar 1', reff1_cel:'Cel', reff2_nombre:'Ref familiar 2', reff2_cel:'Cel', marca_auto:'Marca', modelo_auto:'Modelo', anio_auto:'Año', kms_cod_auto:'Km', precio_venta:'Precio', abono:'Abono', sucursal:'Sucursal', nombre_gestor:'Gestor', comentarios_gestor:'Comentarios', fecha_creacion:'Fecha registro', ip:'IP' };
                     for (var sec in sections) {
@@ -153,6 +156,19 @@ $isGestor = in_array('ROLE_GESTOR', $userRoles);
                         if (filas.length) {
                             html += '<div class="detalle-seccion"><h6>' + sec + '</h6><table class="table table-sm table-borderless"><tbody>' + filas.join('') + '</tbody></table></div>';
                         }
+                    }
+                    // Sección Firma(s): imagen principal + firmantes adicionales
+                    if (d.firma && String(d.firma).length > 50) {
+                        html += '<div class="detalle-seccion"><h6>Firma del solicitante</h6><div class="firma-wrap"><img class="img-firma" src="data:image/png;base64,' + d.firma + '" alt="Firma" /></div></div>';
+                    }
+                    var fa = null;
+                    try { fa = d.firmantes_adicionales ? JSON.parse(d.firmantes_adicionales) : null; } catch (e) {}
+                    if (fa && Array.isArray(fa) && fa.length) {
+                        fa.forEach(function(item, idx) {
+                            if (item.firma && String(item.firma).length > 50) {
+                                html += '<div class="detalle-seccion"><h6>Firma adicional' + (fa.length > 1 ? ' ' + (idx + 1) : '') + (item.nombre ? ': ' + $('<div>').text(item.nombre).html() : '') + '</h6><div class="firma-wrap"><img class="img-firma" src="data:image/png;base64,' + item.firma + '" alt="Firma" /></div></div>';
+                            }
+                        });
                     }
                     $content.html(html || '<p class="text-muted">Sin datos.</p>');
                 })

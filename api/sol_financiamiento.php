@@ -27,9 +27,7 @@ try {
         $stmt->execute([$_GET['id']]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         if ($row) {
-            if (isset($row['firma']) && strlen($row['firma']) > 200) {
-                $row['firma'] = '[imagen base64 omitida]';
-            }
+            // firma y firmantes_adicionales se envían completos para mostrar en el detalle
             echo json_encode(['success' => true, 'data' => $row]);
         } else {
             echo json_encode(['success' => false, 'message' => 'Registro no encontrado']);
