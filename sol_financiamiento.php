@@ -112,7 +112,8 @@ $isGestor = in_array('ROLE_GESTOR', $userRoles);
                     return v.length ? v.join(' ') : '—';
                 }},
                 { data: null, orderable: false, render: function(row) {
-                    return '<button type="button" class="btn btn-sm btn-info btn-ver-detalle" data-id="' + row.id + '"><i class="fas fa-eye"></i> Ver detalle</button>';
+                    return '<a href="api/sol_financiamiento_pdf.php?id=' + row.id + '" class="btn btn-sm btn-success me-1" target="_blank" title="Descargar PDF"><i class="fas fa-file-pdf"></i> PDF</a>' +
+                           '<button type="button" class="btn btn-sm btn-info btn-ver-detalle" data-id="' + row.id + '"><i class="fas fa-eye"></i> Ver detalle</button>';
                 }}
             ],
             order: [[0, 'desc']],
