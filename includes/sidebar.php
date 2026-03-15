@@ -30,6 +30,13 @@ $isVendedor = in_array('ROLE_VENDEDOR', $_SESSION['user_roles']);
             <i class="fas fa-file-alt me-2"></i>Solicitudes de Crédito
         </a>
         <?php endif; ?>
+
+        <!-- Sol Financiamiento - Registros del formulario público (Admin y Gestor) -->
+        <?php if ($isAdmin || $isGestor): ?>
+        <a class="nav-link <?php echo ($current_page == 'sol_financiamiento.php') ? 'active' : ''; ?>" href="sol_financiamiento.php">
+            <i class="fas fa-file-invoice-dollar me-2"></i>Sol Financiamiento
+        </a>
+        <?php endif; ?>
         
         <!-- Gestión de Usuarios - Solo Admin -->
         <?php if ($isAdmin): ?>
