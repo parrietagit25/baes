@@ -157,6 +157,9 @@ window.mostrarAdjuntos = function(adjuntos) {
                     </div>
                 </div>
                 <div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary me-1" onclick="verTextoExtraido(${adjunto.id})" title="Ver texto extraído (OCR)">
+                        <i class="fas fa-file-alt"></i> Texto
+                    </button>
                     <button type="button" class="btn btn-sm btn-outline-primary me-1" onclick="descargarAdjunto(${adjunto.id})" title="Descargar">
                         <i class="fas fa-download"></i>
                     </button>
@@ -195,6 +198,30 @@ window.formatearTamaño = function(bytes) {
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+};
+
+// Función para ver el texto extraído por OCR
+window.verTextoExtraido = function(id) {
+    var $modal = $('#modalTextoExtraido');
+    var $body = $('#modalTextoExtraidoContenido');
+    var $titulo = $('#modalTextoExtraidoTitulo');
+    $body.html('<p class="text-muted"><i class="fas fa-spinner fa-spin me-2"></i>Cargando...</p>');
+    $modal.modal('show');
+    $.get('api/adjuntos.php', { id: id }, function(res) {
+        if (res.success && res.data) {
+            $titulo.text(res.data.nombre_original || 'Texto extraído');
+            var texto = res.data.texto_extraido;
+            if (texto && String(texto).trim() !== '') {
+                $body.html('<pre class="bg-light p-3 rounded small mb-0" style="max-height:70vh;overflow:auto;white-space:pre-wrap;word-break:break-word;">' + $('<div>').text(texto).html() + '</pre>');
+            } else {
+                $body.html('<p class="text-muted mb-0">No hay texto extraído para este documento. Solo se extrae texto de imágenes (OCR), PDF y archivos TXT.</p>');
+            }
+        } else {
+            $body.html('<p class="text-danger mb-0">Error al cargar el adjunto.</p>');
+        }
+    }).fail(function() {
+        $body.html('<p class="text-danger mb-0">Error de conexión.</p>');
+    });
 };
 
 // Función para descargar un adjunto

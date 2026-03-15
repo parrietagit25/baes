@@ -13,8 +13,9 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
-require_once '../config/database.php';
-require_once '../includes/historial_helper.php';
+require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../includes/historial_helper.php';
+require_once __DIR__ . '/../includes/OcrHelper.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 
@@ -211,6 +212,26 @@ function subirAdjunto() {
                     $tamañoArchivo,
                     $descripcion
                 ]);
+                
+                $adjuntoId = (int) $pdo->lastInsertId();
+
+                // Extraer texto por OCR / pdftotext / txt y actualizar registro (si existe columna texto_extraido)
+                try {
+                    $rutaAbsoluta = realpath($rutaArchivo) ?: (dirname(__DIR__) . '/' . $rutaArchivo);
+                    if (is_file($rutaAbsoluta) && $adjuntoId > 0) {
+                        $textoExtraido = OcrHelper::extraerTexto($rutaAbsoluta, $tipoArchivo);
+                        if ($textoExtraido !== '') {
+                            $maxLen = 1024 * 1024; // 1 MB para LONGTEXT
+                            if (strlen($textoExtraido) > $maxLen) {
+                                $textoExtraido = substr($textoExtraido, 0, $maxLen);
+                            }
+                            $up = $pdo->prepare("UPDATE adjuntos_solicitud SET texto_extraido = ? WHERE id = ?");
+                            $up->execute([$textoExtraido, $adjuntoId]);
+                        }
+                    }
+                } catch (Throwable $e) {
+                    error_log('OCR adjunto: ' . $e->getMessage());
+                }
                 
                 $descHistorial = 'Se agregó el documento: ' . $nombreOriginal . ($descripcion ? ' - ' . $descripcion : '');
                 registrarHistorialSolicitud($pdo, $solicitudId, $_SESSION['user_id'], 'documento_agregado', $descHistorial, null, null);
