@@ -712,57 +712,60 @@ require_once 'includes/validar_acceso.php';
         // Autos disponibles (modal): cargar inventario al abrir
         $('#autosDisponiblesModal').on('shown.bs.modal', function() {
             $('#autosDisponiblesError').addClass('d-none').empty();
-            if ($.fn.DataTable.isDataTable('#tablaAutosDisponibles')) {
-                $('#tablaAutosDisponibles').DataTable().destroy();
-                $('#tablaAutosDisponibles tbody').empty();
+            var $modal = $('#autosDisponiblesModal');
+            var $table = $modal.find('#tablaAutosDisponibles');
+            if ($table.length === 0) return;
+            if ($.fn.DataTable.isDataTable($table)) {
+                try { $table.DataTable().destroy(); } catch (e) {}
             }
+            $table.find('tbody').empty();
             $.ajax({
                 url: 'api/autos_disponibles.php',
                 type: 'GET',
                 dataType: 'json',
                 success: function(response) {
+                    if (!$modal.hasClass('show')) return;
                     if (response && response.success === false && response.message) {
                         $('#autosDisponiblesError').text(response.message).removeClass('d-none');
                         return;
                     }
-                    var datos = (response && response.data) ? response.data : [];
-                    $('#tablaAutosDisponibles').DataTable({
-                        data: datos,
-                        columns: [
-                            {
-                                data: null,
-                                orderable: false,
-                                searchable: false,
-                                render: function(row) {
-                                    var photo = row.Photo && String(row.Photo).trim() ? row.Photo : '';
-                                    var unit = (row.Unit && String(row.Unit).trim()) ? row.Unit : (row.LicensePlate && String(row.LicensePlate).trim()) ? row.LicensePlate : '';
-                                    var placa = (row.LicensePlate && String(row.LicensePlate).trim()) ? row.LicensePlate : unit;
-                                    if (photo) {
-                                        return '<a href="#" class="ver-imagen-vehiculo-pd d-inline-block" data-photo="' + String(photo).replace(/"/g, '&quot;') + '" data-unit="' + String(unit).replace(/"/g, '&quot;') + '" data-placa="' + String(placa).replace(/"/g, '&quot;') + '" title="Ver imagen"><img src="' + String(photo).replace(/"/g, '&quot;') + '" style="height:50px;object-fit:cover;cursor:pointer" alt=""></a>';
-                                    }
-                                    return '<span class="text-muted"><i class="fas fa-car"></i></span>';
-                                }
-                            },
-                            { data: 'Make' },
-                            { data: 'Model' },
-                            { data: 'Year' },
-                            {
-                                data: 'Price',
-                                render: function(d) {
-                                    return d != null && d !== '' ? '$' + Number(d).toLocaleString('es-PA') : 'N/D';
-                                }
-                            },
-                            { data: 'Transmission' }
-                        ],
-                        order: [[1, 'asc']],
-                        pageLength: 25,
-                        language: {
-                            url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json',
-                            emptyTable: 'No hay vehículos en el inventario.'
+                    var datos = Array.isArray(response && response.data) ? response.data : [];
+                    if (!$modal.hasClass('show')) return;
+                    var initTable = function() {
+                        if (!$modal.hasClass('show')) return;
+                        if (!$table.length) return;
+                        if ($.fn.DataTable.isDataTable($table)) return;
+                        var $tbody = $table.find('tbody');
+                        $tbody.empty();
+                        function esc(s) {
+                            if (s == null || s === undefined) return '';
+                            return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
                         }
-                    });
+                        datos.forEach(function(row) {
+                            var photo = row.Photo && String(row.Photo).trim() ? row.Photo : '';
+                            var unit = (row.Unit && String(row.Unit).trim()) ? row.Unit : (row.LicensePlate && String(row.LicensePlate).trim()) ? row.LicensePlate : '';
+                            var placa = (row.LicensePlate && String(row.LicensePlate).trim()) ? row.LicensePlate : unit;
+                            var imgHtml = photo
+                                ? '<a href="#" class="ver-imagen-vehiculo-pd d-inline-block" data-photo="' + esc(photo) + '" data-unit="' + esc(unit) + '" data-placa="' + esc(placa) + '" title="Ver imagen"><img src="' + esc(photo) + '" style="height:50px;object-fit:cover;cursor:pointer" alt=""></a>'
+                                : '<span class="text-muted"><i class="fas fa-car"></i></span>';
+                            var price = row.Price != null && row.Price !== '' ? '$' + Number(row.Price).toLocaleString('es-PA') : 'N/D';
+                            $tbody.append(
+                                '<tr><td>' + imgHtml + '</td><td>' + esc(row.Make) + '</td><td>' + esc(row.Model) + '</td><td>' + esc(row.Year) + '</td><td>' + price + '</td><td>' + esc(row.Transmission) + '</td></tr>'
+                            );
+                        });
+                        $table.DataTable({
+                            order: [[1, 'asc']],
+                            pageLength: 25,
+                            language: {
+                                url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json',
+                                emptyTable: 'No hay vehículos en el inventario.'
+                            }
+                        });
+                    };
+                    setTimeout(initTable, 50);
                 },
                 error: function(xhr) {
+                    if (!$modal.hasClass('show')) return;
                     var msg = 'No se pudo cargar el inventario.';
                     if (xhr.status === 401) msg = 'Sesión expirada.';
                     else if (xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
@@ -771,9 +774,9 @@ require_once 'includes/validar_acceso.php';
             });
         });
         $('#autosDisponiblesModal').on('hidden.bs.modal', function() {
-            if ($.fn.DataTable.isDataTable('#tablaAutosDisponibles')) {
-                $('#tablaAutosDisponibles').DataTable().destroy();
-                $('#tablaAutosDisponibles tbody').empty();
+            var $table = $('#autosDisponiblesModal #tablaAutosDisponibles');
+            if ($table.length && $.fn.DataTable.isDataTable($table)) {
+                try { $table.DataTable().destroy(); } catch (e) {}
             }
         });
         $(document).on('click', '#tablaAutosDisponibles .ver-imagen-vehiculo-pd', function(e) {
