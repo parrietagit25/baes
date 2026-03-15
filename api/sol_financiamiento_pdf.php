@@ -51,14 +51,21 @@ try {
 $nombre = isset($row['cliente_nombre']) ? trim($row['cliente_nombre']) : 'Solicitud';
 $firmaBase64 = isset($row['firma']) ? $row['firma'] : '';
 
-if (!file_exists(__DIR__ . '/../vendor/autoload.php') || !class_exists('Dompdf\Dompdf')) {
+$vendorAutoload = __DIR__ . '/../vendor/autoload.php';
+if (!file_exists($vendorAutoload)) {
     http_response_code(500);
     header('Content-Type: text/plain; charset=utf-8');
-    echo 'Dompdf no disponible. Ejecute: composer install';
+    echo 'No se encontró vendor/autoload.php. En la raíz del proyecto ejecute: composer install' . "\n";
+    echo '(Si usa Docker: docker exec -it <contenedor_php> composer install --working-dir=/ruta/del/proyecto)';
     exit;
 }
-
-require_once __DIR__ . '/../vendor/autoload.php';
+require_once $vendorAutoload;
+if (!class_exists('Dompdf\Dompdf')) {
+    http_response_code(500);
+    header('Content-Type: text/plain; charset=utf-8');
+    echo 'El paquete dompdf/dompdf no está instalado. En la raíz del proyecto ejecute: composer install';
+    exit;
+}
 
 $html = buildPdfHtmlFinanciamiento($row, $firmaBase64, $nombre);
 $dompdf = new \Dompdf\Dompdf(['isRemoteEnabled' => true]);
