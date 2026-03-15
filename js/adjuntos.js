@@ -72,25 +72,24 @@ window.subirAdjunto = function() {
         formData.append('archivo[]', archivos[i]);
     }
     
-    console.log('Enviando petición AJAX con', archivos.length, 'archivos...');
+    var urlAdjuntos = window.location.origin + '/api/adjuntos.php';
+    console.log('Enviando petición POST a:', urlAdjuntos, 'archivos:', archivos.length);
     
     $.ajax({
-        url: 'api/adjuntos.php',
+        url: urlAdjuntos,
         type: 'POST',
         data: formData,
         processData: false,
         contentType: false,
         dataType: 'json',
+        timeout: 60000,
         success: function(response) {
             console.log('Respuesta recibida:', response);
             if (response.success) {
                 const count = response.data && response.data.count ? response.data.count : archivos.length;
                 mostrarAlerta(count + ' archivo(s) subido(s) correctamente', 'success');
-                // Limpiar formulario
-                const form = document.getElementById('adjuntoForm');
-                if (form) {
-                    form.reset();
-                }
+                var form = document.getElementById('adjuntoForm');
+                if (form) form.reset();
                 cargarAdjuntos(solicitudId);
             } else {
                 console.error('Error en respuesta:', response.message);
@@ -98,9 +97,19 @@ window.subirAdjunto = function() {
             }
         },
         error: function(xhr, status, error) {
-            console.error('Error AJAX:', status, error);
-            console.error('Response text:', xhr.responseText);
-            mostrarAlerta('Error de conexión al subir archivos: ' + error, 'danger');
+            console.error('Error AJAX:', 'status=', xhr.status, 'statusText=', xhr.statusText, 'textStatus=', status, 'error=', error);
+            console.error('Response text:', (xhr.responseText || '').substring(0, 500));
+            var msg = 'Error al subir archivos. ';
+            if (xhr.status === 0) {
+                msg += 'No hay respuesta del servidor (¿proxy/CORS o conexión cerrada?). Revisa que el proxy permita POST y body grande (client_max_body_size 20M).';
+            } else if (xhr.status === 413) {
+                msg += 'Archivo(s) demasiado grandes (413). Aumenta client_max_body_size en nginx y upload_max_filesize en PHP.';
+            } else if (xhr.status === 502 || xhr.status === 504) {
+                msg += 'El servidor no respondió a tiempo (502/504). Revisa el proxy y el contenedor PHP.';
+            } else {
+                msg += 'Código ' + xhr.status + (xhr.statusText ? ' ' + xhr.statusText : '') + (error ? ' - ' + error : '');
+            }
+            mostrarAlerta(msg, 'danger');
         }
     });
 };
