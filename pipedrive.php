@@ -717,7 +717,9 @@ require_once 'includes/validar_acceso.php';
         }
 
         // Autos disponibles (modal): mismo comportamiento que en Solicitud de Crédito
-        $('#autosDisponiblesModal').on('shown.bs.modal', function() {
+        // Usamos delegación para asegurar que el handler se asocie aunque el modal
+        // se renderice después de este script.
+        $(document).on('shown.bs.modal', '#autosDisponiblesModal', function() {
             $('#autosDisponiblesError').addClass('d-none').empty();
             if ($.fn.DataTable.isDataTable('#tablaAutosDisponibles')) {
                 $('#tablaAutosDisponibles').DataTable().destroy();
@@ -777,7 +779,7 @@ require_once 'includes/validar_acceso.php';
                 }
             });
         });
-        $('#autosDisponiblesModal').on('hidden.bs.modal', function() {
+        $(document).on('hidden.bs.modal', '#autosDisponiblesModal', function() {
             if ($.fn.DataTable.isDataTable('#tablaAutosDisponibles')) {
                 $('#tablaAutosDisponibles').DataTable().destroy();
                 $('#tablaAutosDisponibles tbody').empty();
