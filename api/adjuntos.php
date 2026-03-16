@@ -71,7 +71,7 @@ function _tamano_col(PDO $pdo): ?string {
             FROM INFORMATION_SCHEMA.COLUMNS
             WHERE TABLE_SCHEMA = ?
               AND TABLE_NAME = 'adjuntos_solicitud'
-              AND COLUMN_NAME IN ('tamaño_archivo', 'tamano_archivo')
+              AND COLUMN_NAME IN ('tamaño_archivo', 'tamano_archivo', 'tamao_archivo')
             LIMIT 1
         ");
         $stmt->execute([$dbName]);
