@@ -80,13 +80,21 @@
         var xhr = new XMLHttpRequest();
         xhr.open('POST', 'api/chatbot.php');
         xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.timeout = 45000;
         xhr.onload = function () {
             setTyping(false);
             if (submitBtn) submitBtn.disabled = false;
+            if (xhr.status !== 200) {
+                appendBotMessage('El servidor respondió con error (código ' + xhr.status + '). Revisa los logs del servidor.', true);
+                return;
+            }
             var res = {};
             try {
                 res = JSON.parse(xhr.responseText || '{}');
-            } catch (err) {}
+            } catch (err) {
+                appendBotMessage('Respuesta del servidor no válida. Intenta de nuevo.', true);
+                return;
+            }
             if (res.success && res.reply) {
                 appendBotMessage(res.reply, false);
             } else {
@@ -96,7 +104,12 @@
         xhr.onerror = function () {
             setTyping(false);
             if (submitBtn) submitBtn.disabled = false;
-            appendBotMessage('Error de conexión. Verifica tu red e intenta de nuevo.', true);
+            appendBotMessage('No se pudo conectar con el servidor. Verifica tu red o intenta más tarde.', true);
+        };
+        xhr.ontimeout = function () {
+            setTyping(false);
+            if (submitBtn) submitBtn.disabled = false;
+            appendBotMessage('Tiempo de espera agotado. El asistente tarda demasiado; intenta de nuevo.', true);
         };
         xhr.send(JSON.stringify({ message: text }));
     });

@@ -40,8 +40,9 @@ if (strlen($userMessage) > 2000) {
     exit;
 }
 
-set_time_limit(30);
+set_time_limit(45);
 
+try {
 // Contexto del sistema: descripción de la app y cómo usarla
 $systemPrompt = getSystemPrompt($pdo, $userMessage);
 
@@ -57,23 +58,11 @@ $payload = [
     'temperature' => 0.7
 ];
 
-$ctx = stream_context_create([
-    'http' => [
-        'method' => 'POST',
-        'header' => [
-            'Content-Type: application/json',
-            'Authorization: Bearer ' . $apiKey
-        ],
-        'content' => json_encode($payload),
-        'timeout' => 25
-    ]
-]);
-
 $url = 'https://api.openai.com/v1/chat/completions';
-$response = @file_get_contents($url, false, $ctx);
+$response = callOpenAI($url, $apiKey, $payload);
 
-if ($response === false) {
-    echo json_encode(['success' => false, 'message' => 'No se pudo conectar con el asistente. Intenta más tarde.']);
+if ($response === null) {
+    echo json_encode(['success' => false, 'message' => 'No se pudo conectar con OpenAI. Revisa que el servidor pueda acceder a api.openai.com (firewall, SSL) o que la API key sea válida.']);
     exit;
 }
 
@@ -92,6 +81,56 @@ if ($reply === null || $reply === '') {
 }
 
 echo json_encode(['success' => true, 'reply' => $reply]);
+
+} catch (Throwable $e) {
+    error_log('Chatbot error: ' . $e->getMessage());
+    echo json_encode(['success' => false, 'message' => 'Error interno del asistente. Intenta más tarde.']);
+}
+
+/**
+ * Llama a la API de OpenAI. Usa cURL si está disponible (más fiable con HTTPS/timeouts), sino file_get_contents.
+ * Devuelve el body de la respuesta o null si falla.
+ */
+function callOpenAI(string $url, string $apiKey, array $payload): ?string {
+    $json = json_encode($payload);
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $json,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 30,
+            CURLOPT_HTTPHEADER => [
+                'Content-Type: application/json',
+                'Authorization: Bearer ' . $apiKey
+            ],
+            CURLOPT_SSL_VERIFYPEER => true
+        ]);
+        $response = curl_exec($ch);
+        $err = curl_error($ch);
+        curl_close($ch);
+        if ($err !== '' || $response === false) {
+            error_log('Chatbot OpenAI cURL: ' . $err);
+            return null;
+        }
+        return $response;
+    }
+
+    $ctx = stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' => "Content-Type: application/json\r\nAuthorization: Bearer $apiKey\r\n",
+            'content' => $json,
+            'timeout' => 30
+        ],
+        'ssl' => [
+            'verify_peer' => true,
+            'verify_peer_name' => true
+        ]
+    ]);
+    $response = @file_get_contents($url, false, $ctx);
+    return $response !== false ? $response : null;
+}
 
 /**
  * Construye el prompt del sistema: instrucciones + datos de la app/BD si aplica.
