@@ -21,7 +21,7 @@ $debug = defined('APP_DEBUG') && APP_DEBUG;
 try {
     // Campos para el modal (incl. Unit para el link Impel por unidad/placa)
     $sql = "SELECT Year, Transmission, Make, Price, Model, Photo, Unit, LicensePlate
-            FROM `Automarket_Invs_web`
+            FROM `Automarket_Invs_web_temp`
             ORDER BY Make, Model
             LIMIT 500";
     $stmt = $pdo->query($sql);
