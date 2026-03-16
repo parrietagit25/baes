@@ -179,5 +179,6 @@ $isGestor = in_array('ROLE_GESTOR', $userRoles);
         });
     });
     </script>
+    <?php include __DIR__ . '/includes/chatbot_widget.php'; ?>
 </body>
 </html>

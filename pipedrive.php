@@ -850,5 +850,6 @@ require_once 'includes/validar_acceso.php';
             </div>
         </div>
     </div>
+    <?php include __DIR__ . '/includes/chatbot_widget.php'; ?>
 </body>
 </html>

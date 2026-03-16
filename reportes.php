@@ -320,5 +320,6 @@ $titulosReporte = ['usuarios' => 'Rep. Usuarios', 'tiempo' => 'Rep. Tiempo', 'ba
     }
 })();
     </script>
+    <?php include __DIR__ . '/includes/chatbot_widget.php'; ?>
 </body>
 </html>

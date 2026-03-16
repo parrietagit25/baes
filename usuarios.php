@@ -332,5 +332,6 @@ $roles = $stmt->fetchAll();
     <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
     <script src="js/usuarios.js"></script>
+    <?php include __DIR__ . '/includes/chatbot_widget.php'; ?>
 </body>
 </html>

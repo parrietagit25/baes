@@ -17,7 +17,7 @@ $v = file_exists(__DIR__ . '/../' . $chatbotCss) ? filemtime(__DIR__ . '/../' . 
     </button>
     <div class="chatbot-panel">
         <div class="chatbot-header">
-            <span>Asistente BAES</span>
+            <span>Asistente MOTUS</span>
             <button type="button" class="chatbot-close" aria-label="Cerrar">&times;</button>
         </div>
         <div class="chatbot-messages"></div>

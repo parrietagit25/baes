@@ -1,6 +1,6 @@
-# Chatbot integrado (Opción B)
+# Chatbot integrado (Asistente MOTUS)
 
-Asistente en burbuja que usa la API de OpenAI, consulta la base de datos cuando el usuario pregunta por inventario y explica el uso de la app.
+Asistente en burbuja que usa la API de OpenAI, consulta la base de datos (inventario, total de autos) cuando el usuario pregunta y explica el uso de la app. El nombre del asistente es **MOTUS**.
 
 ## Archivos
 
@@ -40,13 +40,7 @@ Asistente en burbuja que usa la API de OpenAI, consulta la base de datos cuando 
 
 ## Dónde se muestra
 
-El widget está incluido en **solicitudes.php**. Para añadirlo a más páginas, incluye antes de `</body>`:
-
-```php
-<?php include __DIR__ . '/includes/chatbot_widget.php'; ?>
-```
-
-Solo se renderiza si el usuario está logueado (`$_SESSION['user_id']`).
+La burbuja aparece en **todas las páginas internas** (cuando el usuario está logueado), **excepto en el login**: Dashboard, Solicitudes, Sol Financiamiento, Usuarios, Roles, Bancos, Pipedrive, Reportes. No se muestra en `index.php` ni en la pantalla de login. Solo se renderiza si existe `$_SESSION['user_id']`.
 
 ## Inventario
 

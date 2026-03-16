@@ -137,7 +137,7 @@ function callOpenAI(string $url, string $apiKey, array $payload): ?string {
  */
 function getSystemPrompt(PDO $pdo, string $userMessage): string {
     $base = <<<TEXT
-Eres el asistente virtual de BAES (sistema de Solicitudes de Crédito de Motus/AutoMarket). Respondes en español, de forma clara y breve.
+Eres el asistente virtual de MOTUS (sistema de Solicitudes de Crédito de Motus/AutoMarket). Respondes en español, de forma clara y breve.
 
 Información sobre la aplicación:
 - Solicitudes de crédito: desde "Solicitudes" se ven y gestionan las solicitudes. Puedes filtrar, ver detalle, adjuntar documentos, ver autos disponibles y el historial.
@@ -146,7 +146,7 @@ Información sobre la aplicación:
 - Roles: hay administradores, gestores y usuarios banco; cada uno ve lo que le corresponde.
 - Integración Pipedrive: existe una pantalla para sincronizar leads con Pipedrive e importar solicitudes.
 
-Si el usuario pregunta por autos en inventario, usa ÚNICAMENTE los datos que se te proporcionan en el siguiente bloque "DATOS_INVENTARIO". No inventes precios ni unidades.
+Si el usuario pregunta por autos en inventario o cuántos hay, usa ÚNICAMENTE los datos del bloque "DATOS_INVENTARIO" (ahí aparece el total y el listado). Responde con la cantidad total si preguntan "cuántos" y opcionalmente un resumen.
 Si no hay datos de inventario en el mensaje del sistema, di que puede ver el listado completo en "Autos disponibles" dentro de la solicitud.
 Para dudas de uso (cómo subir un adjunto, cómo filtrar, etc.), explica los pasos de forma breve.
 TEXT;
@@ -166,28 +166,30 @@ TEXT;
  */
 function getResumenInventario(PDO $pdo): string {
     try {
+        $countSql = "SELECT COUNT(*) AS total FROM Automarket_Invs_web_temp";
+        $total = (int) $pdo->query($countSql)->fetchColumn();
+        $lines = ["Total de unidades en inventario: $total"];
+        if ($total === 0) {
+            return implode("\n", $lines);
+        }
         $sql = "SELECT Make, Model, Year, Price, LicensePlate
                 FROM Automarket_Invs_web_temp
                 ORDER BY Make, Model
                 LIMIT 80";
         $stmt = $pdo->query($sql);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($rows as $r) {
+            $precio = isset($r['Price']) && $r['Price'] !== null ? number_format((float)$r['Price'], 0, ',', '.') : 'N/A';
+            $lines[] = sprintf('%s %s %s - $%s - Placa: %s',
+                $r['Make'] ?? '',
+                $r['Model'] ?? '',
+                $r['Year'] ?? '',
+                $precio,
+                $r['LicensePlate'] ?? ''
+            );
+        }
+        return implode("\n", $lines);
     } catch (PDOException $e) {
         return '(No se pudo consultar el inventario en este momento.)';
     }
-    if (empty($rows)) {
-        return 'No hay unidades en inventario en este momento.';
-    }
-    $lines = [];
-    foreach ($rows as $r) {
-        $precio = isset($r['Price']) && $r['Price'] !== null ? number_format((float)$r['Price'], 0, ',', '.') : 'N/A';
-        $lines[] = sprintf('%s %s %s - $%s - Placa: %s',
-            $r['Make'] ?? '',
-            $r['Model'] ?? '',
-            $r['Year'] ?? '',
-            $precio,
-            $r['LicensePlate'] ?? ''
-        );
-    }
-    return implode("\n", $lines);
 }

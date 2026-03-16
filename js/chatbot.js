@@ -17,7 +17,7 @@
     function openPanel() {
         bubble.classList.add('chatbot-open');
         if (messagesEl.children.length === 0) {
-            appendBotMessage('Hola. Soy el asistente de BAES. Puedo ayudarte con el uso del sistema, autos disponibles o dudas sobre solicitudes. ¿En qué puedo ayudarte?', false);
+            appendBotMessage('Hola. Soy el asistente de MOTUS. Puedo ayudarte con el uso del sistema, autos disponibles o dudas sobre solicitudes. ¿En qué puedo ayudarte?', false);
         }
         input.focus();
     }
