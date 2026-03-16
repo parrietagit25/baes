@@ -52,25 +52,39 @@ switch ($method) {
         break;
 }
 
-function _tamano_col(PDO $pdo): string {
-    static $col = null;
-    if ($col !== null) return $col;
+function _tamano_col(PDO $pdo): ?string {
+    static $col = '__unset__';
+    if ($col !== '__unset__') return $col ?: null;
 
     // Algunas instalaciones pueden tener la columna sin ñ por compatibilidad.
-    // Detectamos cuál existe en la tabla adjuntos_solicitud.
-    $dbName = $pdo->query("SELECT DATABASE()")->fetchColumn();
-    $stmt = $pdo->prepare("
-        SELECT COLUMN_NAME
-        FROM INFORMATION_SCHEMA.COLUMNS
-        WHERE TABLE_SCHEMA = ?
-          AND TABLE_NAME = 'adjuntos_solicitud'
-          AND COLUMN_NAME IN ('tamaño_archivo', 'tamano_archivo')
-        LIMIT 1
-    ");
-    $stmt->execute([$dbName]);
-    $found = $stmt->fetchColumn();
-    $col = $found ?: 'tamaño_archivo';
-    return $col;
+    // Detectamos cuál existe en la tabla adjuntos_solicitud. Si no existe ninguna,
+    // devolvemos null para no romper INSERT/SELECT.
+    try {
+        $dbName = $pdo->query("SELECT DATABASE()")->fetchColumn();
+        if (!$dbName) {
+            $col = null;
+            return null;
+        }
+
+        $stmt = $pdo->prepare("
+            SELECT COLUMN_NAME
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = ?
+              AND TABLE_NAME = 'adjuntos_solicitud'
+              AND COLUMN_NAME IN ('tamaño_archivo', 'tamano_archivo')
+            LIMIT 1
+        ");
+        $stmt->execute([$dbName]);
+        $found = $stmt->fetchColumn();
+        $col = $found ?: null;
+        return $col;
+    } catch (Throwable $e) {
+        // Si por permisos o configuración no se puede leer INFORMATION_SCHEMA,
+        // no arriesgamos: asumimos que no existe.
+        error_log('Detect columna tamaño_archivo falló: ' . $e->getMessage());
+        $col = null;
+        return null;
+    }
 }
 
 function obtenerAdjuntos($solicitudId) {
@@ -78,6 +92,7 @@ function obtenerAdjuntos($solicitudId) {
     
     try {
         $tamCol = _tamano_col($pdo);
+        $tamSelect = $tamCol ? "a.`$tamCol` AS `tamaño_archivo`" : "0 AS `tamaño_archivo`";
         $stmt = $pdo->prepare("
             SELECT
                 a.id,
@@ -87,7 +102,7 @@ function obtenerAdjuntos($solicitudId) {
                 a.nombre_original,
                 a.ruta_archivo,
                 a.tipo_archivo,
-                a.`$tamCol` AS `tamaño_archivo`,
+                $tamSelect,
                 a.descripcion,
                 a.texto_extraido,
                 a.fecha_subida,
@@ -113,6 +128,7 @@ function obtenerAdjunto($id) {
     
     try {
         $tamCol = _tamano_col($pdo);
+        $tamSelect = $tamCol ? "a.`$tamCol` AS `tamaño_archivo`" : "0 AS `tamaño_archivo`";
         $stmt = $pdo->prepare("
             SELECT
                 a.id,
@@ -122,7 +138,7 @@ function obtenerAdjunto($id) {
                 a.nombre_original,
                 a.ruta_archivo,
                 a.tipo_archivo,
-                a.`$tamCol` AS `tamaño_archivo`,
+                $tamSelect,
                 a.descripcion,
                 a.texto_extraido,
                 a.fecha_subida,
@@ -246,22 +262,40 @@ function subirAdjunto() {
             if (move_uploaded_file($tmpName, $rutaArchivo)) {
                 // Guardar en base de datos
                 $tamCol = _tamano_col($pdo);
-                $stmt = $pdo->prepare("
-                    INSERT INTO adjuntos_solicitud 
-                    (solicitud_id, usuario_id, nombre_archivo, nombre_original, ruta_archivo, tipo_archivo, `$tamCol`, descripcion)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                ");
+                if ($tamCol) {
+                    $stmt = $pdo->prepare("
+                        INSERT INTO adjuntos_solicitud 
+                        (solicitud_id, usuario_id, nombre_archivo, nombre_original, ruta_archivo, tipo_archivo, `$tamCol`, descripcion)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    ");
+                    $params = [
+                        $solicitudId,
+                        $_SESSION['user_id'],
+                        $nombreArchivo,
+                        $nombreOriginal,
+                        $rutaArchivoDB,
+                        $tipoArchivo,
+                        $tamañoArchivo,
+                        $descripcion
+                    ];
+                } else {
+                    $stmt = $pdo->prepare("
+                        INSERT INTO adjuntos_solicitud 
+                        (solicitud_id, usuario_id, nombre_archivo, nombre_original, ruta_archivo, tipo_archivo, descripcion)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ");
+                    $params = [
+                        $solicitudId,
+                        $_SESSION['user_id'],
+                        $nombreArchivo,
+                        $nombreOriginal,
+                        $rutaArchivoDB,
+                        $tipoArchivo,
+                        $descripcion
+                    ];
+                }
                 
-                $stmt->execute([
-                    $solicitudId,
-                    $_SESSION['user_id'],
-                    $nombreArchivo,
-                    $nombreOriginal,
-                    $rutaArchivoDB,
-                    $tipoArchivo,
-                    $tamañoArchivo,
-                    $descripcion
-                ]);
+                $stmt->execute($params);
                 
                 $adjuntoId = (int) $pdo->lastInsertId();
 
@@ -370,6 +404,7 @@ function descargarAdjunto($id) {
         
         // Obtener información del adjunto
         $tamCol = _tamano_col($pdo);
+        $tamSelect = $tamCol ? "`$tamCol` AS `tamaño_archivo`" : "0 AS `tamaño_archivo`";
         $stmt = $pdo->prepare("
             SELECT
                 id,
@@ -379,7 +414,7 @@ function descargarAdjunto($id) {
                 nombre_original,
                 ruta_archivo,
                 tipo_archivo,
-                `$tamCol` AS `tamaño_archivo`,
+                $tamSelect,
                 descripcion,
                 texto_extraido,
                 fecha_subida
