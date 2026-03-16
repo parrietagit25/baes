@@ -52,12 +52,47 @@ switch ($method) {
         break;
 }
 
+function _tamano_col(PDO $pdo): string {
+    static $col = null;
+    if ($col !== null) return $col;
+
+    // Algunas instalaciones pueden tener la columna sin ñ por compatibilidad.
+    // Detectamos cuál existe en la tabla adjuntos_solicitud.
+    $dbName = $pdo->query("SELECT DATABASE()")->fetchColumn();
+    $stmt = $pdo->prepare("
+        SELECT COLUMN_NAME
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = ?
+          AND TABLE_NAME = 'adjuntos_solicitud'
+          AND COLUMN_NAME IN ('tamaño_archivo', 'tamano_archivo')
+        LIMIT 1
+    ");
+    $stmt->execute([$dbName]);
+    $found = $stmt->fetchColumn();
+    $col = $found ?: 'tamaño_archivo';
+    return $col;
+}
+
 function obtenerAdjuntos($solicitudId) {
     global $pdo;
     
     try {
+        $tamCol = _tamano_col($pdo);
         $stmt = $pdo->prepare("
-            SELECT a.*, u.nombre, u.apellido
+            SELECT
+                a.id,
+                a.solicitud_id,
+                a.usuario_id,
+                a.nombre_archivo,
+                a.nombre_original,
+                a.ruta_archivo,
+                a.tipo_archivo,
+                a.`$tamCol` AS `tamaño_archivo`,
+                a.descripcion,
+                a.texto_extraido,
+                a.fecha_subida,
+                u.nombre,
+                u.apellido
             FROM adjuntos_solicitud a
             LEFT JOIN usuarios u ON a.usuario_id = u.id
             WHERE a.solicitud_id = ?
@@ -77,8 +112,22 @@ function obtenerAdjunto($id) {
     global $pdo;
     
     try {
+        $tamCol = _tamano_col($pdo);
         $stmt = $pdo->prepare("
-            SELECT a.*, u.nombre, u.apellido
+            SELECT
+                a.id,
+                a.solicitud_id,
+                a.usuario_id,
+                a.nombre_archivo,
+                a.nombre_original,
+                a.ruta_archivo,
+                a.tipo_archivo,
+                a.`$tamCol` AS `tamaño_archivo`,
+                a.descripcion,
+                a.texto_extraido,
+                a.fecha_subida,
+                u.nombre,
+                u.apellido
             FROM adjuntos_solicitud a
             LEFT JOIN usuarios u ON a.usuario_id = u.id
             WHERE a.id = ?
@@ -196,9 +245,10 @@ function subirAdjunto() {
             // Mover archivo
             if (move_uploaded_file($tmpName, $rutaArchivo)) {
                 // Guardar en base de datos
+                $tamCol = _tamano_col($pdo);
                 $stmt = $pdo->prepare("
                     INSERT INTO adjuntos_solicitud 
-                    (solicitud_id, usuario_id, nombre_archivo, nombre_original, ruta_archivo, tipo_archivo, tamaño_archivo, descripcion)
+                    (solicitud_id, usuario_id, nombre_archivo, nombre_original, ruta_archivo, tipo_archivo, `$tamCol`, descripcion)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 ");
                 
@@ -319,7 +369,23 @@ function descargarAdjunto($id) {
         error_log("ID solicitado: " . $id);
         
         // Obtener información del adjunto
-        $stmt = $pdo->prepare("SELECT * FROM adjuntos_solicitud WHERE id = ?");
+        $tamCol = _tamano_col($pdo);
+        $stmt = $pdo->prepare("
+            SELECT
+                id,
+                solicitud_id,
+                usuario_id,
+                nombre_archivo,
+                nombre_original,
+                ruta_archivo,
+                tipo_archivo,
+                `$tamCol` AS `tamaño_archivo`,
+                descripcion,
+                texto_extraido,
+                fecha_subida
+            FROM adjuntos_solicitud
+            WHERE id = ?
+        ");
         $stmt->execute([$id]);
         $adjunto = $stmt->fetch();
         
