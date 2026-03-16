@@ -2233,5 +2233,6 @@ if ($isBanco && !$isAdmin) {
   
       <script src="js/solicitudes.js?v=<?php echo file_exists(__DIR__ . '/js/solicitudes.js') ? filemtime(__DIR__ . '/js/solicitudes.js') : time(); ?>"></script>
       <script src="js/adjuntos.js?v=<?php echo file_exists(__DIR__ . '/js/adjuntos.js') ? filemtime(__DIR__ . '/js/adjuntos.js') : time(); ?>"></script>
+      <?php include __DIR__ . '/includes/chatbot_widget.php'; ?>
   </body>
   </html>
