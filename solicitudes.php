@@ -405,7 +405,11 @@ if ($isBanco && !$isAdmin) {
                                                               <i class="fas fa-paperclip"></i>
                                                           </button>
                                                       </div>
-                                                      <?php if (in_array('ROLE_BANCO', $userRoles) && $solicitud['estado'] === 'En Revisión Banco'): ?>
+                                                      <?php 
+                                                      // Usuario banco ve el botón de respuesta si la solicitud está asignada a él y está en revisión o aún en Nueva (por si el estado no se actualizó)
+                                                      $puedeResponderBanco = in_array('ROLE_BANCO', $userRoles) && 
+                                                          ($solicitud['estado'] === 'En Revisión Banco' || $solicitud['estado'] === 'Nueva');
+                                                      if ($puedeResponderBanco): ?>
                                                       <div class="btn-group btn-group-sm" role="group">
                                                           <button class="btn btn-success btn-action" onclick="abrirModalAprobacion(<?php echo $solicitud['id']; ?>)" title="Aprobar/Rechazar Solicitud">
                                                               <i class="fas fa-gavel"></i>
