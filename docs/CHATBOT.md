@@ -46,6 +46,14 @@ La burbuja aparece en **todas las páginas internas** (cuando el usuario está l
 
 Si el usuario pregunta por autos o inventario, el backend consulta la tabla `Automarket_Invs_web_temp` (misma BD que usa el resto de BAES) y envía un resumen al prompt de OpenAI. Si esa tabla no existe en tu BD, el bot responderá que puede ver el listado en "Autos disponibles" dentro de la solicitud.
 
+## Voz (Realtime) y creación de solicitudes por voz
+
+- **api/realtime_session.php** – Crea la sesión WebRTC con OpenAI Realtime API: instrucciones, voz y **tools** (function calling).
+- **api/realtime_execute_tool.php** – Ejecuta las herramientas cuando el modelo las llama: `create_credit_request` (POST a api/solicitudes.php) y `add_vehicles_to_request` (POST a api/vehiculos_solicitud.php). Requiere sesión y rol gestor/admin para crear solicitudes.
+- **js/chatbot.js** – En llamada de voz, escucha el data channel `oai-events`; si recibe `response.done` con `function_call`, llama a `realtime_execute_tool.php`, envía el resultado como `function_call_output` y dispara `response.create`.
+
+Flujo por voz: el usuario puede decir por ejemplo *"Crear solicitud para Ana Gómez, cédula 8-999-111, independiente, con un Toyota Raize 2023"*. El asistente pide datos faltantes si aplica, **pide confirmación** antes de ejecutar, crea la solicitud y los vehículos usando los endpoints existentes y responde con el resultado (éxito o error).
+
 ## Cloudflare
 
-El endpoint es `POST /api/chatbot.php` con JSON. Si ya tienes una regla que permite POST a `/api/`, el chatbot no debería ser bloqueado.
+El endpoint es `POST /api/chatbot.php` con JSON. Si ya tienes una regla que permite POST a `/api/`, el chatbot no debería ser bloqueado. Para voz se usan también `api/realtime_session.php` y `api/realtime_execute_tool.php`.

@@ -1,8 +1,9 @@
 <?php
 /**
- * Realtime API (voz): interfaz unificada.
+ * Realtime API (voz): interfaz unificada con function calling.
  * Recibe la SDP de oferta WebRTC del navegador, la envía a OpenAI /v1/realtime/calls
- * con la API key y la configuración de sesión (instrucciones MOTUS), devuelve la SDP de respuesta.
+ * con la API key, instrucciones MOTUS y tools (crear solicitud, agregar vehículos).
+ * Devuelve la SDP de respuesta.
  */
 session_start();
 
@@ -42,6 +43,8 @@ $sessionConfig = [
     'type' => 'realtime',
     'model' => 'gpt-realtime',
     'instructions' => getRealtimeInstructions(),
+    'tools' => getRealtimeTools(),
+    'tool_choice' => 'auto',
     'audio' => [
         'output' => [
             'voice' => 'alloy'
@@ -97,7 +100,85 @@ echo $response;
 
 function getRealtimeInstructions(): string {
     return <<<TEXT
-Eres el asistente de voz de MOTUS, el sistema de Solicitudes de Crédito de Motus/AutoMarket. Hablas en español, de forma clara y breve.
-Ayudas con: uso del sistema, solicitudes de crédito, autos disponibles, adjuntos y Pipedrive. Responde de forma concisa para una conversación por voz.
+Eres el asistente de voz de MOTUS, el sistema de Solicitudes de Crédito de Motus/AutoMarket. Hablas SIEMPRE en español, de forma clara y breve.
+
+Puedes crear solicitudes de crédito por voz. Reglas obligatorias:
+
+1. Recoge los datos obligatorios: nombre del cliente, cédula, perfil financiero (Asalariado, Jubilado o Independiente), tipo de persona (Natural o Jurídica). Si el usuario menciona vehículos (marca, modelo, año, precio), anótalos.
+
+2. Si falta algún dato obligatorio, pídelo al usuario antes de continuar. NO inventes datos.
+
+3. ANTES de ejecutar create_credit_request, SIEMPRE confirma en voz alta: resume los datos (nombre, cédula, perfil, y vehículos si aplica) y pregunta "¿Confirmas que creo la solicitud con estos datos?" o similar. Solo si el usuario confirma (sí, correcto, adelante, etc.), llama a la herramienta create_credit_request.
+
+4. Después de crear la solicitud, si hay vehículos indicados, llama a add_vehicles_to_request con el solicitud_id que obtuviste y la lista de vehículos.
+
+5. NO digas que creaste la solicitud si no ejecutaste la herramienta. Solo informa el resultado real que te devuelve la herramienta (éxito con ID o error).
+
+6. Para dudas de uso del sistema, autos disponibles, adjuntos o Pipedrive, responde de forma concisa.
 TEXT;
+}
+
+function getRealtimeTools(): array {
+    return [
+        [
+            'type' => 'function',
+            'name' => 'create_credit_request',
+            'description' => 'Crea una solicitud de crédito en MOTUS. Usar solo después de confirmar con el usuario.',
+            'parameters' => [
+                'type' => 'object',
+                'properties' => [
+                    'tipo_persona' => [
+                        'type' => 'string',
+                        'enum' => ['Natural', 'Juridica'],
+                        'description' => 'Tipo de persona del cliente'
+                    ],
+                    'nombre_cliente' => [
+                        'type' => 'string',
+                        'description' => 'Nombre completo del cliente'
+                    ],
+                    'cedula' => [
+                        'type' => 'string',
+                        'description' => 'Cédula del cliente'
+                    ],
+                    'perfil_financiero' => [
+                        'type' => 'string',
+                        'enum' => ['Asalariado', 'Jubilado', 'Independiente'],
+                        'description' => 'Perfil financiero del cliente'
+                    ]
+                ],
+                'required' => ['tipo_persona', 'nombre_cliente', 'cedula', 'perfil_financiero']
+            ]
+        ],
+        [
+            'type' => 'function',
+            'name' => 'add_vehicles_to_request',
+            'description' => 'Agrega vehículos a una solicitud existente. Llamar después de create_credit_request si el usuario indicó vehículos.',
+            'parameters' => [
+                'type' => 'object',
+                'properties' => [
+                    'solicitud_id' => [
+                        'type' => 'integer',
+                        'description' => 'ID de la solicitud devuelto por create_credit_request'
+                    ],
+                    'vehiculos' => [
+                        'type' => 'array',
+                        'description' => 'Lista de vehículos a agregar',
+                        'items' => [
+                            'type' => 'object',
+                            'properties' => [
+                                'marca' => ['type' => 'string'],
+                                'modelo' => ['type' => 'string'],
+                                'anio' => ['type' => 'integer'],
+                                'kilometraje' => ['type' => 'integer'],
+                                'precio' => ['type' => 'number'],
+                                'abono_porcentaje' => ['type' => 'number'],
+                                'abono_monto' => ['type' => 'number']
+                            ]
+                        ]
+                    ]
+                ],
+                'required' => ['solicitud_id']
+            ]
+        ]
+    ];
 }

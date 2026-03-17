@@ -91,6 +91,48 @@
         }
     }
 
+    function handleRealtimeFunctionCalls(dc, output) {
+        var calls = output.filter(function (item) {
+            return item && item.type === 'function_call' && item.call_id;
+        });
+        if (calls.length === 0) return;
+        (function next(i) {
+            if (i >= calls.length) {
+                dc.send(JSON.stringify({ type: 'response.create' }));
+                return;
+            }
+            var item = calls[i];
+            var args = item.arguments;
+            if (typeof args !== 'string') args = JSON.stringify(args || {});
+            fetch('api/realtime_execute_tool.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: item.name, arguments: args }),
+                credentials: 'same-origin'
+            }).then(function (r) { return r.json(); }).then(function (result) {
+                dc.send(JSON.stringify({
+                    type: 'conversation.item.create',
+                    item: {
+                        type: 'function_call_output',
+                        call_id: item.call_id,
+                        output: JSON.stringify(result)
+                    }
+                }));
+                next(i + 1);
+            }).catch(function (err) {
+                dc.send(JSON.stringify({
+                    type: 'conversation.item.create',
+                    item: {
+                        type: 'function_call_output',
+                        call_id: item.call_id,
+                        output: JSON.stringify({ success: false, message: err.message || 'Error de conexión' })
+                    }
+                }));
+                next(i + 1);
+            });
+        })(0);
+    }
+
     function startVoiceCall() {
         if (voicePc) {
             endVoiceCall();
@@ -127,6 +169,15 @@
 
             pc.addTrack(stream.getTracks()[0], stream);
             var dc = pc.createDataChannel('oai-events');
+
+            dc.onmessage = function (ev) {
+                try {
+                    var data = JSON.parse(ev.data);
+                    if (data.type === 'response.done' && data.response && Array.isArray(data.response.output)) {
+                        handleRealtimeFunctionCalls(dc, data.response.output);
+                    }
+                } catch (err) { /* ignorar eventos no JSON o inesperados */ }
+            };
 
             pc.createOffer().then(function (offer) {
                 return pc.setLocalDescription(offer);
