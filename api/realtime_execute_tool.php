@@ -165,16 +165,22 @@ function executeCreateCreditRequest(array $args): array {
     $response = httpPostWithSession($url, $postData);
 
     $body = json_decode($response['body'], true);
-    if ($response['code'] !== 200) {
-        $msg = is_array($body) && isset($body['message']) ? $body['message'] : 'Error al crear solicitud';
-        return ['success' => false, 'message' => $msg];
+    $code = $response['code'];
+
+    if ($code !== 200) {
+        $backendMsg = is_array($body) && isset($body['message']) ? $body['message'] : trim($response['body']);
+        if ($backendMsg === '' && $code === 401) {
+            $backendMsg = 'Sesión no válida en la petición interna. Comprueba que la aplicación esté accesible con la misma URL y que las cookies de sesión se envíen correctamente.';
+        } elseif ($backendMsg === '') {
+            $backendMsg = 'El servidor respondió con código HTTP ' . $code . '. Revisa los logs del servidor.';
+        }
+        error_log('realtime_execute_tool create_credit_request: HTTP ' . $code . ' URL=' . $url . ' body=' . substr($response['body'], 0, 500));
+        return ['success' => false, 'message' => $backendMsg];
     }
 
     if (!is_array($body) || empty($body['success']) || empty($body['data']['id'])) {
-        return [
-            'success' => false,
-            'message' => is_array($body) && isset($body['message']) ? $body['message'] : 'Respuesta inválida del servidor'
-        ];
+        $backendMsg = is_array($body) && isset($body['message']) ? $body['message'] : 'Respuesta inválida del servidor (no se recibió ID de solicitud).';
+        return ['success' => false, 'message' => $backendMsg];
     }
 
     return [
@@ -246,6 +252,11 @@ function sanitizeEnum(string $v, array $allowed): string {
 }
 
 function getBaseUrl(): string {
+    // Si está definida, usar URL interna (útil en Docker/proxy para que el POST vaya al mismo backend y conserve la sesión)
+    $env = getenv('REALTIME_INTERNAL_BASE_URL') ?: (defined('REALTIME_INTERNAL_BASE_URL') ? REALTIME_INTERNAL_BASE_URL : '');
+    if ($env !== '') {
+        return rtrim($env, '/');
+    }
     $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
     $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
     $script = $_SERVER['SCRIPT_NAME'] ?? '';
