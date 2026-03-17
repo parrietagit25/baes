@@ -10,6 +10,27 @@ header('Content-Type: application/json; charset=utf-8');
 
 require_once __DIR__ . '/../config/database.php';
 
+if (getenv('REALTIME_INTERNAL_BASE_URL') === false || getenv('REALTIME_INTERNAL_BASE_URL') === '') {
+    $envFile = __DIR__ . '/../.env';
+    if (is_file($envFile) && is_readable($envFile)) {
+        $lines = @file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        if ($lines) {
+            foreach ($lines as $line) {
+                $line = trim($line);
+                if ($line === '' || strpos($line, '#') === 0) continue;
+                if (preg_match('/^REALTIME_INTERNAL_BASE_URL=(.*)$/', $line, $m)) {
+                    $val = trim($m[1]);
+                    if (preg_match('/^["\'](.+)["\']$/', $val, $q)) $val = $q[1];
+                    if ($val !== '' && getenv('REALTIME_INTERNAL_BASE_URL') === false) {
+                        putenv('REALTIME_INTERNAL_BASE_URL=' . $val);
+                    }
+                    break;
+                }
+            }
+        }
+    }
+}
+
 if (!isset($_SESSION['user_id'])) {
     http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'No autorizado']);
@@ -166,20 +187,17 @@ function executeCreateCreditRequest(array $args): array {
 
     $body = json_decode($response['body'], true);
     $code = $response['code'];
+    $rawBody = $response['body'];
 
     if ($code !== 200) {
-        $backendMsg = is_array($body) && isset($body['message']) ? $body['message'] : trim($response['body']);
-        if ($backendMsg === '' && $code === 401) {
-            $backendMsg = 'Sesión no válida en la petición interna. Comprueba que la aplicación esté accesible con la misma URL y que las cookies de sesión se envíen correctamente.';
-        } elseif ($backendMsg === '') {
-            $backendMsg = 'El servidor respondió con código HTTP ' . $code . '. Revisa los logs del servidor.';
-        }
-        error_log('realtime_execute_tool create_credit_request: HTTP ' . $code . ' URL=' . $url . ' body=' . substr($response['body'], 0, 500));
+        $backendMsg = buildBackendErrorMessage($code, $body, $rawBody, $url, 'create_credit_request');
         return ['success' => false, 'message' => $backendMsg];
     }
 
     if (!is_array($body) || empty($body['success']) || empty($body['data']['id'])) {
-        $backendMsg = is_array($body) && isset($body['message']) ? $body['message'] : 'Respuesta inválida del servidor (no se recibió ID de solicitud).';
+        $backendMsg = isCloudflareChallenge($rawBody)
+            ? getCloudflareBypassMessage()
+            : (is_array($body) && isset($body['message']) ? $body['message'] : 'Respuesta inválida del servidor (no se recibió ID de solicitud).');
         return ['success' => false, 'message' => $backendMsg];
     }
 
@@ -223,22 +241,45 @@ function executeAddVehiclesToRequest(array $args): array {
     $response = httpPostWithSession($url, $postData);
 
     $body = json_decode($response['body'], true);
+    $rawBody = $response['body'];
     if ($response['code'] !== 200) {
-        $msg = is_array($body) && isset($body['message']) ? $body['message'] : 'Error al guardar vehículos';
+        $msg = buildBackendErrorMessage($response['code'], $body, $rawBody, $url, 'add_vehicles');
         return ['success' => false, 'message' => $msg];
     }
 
     if (!is_array($body) || empty($body['success'])) {
-        return [
-            'success' => false,
-            'message' => is_array($body) && isset($body['message']) ? $body['message'] : 'Respuesta inválida del servidor'
-        ];
+        $msg = isCloudflareChallenge($rawBody) ? getCloudflareBypassMessage() : (is_array($body) && isset($body['message']) ? $body['message'] : 'Respuesta inválida del servidor');
+        return ['success' => false, 'message' => $msg];
     }
 
     return [
         'success' => true,
         'message' => $body['message'] ?? 'Vehículos guardados correctamente'
     ];
+}
+
+function isCloudflareChallenge(string $body): bool {
+    return strpos($body, 'Just a moment') !== false
+        || strpos($body, 'cf_chl_') !== false
+        || strpos($body, 'challenge-platform') !== false;
+}
+
+function getCloudflareBypassMessage(): string {
+    return 'Cloudflare está interceptando la petición interna. Configura REALTIME_INTERNAL_BASE_URL con la URL directa de tu servidor (sin pasar por Cloudflare), por ejemplo la IP interna o localhost.';
+}
+
+function buildBackendErrorMessage(int $code, $body, string $rawBody, string $url, string $context): string {
+    if (isCloudflareChallenge($rawBody)) {
+        return getCloudflareBypassMessage();
+    }
+    $backendMsg = is_array($body) && isset($body['message']) ? $body['message'] : trim($rawBody);
+    if ($backendMsg === '' && $code === 401) {
+        $backendMsg = 'Sesión no válida en la petición interna. Comprueba que la aplicación esté accesible con la misma URL y que las cookies de sesión se envíen correctamente.';
+    } elseif ($backendMsg === '' || strlen($backendMsg) > 500) {
+        $backendMsg = 'El servidor respondió con código HTTP ' . $code . '. Revisa los logs del servidor.';
+    }
+    error_log('realtime_execute_tool ' . $context . ': HTTP ' . $code . ' URL=' . $url . ' body=' . substr($rawBody, 0, 300));
+    return $backendMsg;
 }
 
 function sanitizeString(string $v, int $maxLen): string {
