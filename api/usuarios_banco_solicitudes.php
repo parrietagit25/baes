@@ -152,25 +152,32 @@ function asignarUsuarioBanco($pdo) {
         return;
     }
     
-    // Asignar usuario
+    // Asignar usuario (estado 'activo' explícito por si el servidor no aplica default o hay ENUM estricto)
     $sql_insert = "
-        INSERT INTO usuarios_banco_solicitudes (solicitud_id, usuario_banco_id, creado_por)
-        VALUES (?, ?, ?)
+        INSERT INTO usuarios_banco_solicitudes (solicitud_id, usuario_banco_id, creado_por, estado)
+        VALUES (?, ?, ?, 'activo')
     ";
     $stmt = $pdo->prepare($sql_insert);
     $stmt->execute([$solicitud_id, $usuario_banco_id, $_SESSION['user_id']]);
     
-    // Actualizar estado de la solicitud a "En Revisión Banco"
-    $sql_update_estado = "
-        UPDATE solicitudes_credito 
-        SET estado = 'En Revisión Banco', 
-            fecha_actualizacion = NOW()
-        WHERE id = ? AND estado = 'Nueva'
-    ";
-    $stmt = $pdo->prepare($sql_update_estado);
-    $stmt->execute([$solicitud_id]);
+    // Actualizar estado de la solicitud, nota e historial (puede fallar si el ENUM 'estado' no coincide exactamente en el servidor)
+    try {
+        $sql_update_estado = "
+            UPDATE solicitudes_credito 
+            SET estado = 'En Revisión Banco', 
+                fecha_actualizacion = NOW()
+            WHERE id = ? AND estado = 'Nueva'
+        ";
+        $stmt = $pdo->prepare($sql_update_estado);
+        $stmt->execute([$solicitud_id]);
+    } catch (PDOException $e) {
+        if (strpos($e->getMessage(), 'estado') !== false && (strpos($e->getMessage(), 'truncat') !== false || strpos($e->getMessage(), '1265') !== false)) {
+            error_log("usuarios_banco_solicitudes: UPDATE estado falló (ENUM puede diferir en este servidor): " . $e->getMessage());
+        } else {
+            throw $e;
+        }
+    }
     
-    // Obtener información del usuario banco asignado para la nota
     $sql_usuario_info = "
         SELECT u.nombre, u.apellido, b.nombre as banco_nombre
         FROM usuarios u
@@ -181,26 +188,31 @@ function asignarUsuarioBanco($pdo) {
     $stmt->execute([$usuario_banco_id]);
     $usuario_info = $stmt->fetch();
     
-    // Crear nota automática del cambio de estado
-    $sql_nota = "
-        INSERT INTO notas_solicitud (solicitud_id, usuario_id, tipo_nota, titulo, contenido)
-        VALUES (?, ?, 'Actualización', 'Solicitud enviada a revisión bancaria', ?)
-    ";
-    
-    $contenido_nota = "Solicitud asignada al usuario banco: {$usuario_info['nombre']} {$usuario_info['apellido']}";
-    if ($usuario_info['banco_nombre']) {
-        $contenido_nota .= " ({$usuario_info['banco_nombre']})";
+    $contenido_nota = "Solicitud asignada al usuario banco: " . ($usuario_info['nombre'] ?? '') . " " . ($usuario_info['apellido'] ?? '');
+    if (!empty($usuario_info['banco_nombre'])) {
+        $contenido_nota .= " (" . $usuario_info['banco_nombre'] . ")";
     }
     $contenido_nota .= ". Estado cambiado a 'En Revisión Banco'.";
     
-    $stmt = $pdo->prepare($sql_nota);
-    $stmt->execute([$solicitud_id, $_SESSION['user_id'], $contenido_nota]);
+    try {
+        $sql_nota = "
+            INSERT INTO notas_solicitud (solicitud_id, usuario_id, tipo_nota, titulo, contenido)
+            VALUES (?, ?, 'Actualización', 'Solicitud enviada a revisión bancaria', ?)
+        ";
+        $stmt = $pdo->prepare($sql_nota);
+        $stmt->execute([$solicitud_id, $_SESSION['user_id'], $contenido_nota]);
+    } catch (PDOException $e) {
+        error_log("usuarios_banco_solicitudes: nota no creada: " . $e->getMessage());
+    }
     
-    // Registrar en historial
-    $stmt = $pdo->prepare("SELECT estado FROM solicitudes_credito WHERE id = ?");
-    $stmt->execute([$solicitud_id]);
-    $estadoActual = $stmt->fetchColumn();
-    registrarHistorialSolicitud($pdo, $solicitud_id, $_SESSION['user_id'], 'asignacion_banco', $contenido_nota, $estadoActual, 'En Revisión Banco');
+    try {
+        $stmt = $pdo->prepare("SELECT estado FROM solicitudes_credito WHERE id = ?");
+        $stmt->execute([$solicitud_id]);
+        $estadoActual = $stmt->fetchColumn();
+        registrarHistorialSolicitud($pdo, $solicitud_id, $_SESSION['user_id'], 'asignacion_banco', $contenido_nota, $estadoActual, 'En Revisión Banco');
+    } catch (Throwable $e) {
+        error_log("usuarios_banco_solicitudes: historial no registrado: " . $e->getMessage());
+    }
     
     // Enviar notificación por correo al banco asignado (opcional; errores no deben afectar la respuesta)
     try {
