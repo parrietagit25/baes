@@ -1674,6 +1674,8 @@ function mostrarUsuariosAsignados(usuarios) {
         const estadoClass = usuario.estado === 'activo' ? 'success' : 'secondary';
         const estadoText = usuario.estado === 'activo' ? 'Activo' : 'Inactivo';
         
+        const emailEsc = (usuario.usuario_email || '').replace(/"/g, '&quot;');
+        const nombreEsc = ((usuario.usuario_nombre || '') + ' ' + (usuario.usuario_apellido || '')).trim().replace(/"/g, '&quot;');
         const row = $(`
             <tr>
                 <td>
@@ -1688,6 +1690,12 @@ function mostrarUsuariosAsignados(usuarios) {
                 <td>-</td>
                 <td>
                     <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-primary btn-enviar-resumen-banco" title="Enviar resumen por correo"
+                                data-usuario-banco-id="${usuario.usuario_banco_id}"
+                                data-usuario-email="${emailEsc}"
+                                data-usuario-nombre="${nombreEsc}">
+                            <i class="fas fa-envelope"></i>
+                        </button>
                         <button class="btn btn-outline-${usuario.estado === 'activo' ? 'warning' : 'success'}" 
                                 onclick="cambiarEstadoUsuario(${usuario.id}, '${usuario.estado === 'activo' ? 'inactivo' : 'activo'}')">
                             <i class="fas fa-${usuario.estado === 'activo' ? 'pause' : 'play'}"></i>
@@ -1730,6 +1738,51 @@ function cambiarEstadoUsuario(id, nuevoEstado) {
             console.error('Status:', status);
             console.error('Response:', xhr.responseText);
             mostrarAlerta('Error al actualizar estado', 'danger');
+        }
+    });
+}
+
+/**
+ * Delegación: botón enviar resumen por correo a usuario banco
+ */
+$(document).on('click', '.btn-enviar-resumen-banco', function() {
+    var btn = $(this);
+    var usuarioBancoId = btn.data('usuario-banco-id');
+    var email = btn.data('usuario-email') || '';
+    var nombre = btn.data('usuario-nombre') || 'Usuario banco';
+    if (!solicitudActualId || !usuarioBancoId) return;
+    $('#modalEnviarResumenBanco .resumen-destino').text(email || nombre);
+    $('#modalEnviarResumenBanco').data('solicitud-id', solicitudActualId).data('usuario-banco-id', usuarioBancoId).modal('show');
+});
+
+/**
+ * Confirmar envío de resumen por correo
+ */
+function confirmarEnviarResumenBanco() {
+    var modal = $('#modalEnviarResumenBanco');
+    var solicitudId = modal.data('solicitud-id');
+    var usuarioBancoId = modal.data('usuario-banco-id');
+    if (!solicitudId || !usuarioBancoId) return;
+    modal.modal('hide');
+    $.ajax({
+        url: 'api/enviar_resumen_banco.php',
+        type: 'POST',
+        data: { solicitud_id: solicitudId, usuario_banco_id: usuarioBancoId },
+        dataType: 'json',
+        success: function(res) {
+            if (res.success) {
+                mostrarAlerta(res.message || 'Resumen enviado por correo correctamente', 'success');
+            } else {
+                mostrarAlerta(res.message || 'Error al enviar', 'danger');
+            }
+        },
+        error: function(xhr) {
+            var msg = 'Error al enviar el resumen';
+            try {
+                var d = JSON.parse(xhr.responseText || '{}');
+                if (d.message) msg = d.message;
+            } catch (e) {}
+            mostrarAlerta(msg, 'danger');
         }
     });
 }

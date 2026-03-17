@@ -297,3 +297,148 @@ function notificarReevaluacion($solicitudId, $evaluacionId, $comentario) {
     }
 }
 
+/**
+ * Envía al usuario banco un resumen completo de la solicitud por correo
+ * (datos generales, perfil financiero, datos del auto, análisis, adjuntos).
+ */
+function enviarResumenSolicitudBanco($solicitudId, $usuarioBancoId) {
+    global $pdo;
+    
+    try {
+        $stmt = $pdo->prepare("
+            SELECT u.email as banco_email, u.nombre as banco_nombre, u.apellido as banco_apellido
+            FROM usuarios u
+            INNER JOIN usuario_roles ur ON u.id = ur.usuario_id
+            INNER JOIN roles r ON ur.rol_id = r.id
+            WHERE u.id = ? AND r.nombre = 'ROLE_BANCO'
+        ");
+        $stmt->execute([$usuarioBancoId]);
+        $banco = $stmt->fetch();
+        if (!$banco || empty($banco['banco_email'])) {
+            return ['success' => false, 'message' => 'Usuario banco no encontrado o sin email'];
+        }
+
+        $stmt = $pdo->prepare("SELECT * FROM solicitudes_credito WHERE id = ?");
+        $stmt->execute([$solicitudId]);
+        $solicitud = $stmt->fetch();
+        if (!$solicitud) {
+            return ['success' => false, 'message' => 'Solicitud no encontrada'];
+        }
+        if (isset($solicitud['ao_auto'])) $solicitud['año_auto'] = $solicitud['ao_auto'];
+
+        $stmt = $pdo->prepare("SELECT * FROM vehiculos_solicitud WHERE solicitud_id = ? ORDER BY id");
+        $stmt->execute([$solicitudId]);
+        $vehiculos = $stmt->fetchAll();
+
+        $stmt = $pdo->prepare("
+            SELECT e.*, u.nombre as banco_nombre, u.apellido as banco_apellido
+            FROM evaluaciones_banco e
+            INNER JOIN usuarios_banco_solicitudes ubs ON e.usuario_banco_id = ubs.id
+            INNER JOIN usuarios u ON ubs.usuario_banco_id = u.id
+            WHERE e.solicitud_id = ?
+            ORDER BY e.fecha_evaluacion DESC
+        ");
+        $stmt->execute([$solicitudId]);
+        $evaluaciones = $stmt->fetchAll();
+
+        $stmt = $pdo->prepare("SELECT nombre_original, tipo_archivo FROM adjuntos_solicitud WHERE solicitud_id = ? ORDER BY fecha_subida DESC");
+        $stmt->execute([$solicitudId]);
+        $adjuntos = $stmt->fetchAll();
+
+        $app_url = (function_exists('getenv') && getenv('APP_URL')) ? getenv('APP_URL') : '';
+        if (empty($app_url) && file_exists(__DIR__ . '/../config/email.php')) {
+            $cfg = require __DIR__ . '/../config/email.php';
+            $app_url = $cfg['app_url'] ?? '';
+        }
+
+        $bancoNombre = trim(($banco['banco_nombre'] ?? '') . ' ' . ($banco['banco_apellido'] ?? ''));
+        $html = construirResumenSolicitudHtml($solicitud, $vehiculos, $evaluaciones, $adjuntos, $bancoNombre, $app_url);
+
+        $errorLevel = error_reporting(E_ALL & ~E_DEPRECATED & ~E_STRICT);
+        ob_start();
+        try {
+            $emailService = new EmailService();
+            $resultado = $emailService->enviarCorreo(
+                $banco['banco_email'],
+                'Resumen Solicitud #' . $solicitudId . ' - MOTUS',
+                $html,
+                $bancoNombre ?: 'Usuario Banco',
+                strip_tags(preg_replace('/<br\s*\/?>/i', "\n", $html)),
+                []
+            );
+        } finally {
+            ob_end_clean();
+            error_reporting($errorLevel);
+        }
+        return $resultado;
+    } catch (Exception $e) {
+        error_log("Error enviarResumenSolicitudBanco: " . $e->getMessage());
+        return ['success' => false, 'message' => 'Error al enviar el correo'];
+    }
+}
+
+function construirResumenSolicitudHtml($solicitud, $vehiculos, $evaluaciones, $adjuntos, $bancoNombre, $app_url) {
+    $h = function($s) { return htmlspecialchars($s ?? '', ENT_QUOTES, 'UTF-8'); };
+    $n = function($v, $dec = 0) { return $v !== null && $v !== '' ? number_format((float)$v, $dec, ',', '.') : 'N/A'; };
+    
+    $linkVer = $app_url ? '<p><a href="' . $h($app_url) . '/solicitudes.php?id=' . (int)$solicitud['id'] . '" style="display:inline-block;padding:12px 24px;background:#0d6efd;color:#fff;text-decoration:none;border-radius:6px;">Ver solicitud en MOTUS</a></p>' : '';
+    
+    $html = '<h2>Resumen de Solicitud de Crédito #' . (int)$solicitud['id'] . '</h2>';
+    $html .= '<p>Estimado/a <strong>' . $h($bancoNombre) . '</strong>,</p>';
+    $html .= '<p>Se adjunta un resumen de la solicitud para su revisión.</p>';
+
+    $html .= '<h3>Datos generales</h3><div class="info-box" style="background:#f8f9fa;border-left:4px solid #0d6efd;padding:12px;margin:10px 0;">';
+    $html .= '<p><strong>Cliente:</strong> ' . $h($solicitud['nombre_cliente']) . '</p>';
+    $html .= '<p><strong>Cédula:</strong> ' . $h($solicitud['cedula']) . '</p>';
+    $html .= '<p><strong>Teléfono:</strong> ' . $h($solicitud['telefono']) . '</p>';
+    $html .= '<p><strong>Email:</strong> ' . $h($solicitud['email']) . '</p>';
+    $html .= '<p><strong>Dirección:</strong> ' . $h($solicitud['direccion']) . '</p>';
+    $html .= '<p><strong>Estado:</strong> ' . $h($solicitud['estado']) . '</p>';
+    $html .= '</div>';
+
+    $html .= '<h3>Perfil financiero</h3><div class="info-box" style="background:#f8f9fa;border-left:4px solid #28a745;padding:12px;margin:10px 0;">';
+    $html .= '<p><strong>Perfil:</strong> ' . $h($solicitud['perfil_financiero']) . '</p>';
+    $html .= '<p><strong>Ingreso:</strong> ' . $n($solicitud['ingreso'], 2) . '</p>';
+    $html .= '<p><strong>Profesión/Ocupación:</strong> ' . $h($solicitud['profesion']) . ' / ' . $h($solicitud['ocupacion']) . '</p>';
+    $html .= '<p><strong>Empresa/Negocio:</strong> ' . $h($solicitud['nombre_empresa_negocio']) . '</p>';
+    $html .= '<p><strong>Estabilidad laboral:</strong> ' . $h($solicitud['estabilidad_laboral']) . '</p>';
+    $html .= '</div>';
+
+    $html .= '<h3>Datos del auto</h3><div class="info-box" style="background:#f8f9fa;border-left:4px solid #ffc107;padding:12px;margin:10px 0;">';
+    if (!empty($vehiculos)) {
+        foreach ($vehiculos as $v) {
+            $html .= '<p><strong>Vehículo:</strong> ' . $h($v['marca'] ?? '') . ' ' . $h($v['modelo'] ?? '') . ' ' . $h($v['anio'] ?? '') . ' - Precio: $' . $n($v['precio']) . '</p>';
+        }
+    } else {
+        $html .= '<p>Marca: ' . $h($solicitud['marca_auto']) . ', Modelo: ' . $h($solicitud['modelo_auto']) . ', Año: ' . $h($solicitud['año_auto'] ?? $solicitud['ao_auto'] ?? '') . '</p>';
+        $html .= '<p>Precio especial: $' . $n($solicitud['precio_especial']) . ', Abono: ' . $n($solicitud['abono_porcentaje']) . '% / $' . $n($solicitud['abono_monto']) . '</p>';
+    }
+    $html .= '</div>';
+
+    if (!empty($evaluaciones)) {
+        $html .= '<h3>Análisis / Evaluaciones</h3><div class="info-box" style="background:#f8f9fa;border-left:4px solid #17a2b8;padding:12px;margin:10px 0;">';
+        foreach ($evaluaciones as $e) {
+            $html .= '<p><strong>Evaluación:</strong> ' . $h($e['decision'] ?? '') . ' - ' . $h($e['comentarios'] ?? '') . ' (Fecha: ' . $h($e['fecha_evaluacion'] ?? '') . ')</p>';
+        }
+        $html .= '</div>';
+    }
+
+    if (!empty($adjuntos)) {
+        $html .= '<h3>Adjuntos</h3><div class="info-box" style="background:#f8f9fa;padding:12px;margin:10px 0;"><ul>';
+        foreach ($adjuntos as $a) {
+            $html .= '<li>' . $h($a['nombre_original']) . ' (' . $h($a['tipo_archivo']) . ')</li>';
+        }
+        $html .= '</ul></div>';
+    }
+
+    $html .= $linkVer;
+    $html .= '<p>Saludos cordiales,<br><strong>MOTUS - AutoMarket Seminuevos</strong></p>';
+
+    $subject = 'Resumen Solicitud #' . $solicitud['id'] . ' - MOTUS';
+    $app_name = 'MOTUS - AutoMarket Seminuevos';
+    $content = $html;
+    ob_start();
+    include __DIR__ . '/../templates/email/base.php';
+    return ob_get_clean();
+}
+

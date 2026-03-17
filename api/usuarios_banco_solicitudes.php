@@ -2,7 +2,7 @@
 /**
  * API para gestionar usuarios banco asignados a solicitudes
  */
-
+ob_start();
 session_start();
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../includes/historial_helper.php';
@@ -221,6 +221,8 @@ function asignarUsuarioBanco($pdo) {
         error_log("Notificación banco (asignar usuario): " . $e->getMessage());
     }
     
+    if (ob_get_length()) ob_clean();
+    header('Content-Type: application/json');
     echo json_encode(['success' => true, 'message' => 'Usuario asignado correctamente y solicitud enviada a revisión bancaria']);
 }
 

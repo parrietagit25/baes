@@ -1667,6 +1667,29 @@ if ($isBanco && !$isAdmin) {
         }
     </script>
 
+    <!-- Modal confirmar envío de resumen por correo al usuario banco -->
+    <div class="modal fade" id="modalEnviarResumenBanco" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">
+                        <i class="fas fa-envelope me-2"></i>Enviar resumen por correo
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-0">¿Desea enviar por correo un resumen de la solicitud (datos generales, perfil financiero, datos del auto, análisis y adjuntos) a <strong class="resumen-destino"></strong>?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="confirmarEnviarResumenBanco()">
+                        <i class="fas fa-paper-plane me-1"></i>Enviar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal para ver Usuarios Banco Asignados -->
     <div class="modal fade" id="modalUsuariosBanco" tabindex="-1">
         <div class="modal-dialog modal-lg">
