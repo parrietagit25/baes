@@ -1,12 +1,14 @@
 <?php
 /**
- * Ejecuta tools de la Realtime API: create_credit_request y add_vehicles_to_request.
- * Llama a los endpoints existentes api/solicitudes.php y api/vehiculos_solicitud.php.
+ * Ejecuta tools de la Realtime API: query_autos_disponibles, create_credit_request y add_vehicles_to_request.
+ * Consulta inventario (Automarket_Invs_web_temp), crea solicitudes y agrega vehículos usando los endpoints existentes.
  * Requiere sesión activa y permisos de gestor/admin para crear solicitudes.
  */
 session_start();
 
 header('Content-Type: application/json; charset=utf-8');
+
+require_once __DIR__ . '/../config/database.php';
 
 if (!isset($_SESSION['user_id'])) {
     http_response_code(401);
@@ -40,14 +42,16 @@ if ($name === '') {
     exit;
 }
 
-$allowedTools = ['create_credit_request', 'add_vehicles_to_request'];
+$allowedTools = ['query_autos_disponibles', 'create_credit_request', 'add_vehicles_to_request'];
 if (!in_array($name, $allowedTools, true)) {
     echo json_encode(['success' => false, 'message' => 'Herramienta no permitida']);
     exit;
 }
 
 try {
-    if ($name === 'create_credit_request') {
+    if ($name === 'query_autos_disponibles') {
+        $result = executeQueryAutosDisponibles($arguments);
+    } elseif ($name === 'create_credit_request') {
         $result = executeCreateCreditRequest($arguments);
     } else {
         $result = executeAddVehiclesToRequest($arguments);
@@ -59,6 +63,68 @@ try {
         'success' => false,
         'message' => 'Error al ejecutar la acción. Intenta de nuevo.'
     ]);
+}
+
+/**
+ * Consulta inventario de autos (Automarket_Invs_web_temp). Devuelve total, opcionalmente filtrado por marca, y listado breve.
+ */
+function executeQueryAutosDisponibles(array $args): array {
+    global $pdo;
+
+    $marca = isset($args['marca']) ? trim((string) $args['marca']) : '';
+    $soloCantidad = !empty($args['solo_cantidad']);
+    $limite = isset($args['limite']) && is_numeric($args['limite']) ? max(1, min(50, (int) $args['limite'])) : 15;
+
+    $table = 'Automarket_Invs_web_temp';
+    try {
+        if ($marca !== '') {
+            $countSql = "SELECT COUNT(*) AS total FROM `$table` WHERE Make = ?";
+            $stmt = $pdo->prepare($countSql);
+            $stmt->execute([$marca]);
+        } else {
+            $stmt = $pdo->query("SELECT COUNT(*) AS total FROM `$table`");
+        }
+        $total = (int) $stmt->fetchColumn();
+    } catch (PDOException $e) {
+        error_log('query_autos_disponibles: ' . $e->getMessage());
+        return ['success' => false, 'message' => 'No se pudo consultar el inventario.', 'total' => 0];
+    }
+
+    $out = [
+        'success' => true,
+        'total' => $total,
+    ];
+    if ($marca !== '') {
+        $out['marca'] = $marca;
+    }
+
+    if ($soloCantidad) {
+        return $out;
+    }
+
+    $cols = 'Make, Model, Year, Price';
+    if ($marca !== '') {
+        $sql = "SELECT $cols FROM `$table` WHERE Make = ? ORDER BY Model, Year DESC LIMIT " . $limite;
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([$marca]);
+    } else {
+        $sql = "SELECT $cols FROM `$table` ORDER BY Make, Model, Year DESC LIMIT " . $limite;
+        $stmt = $pdo->query($sql);
+    }
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $unidades = [];
+    foreach ($rows as $r) {
+        $precio = isset($r['Price']) && $r['Price'] !== null ? (float) $r['Price'] : null;
+        $unidades[] = [
+            'marca' => $r['Make'] ?? '',
+            'modelo' => $r['Model'] ?? '',
+            'anio' => isset($r['Year']) ? (int) $r['Year'] : null,
+            'precio' => $precio
+        ];
+    }
+    $out['unidades'] = $unidades;
+    return $out;
 }
 
 /**

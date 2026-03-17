@@ -114,12 +114,37 @@ Puedes crear solicitudes de crédito por voz. Reglas obligatorias:
 
 5. NO digas que creaste la solicitud si no ejecutaste la herramienta. Solo informa el resultado real que te devuelve la herramienta (éxito con ID o error).
 
-6. Para dudas de uso del sistema, autos disponibles, adjuntos o Pipedrive, responde de forma concisa.
+6. Cuando el usuario pregunte por autos disponibles, cuántos hay, cuántos de una marca, o qué marcas hay, USA la herramienta query_autos_disponibles ANTES de responder. Responde en voz alta con los datos que te devuelva (total, cantidad por marca, o listado breve).
+
+7. Para dudas de uso del sistema, adjuntos o Pipedrive, responde de forma concisa.
 TEXT;
 }
 
 function getRealtimeTools(): array {
     return [
+        [
+            'type' => 'function',
+            'name' => 'query_autos_disponibles',
+            'description' => 'Consulta el inventario de autos disponibles. Usar cuando el usuario pregunte qué autos hay, cuántos hay, cuántos hay de una marca, o listado por marca.',
+            'parameters' => [
+                'type' => 'object',
+                'properties' => [
+                    'marca' => [
+                        'type' => 'string',
+                        'description' => 'Filtrar por marca (ej: Toyota, Honda). Opcional; si no se pasa, se devuelve todo el inventario.'
+                    ],
+                    'solo_cantidad' => [
+                        'type' => 'boolean',
+                        'description' => 'Si es true, solo devuelve totales (cantidad), sin listado de unidades. Útil para preguntas como "cuántos hay" o "cuántos Toyota hay".'
+                    ],
+                    'limite' => [
+                        'type' => 'integer',
+                        'description' => 'Máximo de unidades a listar (por defecto 15). Solo aplica si solo_cantidad es false.'
+                    ]
+                ],
+                'required' => []
+            ]
+        ],
         [
             'type' => 'function',
             'name' => 'create_credit_request',
