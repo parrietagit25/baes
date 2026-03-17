@@ -13,6 +13,14 @@
     var input = bubble.querySelector('.chatbot-input');
     var toggleBtn = bubble.querySelector('.chatbot-toggle');
     var closeBtn = bubble.querySelector('.chatbot-close');
+    var voiceBtn = bubble.querySelector('.chatbot-voice-btn');
+    var voiceBar = bubble.querySelector('.chatbot-voice-bar');
+    var voiceStatus = voiceBar ? voiceBar.querySelector('.chatbot-voice-status') : null;
+    var hangupBtn = voiceBar ? voiceBar.querySelector('.chatbot-voice-hangup') : null;
+
+    var voicePc = null;
+    var voiceStream = null;
+    var voiceAudioEl = null;
 
     function openPanel() {
         bubble.classList.add('chatbot-open');
@@ -64,6 +72,98 @@
 
     if (closeBtn) {
         closeBtn.addEventListener('click', closePanel);
+    }
+
+    function setVoiceStatus(text) {
+        if (voiceStatus) voiceStatus.textContent = text;
+    }
+
+    function endVoiceCall() {
+        if (voiceBar) voiceBar.classList.add('d-none');
+        if (voiceBtn) voiceBtn.classList.remove('in-call');
+        if (voiceStream) {
+            voiceStream.getTracks().forEach(function (t) { t.stop(); });
+            voiceStream = null;
+        }
+        if (voicePc) {
+            voicePc.close();
+            voicePc = null;
+        }
+    }
+
+    function startVoiceCall() {
+        if (voicePc) {
+            endVoiceCall();
+            return;
+        }
+        if (!voiceBar || !voiceBtn) return;
+        voiceBar.classList.remove('d-none');
+        setVoiceStatus('Conectando...');
+        voiceBtn.classList.add('in-call');
+
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            setVoiceStatus('Tu navegador no soporta micrófono.');
+            appendBotMessage('Tu navegador no soporta llamadas de voz.', true);
+            endVoiceCall();
+            return;
+        }
+
+        navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
+            voiceStream = stream;
+            var pc = new RTCPeerConnection();
+            voicePc = pc;
+
+            if (!voiceAudioEl) {
+                voiceAudioEl = document.createElement('audio');
+                voiceAudioEl.autoplay = true;
+                voiceAudioEl.style.display = 'none';
+                document.body.appendChild(voiceAudioEl);
+            }
+            pc.ontrack = function (e) {
+                if (voiceAudioEl && e.streams && e.streams[0]) {
+                    voiceAudioEl.srcObject = e.streams[0];
+                }
+            };
+
+            pc.addTrack(stream.getTracks()[0], stream);
+            var dc = pc.createDataChannel('oai-events');
+
+            pc.createOffer().then(function (offer) {
+                return pc.setLocalDescription(offer);
+            }).then(function () {
+                setVoiceStatus('Conectando...');
+                return fetch('api/realtime_session.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/sdp' },
+                    body: pc.localDescription.sdp
+                });
+            }).then(function (res) {
+                if (!res.ok) {
+                    return res.json().then(function (data) {
+                        throw new Error(data.error || 'Error ' + res.status);
+                    });
+                }
+                return res.text();
+            }).then(function (answerSdp) {
+                setVoiceStatus('En llamada');
+                return pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: answerSdp }));
+            }).catch(function (err) {
+                setVoiceStatus('Error');
+                appendBotMessage('Voz: ' + (err.message || 'No se pudo conectar.'), true);
+                endVoiceCall();
+            });
+        }).catch(function (err) {
+            setVoiceStatus('Error');
+            appendBotMessage('No se pudo acceder al micrófono. Revisa los permisos.', true);
+            endVoiceCall();
+        });
+    }
+
+    if (voiceBtn) {
+        voiceBtn.addEventListener('click', startVoiceCall);
+    }
+    if (hangupBtn) {
+        hangupBtn.addEventListener('click', endVoiceCall);
     }
 
     form.addEventListener('submit', function (e) {

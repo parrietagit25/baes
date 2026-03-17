@@ -63,8 +63,53 @@
     gap: 10px;
 }
 
-#chatbot-bubble .chatbot-header .chatbot-close {
+#chatbot-bubble .chatbot-header .chatbot-voice-btn {
     margin-left: auto;
+    background: rgba(255,255,255,0.2);
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    padding: 6px;
+    line-height: 1;
+    border-radius: 8px;
+}
+#chatbot-bubble .chatbot-header .chatbot-voice-btn:hover {
+    background: rgba(255,255,255,0.35);
+}
+#chatbot-bubble .chatbot-header .chatbot-voice-btn.in-call {
+    background: #dc3545;
+    color: #fff;
+}
+#chatbot-bubble .chatbot-header .chatbot-voice-icon {
+    width: 20px;
+    height: 20px;
+    display: block;
+}
+#chatbot-bubble .chatbot-voice-bar {
+    padding: 8px 12px;
+    background: #0a58ca;
+    color: #fff;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+#chatbot-bubble .chatbot-voice-bar .chatbot-voice-status {
+    flex: 1;
+}
+#chatbot-bubble .chatbot-voice-bar .chatbot-voice-hangup {
+    padding: 4px 12px;
+    background: #dc3545;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.8rem;
+}
+#chatbot-bubble .chatbot-voice-bar .chatbot-voice-hangup:hover {
+    background: #c82333;
+}
+#chatbot-bubble .chatbot-header .chatbot-close {
     background: transparent;
     border: none;
     color: rgba(255,255,255,0.9);
