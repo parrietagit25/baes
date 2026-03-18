@@ -451,6 +451,10 @@ function limpiarFormularioSolicitud() {
     
     // Cargar desde Sol Financiamiento (select)
     $('#cliente_financiamiento_select').val('');
+
+    // Ejecutivo de ventas: limpiar búsqueda y selección
+    $('#buscar_ejecutivo').val('');
+    $('#ejecutivo_ventas_id').val('');
     
     // Resetear botones
     $('#btnCerrarDespuesAdjuntos').hide();
@@ -896,6 +900,21 @@ function llenarFormularioEdicion(solicitud) {
     // Asignaciones
     $('#banco_id').val(solicitud.banco_id || '');
     $('#vendedor_id').val(solicitud.vendedor_id || '');
+
+    // Ejecutivo de ventas
+    if (typeof solicitud.ejecutivo_ventas_id !== 'undefined' && solicitud.ejecutivo_ventas_id !== null) {
+        var idEj = String(solicitud.ejecutivo_ventas_id);
+        $('#ejecutivo_ventas_id').val(idEj);
+        var optEj = $('#ejecutivo_ventas_id option[value=\"' + idEj.replace(/\"/g, '\\\"') + '\"]');
+        if (optEj.length > 0) {
+            $('#buscar_ejecutivo').val(optEj.text().trim());
+        } else {
+            $('#buscar_ejecutivo').val('');
+        }
+    } else {
+        $('#ejecutivo_ventas_id').val('');
+        $('#buscar_ejecutivo').val('');
+    }
     
     // Cambiar título del modal
     $('#solicitudModalLabel').html('<i class="fas fa-edit me-2"></i>Editar Solicitud de Crédito');
