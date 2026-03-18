@@ -191,13 +191,13 @@ function crearSolicitud() {
         // Insertar solicitud
         $stmt = $pdo->prepare("
             INSERT INTO solicitudes_credito (
-                gestor_id, banco_id, tipo_persona, nombre_cliente, cedula, edad, genero,
+                gestor_id, banco_id, ejecutivo_ventas_id, tipo_persona, nombre_cliente, cedula, edad, genero,
                 direccion, provincia, distrito, corregimiento, barriada, casa_edif,
                 numero_casa_apto, telefono, email, email_pipedrive, casado, hijos, perfil_financiero,
                 ingreso, tiempo_laborar, profesion, ocupacion, nombre_empresa_negocio, estabilidad_laboral,
                 fecha_constitucion, continuidad_laboral, marca_auto, modelo_auto, ao_auto, kilometraje,
                 precio_especial, abono_porcentaje, abono_monto, comentarios_gestor
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         
         // Función helper para convertir campos numéricos vacíos a null o 0
@@ -232,6 +232,7 @@ function crearSolicitud() {
         $stmt->execute([
             $_SESSION['user_id'],
             $convertirNumero($_POST['banco_id'] ?? null),
+            $convertirNumero($_POST['ejecutivo_ventas_id'] ?? null),
             $_POST['tipo_persona'],
             $_POST['nombre_cliente'],
             $_POST['cedula'],

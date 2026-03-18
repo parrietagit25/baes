@@ -15,6 +15,15 @@ $isAdmin = in_array('ROLE_ADMIN', $userRoles);
 $isGestor = in_array('ROLE_GESTOR', $userRoles);
 $isBanco = in_array('ROLE_BANCO', $userRoles);
 
+// Ejecutivos de ventas para el select (Datos Generales)
+$ejecutivosVentas = [];
+try {
+    $stmtEj = $pdo->query("SELECT id, nombre, sucursal, email FROM ejecutivos_ventas ORDER BY sucursal, nombre");
+    $ejecutivosVentas = $stmtEj->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    error_log('Error cargando ejecutivos_ventas: ' . $e->getMessage());
+}
+
 // Obtener estadísticas (filtrar por usuario banco si aplica)
 if ($isBanco && !$isAdmin) {
     // Usuario banco solo ve sus solicitudes asignadas
@@ -566,6 +575,38 @@ if ($isBanco && !$isAdmin) {
                                         <div class="mb-3">
                                             <label for="email_pipedrive" class="form-label">Email PipeDrive</label>
                                             <input type="email" class="form-control" id="email_pipedrive" name="email_pipedrive">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="buscar_ejecutivo" class="form-label">Ejecutivo de Ventas</label>
+                                            <input type="text"
+                                                   class="form-control mb-1"
+                                                   id="buscar_ejecutivo"
+                                                   placeholder="Buscar por nombre, sucursal o correo...">
+                                            <select class="form-select"
+                                                    id="ejecutivo_ventas_id"
+                                                    name="ejecutivo_ventas_id">
+                                                <option value="">Sin ejecutivo asignado</option>
+                                                <?php foreach ($ejecutivosVentas as $ej): ?>
+                                                    <?php
+                                                        $nombreEj = trim((string)($ej['nombre'] ?? ''));
+                                                        $sucursalEj = trim((string)($ej['sucursal'] ?? ''));
+                                                        $emailEj = trim((string)($ej['email'] ?? ''));
+                                                        $label = $nombreEj;
+                                                        if ($sucursalEj !== '') {
+                                                            $label .= ' (' . $sucursalEj . ')';
+                                                        }
+                                                        if ($emailEj !== '') {
+                                                            $label .= ' - ' . $emailEj;
+                                                        }
+                                                        $search = mb_strtolower($label, 'UTF-8');
+                                                    ?>
+                                                    <option value="<?php echo (int) $ej['id']; ?>"
+                                                            data-search="<?php echo htmlspecialchars($search, ENT_QUOTES, 'UTF-8'); ?>">
+                                                        <?php echo htmlspecialchars($label, ENT_QUOTES, 'UTF-8'); ?>
+                                                    </option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                            <small class="text-muted">Opcional. Se guarda el ID del ejecutivo seleccionado.</small>
                                         </div>
                                         <div class="row">
                                             <div class="col-md-6">
@@ -1397,6 +1438,34 @@ if ($isBanco && !$isAdmin) {
     <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var inputEj = document.getElementById('buscar_ejecutivo');
+        var selectEj = document.getElementById('ejecutivo_ventas_id');
+        if (inputEj && selectEj) {
+            inputEj.addEventListener('input', function () {
+                var term = (inputEj.value || '').toLowerCase().trim();
+                for (var i = 0; i < selectEj.options.length; i++) {
+                    var opt = selectEj.options[i];
+                    if (!opt.value) { // opción "sin ejecutivo"
+                        opt.hidden = false;
+                        continue;
+                    }
+                    var txt = (opt.getAttribute('data-search') || opt.textContent.toLowerCase());
+                    opt.hidden = term && txt.indexOf(term) === -1;
+                }
+            });
+            selectEj.addEventListener('change', function () {
+                var opt = selectEj.options[selectEj.selectedIndex];
+                if (opt && opt.value) {
+                    inputEj.value = opt.textContent;
+                } else {
+                    inputEj.value = '';
+                }
+            });
+        }
+    });
+
             <script>
           // Pasar información del rol a JavaScript
           window.userRoles = {
