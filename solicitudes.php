@@ -576,15 +576,18 @@ if ($isBanco && !$isAdmin) {
                                             <label for="email_pipedrive" class="form-label">Email PipeDrive</label>
                                             <input type="email" class="form-control" id="email_pipedrive" name="email_pipedrive">
                                         </div>
-                                        <div class="mb-3">
+                                        <div class="mb-3 position-relative">
                                             <label for="buscar_ejecutivo" class="form-label">Ejecutivo de Ventas</label>
                                             <input type="text"
-                                                   class="form-control mb-1"
+                                                   class="form-control"
                                                    id="buscar_ejecutivo"
-                                                   placeholder="Buscar por nombre, sucursal o correo...">
-                                            <select class="form-select"
+                                                   placeholder="Buscar por nombre, sucursal o correo..."
+                                                   autocomplete="off">
+                                            <select class="form-select d-none"
                                                     id="ejecutivo_ventas_id"
-                                                    name="ejecutivo_ventas_id">
+                                                    name="ejecutivo_ventas_id"
+                                                    aria-hidden="true"
+                                                    tabindex="-1">
                                                 <option value="">Sin ejecutivo asignado</option>
                                                 <?php foreach ($ejecutivosVentas as $ej): ?>
                                                     <?php
@@ -606,7 +609,8 @@ if ($isBanco && !$isAdmin) {
                                                     </option>
                                                 <?php endforeach; ?>
                                             </select>
-                                            <small class="text-muted">Opcional. Se guarda el ID del ejecutivo seleccionado.</small>
+                                            <div id="ejecutivo_lista" class="list-group position-absolute shadow-sm w-100" style="top: 100%; left: 0; max-height: 220px; overflow-y: auto; display: none; z-index: 1050;"></div>
+                                            <small class="text-muted">Opcional. Escriba para buscar y haga clic en un resultado.</small>
                                         </div>
                                         <div class="row">
                                             <div class="col-md-6">
@@ -1442,31 +1446,67 @@ if ($isBanco && !$isAdmin) {
     document.addEventListener('DOMContentLoaded', function () {
         var inputEj = document.getElementById('buscar_ejecutivo');
         var selectEj = document.getElementById('ejecutivo_ventas_id');
-        if (inputEj && selectEj) {
-            inputEj.addEventListener('input', function () {
-                var term = (inputEj.value || '').toLowerCase().trim();
-                for (var i = 0; i < selectEj.options.length; i++) {
-                    var opt = selectEj.options[i];
-                    if (!opt.value) { // opción "sin ejecutivo"
-                        opt.hidden = false;
-                        continue;
-                    }
-                    var txt = (opt.getAttribute('data-search') || opt.textContent.toLowerCase());
-                    opt.hidden = term && txt.indexOf(term) === -1;
-                }
-            });
-            selectEj.addEventListener('change', function () {
-                var opt = selectEj.options[selectEj.selectedIndex];
-                if (opt && opt.value) {
-                    inputEj.value = opt.textContent;
-                } else {
-                    inputEj.value = '';
-                }
+        var listaEj = document.getElementById('ejecutivo_lista');
+        if (!inputEj || !selectEj || !listaEj) return;
+
+        var opciones = [];
+        for (var i = 0; i < selectEj.options.length; i++) {
+            var opt = selectEj.options[i];
+            if (!opt.value) continue;
+            opciones.push({ id: opt.value, text: opt.textContent.trim(), search: (opt.getAttribute('data-search') || opt.textContent).toLowerCase() });
+        }
+
+        function mostrarLista(term) {
+            term = (term || '').toLowerCase().trim();
+            var html = '';
+            if (term === '') {
+                html = '<a href="#" class="list-group-item list-group-item-action" data-id="" data-text="">Sin ejecutivo asignado</a>';
+            }
+            for (var j = 0; j < opciones.length; j++) {
+                if (term && opciones[j].search.indexOf(term) === -1) continue;
+                html += '<a href="#" class="list-group-item list-group-item-action" data-id="' + opciones[j].id + '" data-text="' + opciones[j].text.replace(/"/g, '&quot;') + '">' + opciones[j].text + '</a>';
+            }
+            listaEj.innerHTML = html;
+            listaEj.style.display = html ? 'block' : 'none';
+
+            listaEj.querySelectorAll('a').forEach(function (a) {
+                a.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    var id = a.getAttribute('data-id');
+                    var text = a.getAttribute('data-text') || '';
+                    selectEj.value = id;
+                    inputEj.value = text;
+                    listaEj.style.display = 'none';
+                });
             });
         }
-    });
 
-            <script>
+        inputEj.addEventListener('input', function () {
+            mostrarLista(inputEj.value);
+        });
+        inputEj.addEventListener('focus', function () {
+            mostrarLista(inputEj.value);
+        });
+
+        document.addEventListener('click', function (e) {
+            if (e.target !== inputEj && e.target !== listaEj && !listaEj.contains(e.target)) {
+                listaEj.style.display = 'none';
+            }
+        });
+        inputEj.addEventListener('blur', function () {
+            setTimeout(function () {
+                var sel = selectEj.options[selectEj.selectedIndex];
+                if (sel && sel.value && inputEj.value !== sel.textContent.trim()) {
+                    inputEj.value = sel.textContent.trim();
+                }
+                if (!selectEj.value && inputEj.value) {
+                    inputEj.value = '';
+                }
+            }, 200);
+        });
+    });
+    </script>
+    <script>
           // Pasar información del rol a JavaScript
           window.userRoles = {
               isAdmin: <?php echo $isAdmin ? 'true' : 'false'; ?>,
