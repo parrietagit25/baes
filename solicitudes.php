@@ -1485,7 +1485,8 @@ if ($isBanco && !$isAdmin) {
             mostrarLista(inputEj.value);
         });
         inputEj.addEventListener('focus', function () {
-            mostrarLista(inputEj.value);
+            // Al hacer foco mostrar toda la lista para poder cambiar de ejecutivo
+            mostrarLista('');
         });
 
         document.addEventListener('click', function (e) {

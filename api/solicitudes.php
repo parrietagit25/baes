@@ -359,7 +359,7 @@ function actualizarSolicitud() {
         $valores = [];
         
         $camposPermitidos = [
-            'banco_id', 'vendedor_id', 'tipo_persona', 'nombre_cliente', 'cedula', 'edad', 'genero',
+            'banco_id', 'vendedor_id', 'ejecutivo_ventas_id', 'tipo_persona', 'nombre_cliente', 'cedula', 'edad', 'genero',
             'direccion', 'provincia', 'distrito', 'corregimiento', 'barriada',
             'casa_edif', 'numero_casa_apto', 'telefono', 'email', 'email_pipedrive', 'casado',
             'hijos', 'perfil_financiero', 'ingreso', 'tiempo_laborar',
@@ -375,7 +375,7 @@ function actualizarSolicitud() {
         ];
         
         // Campos numéricos (enteros) que deben convertirse a NULL si están vacíos
-        $camposNumericos = ['edad', 'hijos', 'ao_auto', 'kilometraje', 'plazo', 'banco_id', 'vendedor_id'];
+        $camposNumericos = ['edad', 'hijos', 'ao_auto', 'kilometraje', 'plazo', 'banco_id', 'vendedor_id', 'ejecutivo_ventas_id'];
         // Columnas DECIMAL/DATE: vacío -> NULL (MySQL no acepta '' en estos tipos)
         $camposDecimalOFecha = ['ingreso', 'precio_especial', 'abono_porcentaje', 'abono_monto', 'abono_banco', 'estabilidad_laboral', 'fecha_constitucion'];
         
