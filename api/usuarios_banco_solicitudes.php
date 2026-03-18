@@ -160,19 +160,34 @@ function asignarUsuarioBanco($pdo) {
     $stmt = $pdo->prepare($sql_insert);
     $stmt->execute([$solicitud_id, $usuario_banco_id, $_SESSION['user_id']]);
     
-    // Actualizar estado de la solicitud, nota e historial (puede fallar si el ENUM 'estado' no coincide exactamente en el servidor)
+    // Leer estado actual antes de cambiarlo (para historial)
+    $estadoAnterior = null;
+    $stmt = $pdo->prepare("SELECT estado FROM solicitudes_credito WHERE id = ?");
+    $stmt->execute([$solicitud_id]);
+    if ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $estadoAnterior = $row['estado'];
+    }
+    
+    // Actualizar estado de la solicitud a "En Revisión Banco" al asignar usuario banco (siempre que se asigne, sin depender del estado actual)
+    $estadoActualizado = false;
     try {
         $sql_update_estado = "
             UPDATE solicitudes_credito 
             SET estado = 'En Revisión Banco', 
                 fecha_actualizacion = NOW()
-            WHERE id = ? AND estado = 'Nueva'
+            WHERE id = ?
         ";
         $stmt = $pdo->prepare($sql_update_estado);
         $stmt->execute([$solicitud_id]);
+        $estadoActualizado = $stmt->rowCount() > 0;
+        if (!$estadoActualizado) {
+            error_log("usuarios_banco_solicitudes: UPDATE estado no afectó filas para solicitud_id=" . $solicitud_id);
+        }
     } catch (PDOException $e) {
-        if (strpos($e->getMessage(), 'estado') !== false && (strpos($e->getMessage(), 'truncat') !== false || strpos($e->getMessage(), '1265') !== false)) {
-            error_log("usuarios_banco_solicitudes: UPDATE estado falló (ENUM puede diferir en este servidor): " . $e->getMessage());
+        error_log("usuarios_banco_solicitudes: UPDATE estado falló: " . $e->getMessage());
+        // No interrumpir: la asignación ya se guardó; solo avisar si el ENUM/estado falló
+        if (strpos($e->getMessage(), 'estado') !== false || strpos($e->getMessage(), '1265') !== false || stripos($e->getMessage(), 'truncat') !== false) {
+            // Respuesta abajo incluirá warning
         } else {
             throw $e;
         }
@@ -206,10 +221,7 @@ function asignarUsuarioBanco($pdo) {
     }
     
     try {
-        $stmt = $pdo->prepare("SELECT estado FROM solicitudes_credito WHERE id = ?");
-        $stmt->execute([$solicitud_id]);
-        $estadoActual = $stmt->fetchColumn();
-        registrarHistorialSolicitud($pdo, $solicitud_id, $_SESSION['user_id'], 'asignacion_banco', $contenido_nota, $estadoActual, 'En Revisión Banco');
+        registrarHistorialSolicitud($pdo, $solicitud_id, $_SESSION['user_id'], 'asignacion_banco', $contenido_nota, $estadoAnterior, 'En Revisión Banco');
     } catch (Throwable $e) {
         error_log("usuarios_banco_solicitudes: historial no registrado: " . $e->getMessage());
     }
@@ -235,7 +247,11 @@ function asignarUsuarioBanco($pdo) {
     
     if (ob_get_length()) ob_clean();
     header('Content-Type: application/json');
-    echo json_encode(['success' => true, 'message' => 'Usuario asignado correctamente y solicitud enviada a revisión bancaria']);
+    $resp = ['success' => true, 'message' => 'Usuario asignado correctamente y solicitud enviada a revisión bancaria'];
+    if (!$estadoActualizado) {
+        $resp['warning'] = 'El usuario se asignó correctamente, pero no se pudo cambiar el estado de la solicitud a "En Revisión Banco". Compruebe que la columna estado en solicitudes_credito acepte ese valor.';
+    }
+    echo json_encode($resp);
 }
 
 /**
