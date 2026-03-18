@@ -4,10 +4,21 @@
  */
 
 session_start();
-header('Content-Type: application/json');
+
+// Para descarga de archivo no enviar JSON ni otra salida antes de los headers del archivo
+$esDescarga = ($_SERVER['REQUEST_METHOD'] ?? '') === 'GET' && isset($_GET['id']) && isset($_GET['action']) && $_GET['action'] === 'descargar';
+if ($esDescarga) {
+    ob_start();
+} else {
+    header('Content-Type: application/json');
+}
 
 // Verificar si el usuario está logueado
 if (!isset($_SESSION['user_id'])) {
+    if ($esDescarga) {
+        while (ob_get_level()) ob_end_clean();
+    }
+    header('Content-Type: application/json');
     http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'No autorizado']);
     exit();
@@ -427,6 +438,7 @@ function descargarAdjunto($id) {
         error_log("Adjunto encontrado: " . print_r($adjunto, true));
         
         if (!$adjunto) {
+            while (ob_get_level()) ob_end_clean();
             http_response_code(404);
             header('Content-Type: application/json');
             echo json_encode(['success' => false, 'message' => 'Archivo no encontrado']);
@@ -436,27 +448,36 @@ function descargarAdjunto($id) {
         // Verificar que el archivo existe (ajustar ruta relativa desde api/)
         $rutaArchivo = '../' . $adjunto['ruta_archivo'];
         if (!file_exists($rutaArchivo)) {
+            while (ob_get_level()) ob_end_clean();
             http_response_code(404);
             header('Content-Type: application/json');
             echo json_encode(['success' => false, 'message' => 'El archivo no existe en el servidor: ' . $rutaArchivo]);
             return;
         }
         
-        // Limpiar buffer de salida
-        ob_clean();
+        // Descartar cualquier salida previa (buffers iniciados en este script o en includes)
+        while (ob_get_level()) {
+            ob_end_clean();
+        }
         
-        // Configurar headers para descarga
-        header('Content-Type: ' . $adjunto['tipo_archivo']);
-        header('Content-Disposition: attachment; filename="' . $adjunto['nombre_original'] . '"');
-        header('Content-Length: ' . $adjunto['tamaño_archivo']);
+        // Content-Length desde el archivo real (más fiable que solo la BD)
+        $tamano = filesize($rutaArchivo);
+        $tipo = $adjunto['tipo_archivo'] ?: 'application/octet-stream';
+        $nombreOriginal = $adjunto['nombre_original'];
+        // Evitar que comillas o backslash rompan el header
+        $nombreSeguro = str_replace(['"', '\\'], ['_', '_'], $nombreOriginal);
+        
+        header('Content-Type: ' . $tipo);
+        header('Content-Disposition: attachment; filename="' . $nombreSeguro . '"');
+        header('Content-Length: ' . $tamano);
         header('Cache-Control: must-revalidate');
         header('Pragma: public');
         
-        // Leer y enviar el archivo
         readfile($rutaArchivo);
         exit();
         
     } catch (Exception $e) {
+        while (ob_get_level()) ob_end_clean();
         http_response_code(500);
         header('Content-Type: application/json');
         echo json_encode(['success' => false, 'message' => 'Error: ' . $e->getMessage()]);
