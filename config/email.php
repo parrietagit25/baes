@@ -7,7 +7,36 @@
  * Puedes configurar estas variables de dos formas:
  * 1. Modificando directamente este archivo
  * 2. Usando variables de entorno (getenv)
+ * 3. Archivo .env en la raíz del proyecto (misma carpeta que composer.json)
  */
+
+// Cargar .env si existe (Apache/PHP no lo leen solos; igual que config/chatbot.php)
+$__emailEnvFile = __DIR__ . '/../.env';
+if (is_file($__emailEnvFile) && is_readable($__emailEnvFile)) {
+    $__lines = @file($__emailEnvFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    if ($__lines) {
+        foreach ($__lines as $__line) {
+            $__line = trim($__line);
+            if ($__line === '' || strpos($__line, '#') === 0) {
+                continue;
+            }
+            if (preg_match('/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/', $__line, $__m)) {
+                $__key = $__m[1];
+                $__val = trim($__m[2]);
+                if (strpos($__val, '"') === 0 && substr($__val, -1) === '"') {
+                    $__val = substr($__val, 1, -1);
+                } elseif (strpos($__val, "'") === 0 && substr($__val, -1) === "'") {
+                    $__val = substr($__val, 1, -1);
+                }
+                if (getenv($__key) === false) {
+                    putenv("$__key=$__val");
+                    $_ENV[$__key] = $__val;
+                }
+            }
+        }
+    }
+}
+unset($__emailEnvFile, $__lines, $__line, $__m, $__key, $__val);
 
 // Función helper para obtener variables de entorno o valores por defecto
 if (!function_exists('getEnvOrDefault')) {
