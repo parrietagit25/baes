@@ -4,8 +4,7 @@
  *
  * Uso en navegador:
  *   - /test_sendgrid.php?to=tu_correo@dominio.com
- *
- * Variables en .env (raíz del proyecto, junto a composer.json): véase comentario abajo.
+ *   - /test_sendgrid.php?diag=1   (solo prueba TCP a puertos SMTP, sin enviar correo)
  */
 
 error_reporting(E_ALL);
@@ -23,12 +22,56 @@ while (ob_get_level()) {
 
 require_once __DIR__ . '/includes/EmailService.php';
 
+/**
+ * Prueba si este servidor puede abrir TCP saliente (sin SMTP/auth).
+ */
+function test_sendgrid_tcp_probe(string $host, int $port, int $timeoutSec = 5): string {
+    $errno = 0;
+    $errstr = '';
+    $fp = @stream_socket_client(
+        "tcp://{$host}:{$port}",
+        $errno,
+        $errstr,
+        $timeoutSec,
+        STREAM_CLIENT_CONNECT
+    );
+    if ($fp) {
+        fclose($fp);
+        return "OK (TCP conectó en {$timeoutSec}s máx.)";
+    }
+    return "FALLO: {$errstr} (errno {$errno})";
+}
+
+$diag = isset($_GET['diag']) && $_GET['diag'] === '1';
+
 $to = isset($_GET['to']) && filter_var($_GET['to'], FILTER_VALIDATE_EMAIL)
     ? $_GET['to']
     : null;
 
+if ($diag) {
+    echo "=== Diagnóstico TCP saliente (este PHP corre en el servidor web) ===\n\n";
+    $pairs = [
+        ['smtp.office365.com', 587],
+        ['smtp.office365.com', 465],
+        ['smtp-mail.outlook.com', 587],
+    ];
+    foreach ($pairs as $p) {
+        echo "{$p[0]}:{$p[1]} ... ";
+        flush();
+        echo test_sendgrid_tcp_probe($p[0], $p[1], 8) . "\n";
+    }
+    echo "\nSi todos fallan: el datacenter/firewall bloquea salida SMTP → hablar con hosting o usar relay API.\n";
+    echo "Si office365:587 OK pero el envío falla: revisar usuario/contraseña/app password de M365.\n";
+    if (!$to) {
+        echo "\nPara probar envío: ?to=correo@dominio.com (y opcional &diag=1 para repetir este bloque).\n";
+        exit;
+    }
+    echo "\n";
+}
+
 if (!$to) {
-    echo "Falta el parámetro ?to=correo@dominio.com\n\n";
+    echo "Falta el parámetro ?to=correo@dominio.com\n";
+    echo "(Opcional: ?diag=1 solo prueba conectividad TCP a Microsoft SMTP)\n\n";
     echo "SMTP (Microsoft 365 / Outlook) en .env en la raíz del proyecto:\n";
     echo "  EMAIL_DRIVER=smtp\n";
     echo "  SMTP_HOST=smtp.office365.com\n";
@@ -48,6 +91,10 @@ $usaSmtp = ($driver === 'smtp' || ($cfg['smtp_host'] ?? '') !== '') && $smtpOk;
 
 echo "Modo: " . ($usaSmtp ? "SMTP ({$cfg['smtp_host']})" : "SendGrid API") . "\n";
 if ($usaSmtp) {
+    $h = strtolower((string) ($cfg['smtp_host'] ?? ''));
+    if ($h === 'smtp-mail.outlook.com' || strpos($h, 'outlook.com') !== false && strpos($h, 'office365') === false) {
+        echo "AVISO: Para correo Microsoft 365 empresarial suele ser SMTP_HOST=smtp.office365.com (no smtp-mail.outlook.com).\n";
+    }
     $tout = (int) ($cfg['smtp_timeout'] ?? 25);
     echo "SMTP_USER: " . ($cfg['smtp_user'] ?? '') . "\n";
     echo "SMTP_PASS: " . (strlen($cfg['smtp_pass'] ?? '') > 0 ? "sí (configurada)" : "NO") . "\n";
