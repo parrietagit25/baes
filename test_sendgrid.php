@@ -29,9 +29,9 @@ $to = isset($_GET['to']) && filter_var($_GET['to'], FILTER_VALIDATE_EMAIL)
 
 if (!$to) {
     echo "Falta el parámetro ?to=correo@dominio.com\n\n";
-    echo "SMTP (Outlook) en .env en la raíz del proyecto, por ejemplo:\n";
+    echo "SMTP (Microsoft 365 / Outlook) en .env en la raíz del proyecto:\n";
     echo "  EMAIL_DRIVER=smtp\n";
-    echo "  SMTP_HOST=smtp-mail.outlook.com\n";
+    echo "  SMTP_HOST=smtp.office365.com\n";
     echo "  SMTP_PORT=587\n";
     echo "  SMTP_USER=notificaciones@tu-dominio.com\n";
     echo "  SMTP_PASS=\"tu_contraseña_con_caracteres_especiales\"\n";
@@ -81,9 +81,18 @@ try {
 }
 
 if ($usaSmtp) {
-    echo "\n--- Si falla o antes tardaba mucho (504) ---\n";
-    echo "El datacenter debe poder salir al puerto 587/TLS hacia tu SMTP.\n";
-    echo "Cuentas Microsoft 365 a veces usan SMTP_HOST=smtp.office365.com (no outlook.com).\n";
-    echo "Opcional en .env: SMTP_TIMEOUT=25\n";
+    echo "\n--- Si ves \"SMTP code: 110\" o \"Connection timed out\" ---\n";
+    echo "No es la contraseña: el servidor web NO llega al host SMTP (red/firewall).\n\n";
+    echo "1) Microsoft 365 (correo @grupopcr.com.pa): prueba en .env:\n";
+    echo "   SMTP_HOST=smtp.office365.com\n";
+    echo "   SMTP_PORT=587\n";
+    echo "   SMTP_SECURE=tls\n\n";
+    echo "2) Si 587 sigue en timeout, prueba SSL en otro puerto (algunos hosts bloquean 587):\n";
+    echo "   SMTP_HOST=smtp.office365.com\n";
+    echo "   SMTP_PORT=465\n";
+    echo "   SMTP_SECURE=ssl\n\n";
+    echo "3) Pide al proveedor del hosting que permita salida TCP a Internet en 587 y/o 465\n";
+    echo "   (a los endpoints SMTP de Microsoft). Sin eso, SMTP directo no funcionará.\n\n";
+    echo "4) Alternativa: servicio de relay (SendGrid, SES, etc.) cuando el datacenter bloquea SMTP.\n";
 }
 
