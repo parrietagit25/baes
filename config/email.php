@@ -62,6 +62,8 @@ return [
     'smtp_user' => getEnvOrDefault('SMTP_USER', ''),
     'smtp_pass' => getEnvOrDefault('SMTP_PASS', ''),
     'smtp_secure' => getEnvOrDefault('SMTP_SECURE', 'tls'),
+    // Evitar 504 de Cloudflare si el servidor no alcanza el SMTP (PHPMailer por defecto ~300s)
+    'smtp_timeout' => (int) getEnvOrDefault('SMTP_TIMEOUT', '25'),
     'from_email' => getEnvOrDefault('SENDGRID_FROM_EMAIL', 'noreply.automarket@automarket.com.pa'),
     'from_name' => getEnvOrDefault('SENDGRID_FROM_NAME', 'AutoMarket'),
     'reply_to_email' => getEnvOrDefault('SENDGRID_REPLY_TO', 'noreply.automarket@automarket.com.pa'),

@@ -12,6 +12,14 @@ error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
 header('Content-Type: text/plain; charset=utf-8');
+if (function_exists('apache_setenv')) {
+    @apache_setenv('no-gzip', '1');
+}
+@ini_set('zlib.output_compression', '0');
+@ini_set('implicit_flush', '1');
+while (ob_get_level()) {
+    ob_end_flush();
+}
 
 require_once __DIR__ . '/includes/EmailService.php';
 
@@ -40,8 +48,10 @@ $usaSmtp = ($driver === 'smtp' || ($cfg['smtp_host'] ?? '') !== '') && $smtpOk;
 
 echo "Modo: " . ($usaSmtp ? "SMTP ({$cfg['smtp_host']})" : "SendGrid API") . "\n";
 if ($usaSmtp) {
+    $tout = (int) ($cfg['smtp_timeout'] ?? 25);
     echo "SMTP_USER: " . ($cfg['smtp_user'] ?? '') . "\n";
     echo "SMTP_PASS: " . (strlen($cfg['smtp_pass'] ?? '') > 0 ? "sí (configurada)" : "NO") . "\n";
+    echo "SMTP_TIMEOUT: {$tout}s (evita 504 de Cloudflare si el host bloquea el puerto 587)\n";
 } else {
     $key = $cfg['sendgrid_api_key'] ?? '';
     echo "SENDGRID_API_KEY: " . (strlen($key) > 10 ? "sí (longitud " . strlen($key) . ")" : "NO - define SMTP_* en .env o SENDGRID_API_KEY") . "\n";
@@ -49,6 +59,10 @@ if ($usaSmtp) {
 echo "\n";
 
 try {
+    echo "Conectando y enviando...\n";
+    flush();
+
+    set_time_limit(120);
     $emailService = new EmailService();
     $subject = 'Prueba correo (SMTP/SendGrid) - Motus / Financiamiento';
     $bodyHtml = '<p>Este es un correo de <strong>prueba</strong> enviado desde test_sendgrid.php.</p>'
@@ -64,5 +78,12 @@ try {
 } catch (Throwable $e) {
     echo "ERROR al enviar correo:\n";
     echo $e->getMessage() . "\n";
+}
+
+if ($usaSmtp) {
+    echo "\n--- Si falla o antes tardaba mucho (504) ---\n";
+    echo "El datacenter debe poder salir al puerto 587/TLS hacia tu SMTP.\n";
+    echo "Cuentas Microsoft 365 a veces usan SMTP_HOST=smtp.office365.com (no outlook.com).\n";
+    echo "Opcional en .env: SMTP_TIMEOUT=25\n";
 }
 

@@ -96,6 +96,7 @@ class EmailService {
             $mail->Password   = $this->config['smtp_pass'];
             $mail->SMTPSecure = $this->config['smtp_secure'] ?? 'tls';
             $mail->Port       = (int) ($this->config['smtp_port'] ?? 587);
+            $mail->Timeout    = (int) ($this->config['smtp_timeout'] ?? 25);
             $mail->CharSet    = 'UTF-8';
             $mail->setFrom($this->config['from_email'], $this->config['from_name']);
             $mail->addAddress($to, $toName ?: '');
