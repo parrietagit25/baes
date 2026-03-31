@@ -25,6 +25,10 @@ RUN a2enmod rewrite
 # Permitir subida de archivos grandes (evitar 403 por límite de Apache)
 COPY docker/apache-uploads.conf /etc/apache2/conf-enabled/uploads.conf
 
+# Entrypoint: composer en bind mount (ver docker/apache-entrypoint.sh)
+COPY docker/apache-entrypoint.sh /usr/local/bin/apache-entrypoint.sh
+RUN chmod +x /usr/local/bin/apache-entrypoint.sh
+
 # Configurar Apache para permitir .htaccess
 RUN echo '<Directory /var/www/html>' >> /etc/apache2/apache2.conf \
     && echo '    AllowOverride All' >> /etc/apache2/apache2.conf \
@@ -56,5 +60,6 @@ RUN echo "upload_max_filesize = 50M" >> /usr/local/etc/php/conf.d/uploads.ini \
 # Exponer puerto 80
 EXPOSE 80
 
+ENTRYPOINT ["/usr/local/bin/apache-entrypoint.sh"]
 # Comando por defecto
 CMD ["apache2-foreground"]
