@@ -1,7 +1,7 @@
 <?php
 /**
- * Servicio de envío de correos: SMTP (Outlook) o SendGrid
- * Si en config está driver=smtp y smtp_host/smtp_user/smtp_pass, se usa SMTP (como pasevistainter.py).
+ * Servicio de envío de correos: SMTP (Outlook), Resend o SendGrid
+ * Si en config está driver=smtp y smtp_host/smtp_user/smtp_pass, se usa SMTP.
  */
 
 $autoloadPath = __DIR__ . '/../vendor/autoload.php';
@@ -23,6 +23,7 @@ class EmailService {
     private $config;
     private $sendgrid;
     private $useSmtp = false;
+    private $useResend = false;
     
     public function __construct() {
         $this->config = require __DIR__ . '/../config/email.php';
@@ -33,13 +34,19 @@ class EmailService {
                 $this->config[$key] = $key === 'reply_to_name' ? $nombreCorrecto . ' - Soporte' : $nombreCorrecto;
             }
         }
-        $driver = $this->config['driver'] ?? 'sendgrid';
+        $driver = strtolower((string) ($this->config['driver'] ?? 'sendgrid'));
         $smtpHost = $this->config['smtp_host'] ?? '';
         $smtpUser = $this->config['smtp_user'] ?? '';
         $smtpPass = $this->config['smtp_pass'] ?? '';
+        $resendApiKey = trim((string) ($this->config['resend_api_key'] ?? ''));
         
         if (($driver === 'smtp' || $smtpHost !== '') && $smtpUser !== '' && $smtpPass !== '') {
             $this->useSmtp = true;
+            return;
+        }
+
+        if ($driver === 'resend' && $resendApiKey !== '') {
+            $this->useResend = true;
             return;
         }
         
@@ -52,7 +59,7 @@ class EmailService {
     }
     
     /**
-     * Envía un correo genérico (SMTP Outlook o SendGrid)
+     * Envía un correo genérico (SMTP Outlook, Resend o SendGrid)
      * @param string $to Destinatario
      * @param string $subject Asunto
      * @param string $bodyHTML Cuerpo HTML
@@ -71,6 +78,9 @@ class EmailService {
         try {
             if ($this->useSmtp) {
                 return $this->enviarCorreoSMTP($to, $toName, $subject, $bodyHTML, $bodyText, $attachments);
+            }
+            if ($this->useResend) {
+                return $this->enviarCorreoResend($to, $toName, $subject, $bodyHTML, $bodyText, $attachments);
             }
             $tieneV7 = class_exists('SendGrid\Mail\Mail');
             if ($tieneV7) {
@@ -116,6 +126,99 @@ class EmailService {
             error_log("PHPMailer SMTP: " . $mail->ErrorInfo);
             return ['success' => false, 'message' => 'Error SMTP: ' . $mail->ErrorInfo];
         }
+    }
+
+    /**
+     * Envío por Resend (API HTTP)
+     */
+    private function enviarCorreoResend($to, $toName, $subject, $bodyHTML, $bodyText, $attachments) {
+        $apiKey = trim((string) ($this->config['resend_api_key'] ?? ''));
+        if ($apiKey === '') {
+            return ['success' => false, 'message' => 'RESEND_API_KEY no configurada'];
+        }
+
+        $baseUrl = rtrim((string) ($this->config['resend_base_url'] ?? 'https://api.resend.com'), '/');
+        $url = $baseUrl . '/emails';
+
+        $fromName = trim((string) ($this->config['from_name'] ?? ''));
+        $fromEmail = trim((string) ($this->config['from_email'] ?? ''));
+        $from = $fromName !== '' ? ($fromName . ' <' . $fromEmail . '>') : $fromEmail;
+
+        $payload = [
+            'from' => $from,
+            'to' => [$to],
+            'subject' => $subject,
+            'html' => $bodyHTML,
+            'text' => $bodyText ?: strip_tags($bodyHTML),
+        ];
+
+        if (!empty($toName)) {
+            $payload['to'] = [$toName . ' <' . $to . '>'];
+        }
+
+        $replyTo = trim((string) ($this->config['reply_to_email'] ?? ''));
+        if ($replyTo !== '') {
+            $payload['reply_to'] = $replyTo;
+        }
+
+        if (!empty($attachments)) {
+            $payload['attachments'] = [];
+            foreach ($attachments as $path) {
+                if (!is_string($path) || !file_exists($path)) {
+                    continue;
+                }
+                $content = @file_get_contents($path);
+                if ($content === false) {
+                    continue;
+                }
+                $payload['attachments'][] = [
+                    'filename' => basename($path),
+                    'content' => base64_encode($content),
+                ];
+            }
+        }
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Authorization: Bearer ' . $apiKey,
+            'Content-Type: application/json',
+            'Accept: application/json',
+        ]);
+        curl_setopt($ch, CURLOPT_TIMEOUT, (int) ($this->config['smtp_timeout'] ?? 25));
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+        $raw = curl_exec($ch);
+        $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $err = curl_error($ch);
+        curl_close($ch);
+
+        if ($err) {
+            return ['success' => false, 'message' => 'Error Resend: ' . $err];
+        }
+
+        $decoded = json_decode((string) $raw, true);
+        if ($httpCode >= 200 && $httpCode < 300) {
+            return [
+                'success' => true,
+                'message' => 'Correo enviado correctamente',
+                'status_code' => $httpCode,
+                'provider' => 'resend',
+                'id' => $decoded['id'] ?? null,
+            ];
+        }
+
+        $providerMsg = '';
+        if (is_array($decoded)) {
+            $providerMsg = $decoded['message'] ?? ($decoded['error'] ?? json_encode($decoded));
+        }
+        return [
+            'success' => false,
+            'message' => 'Error Resend: HTTP ' . $httpCode . ($providerMsg !== '' ? (' - ' . $providerMsg) : ''),
+            'status_code' => $httpCode,
+            'provider' => 'resend',
+        ];
     }
     
     /**

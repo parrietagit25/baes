@@ -1,8 +1,8 @@
 <?php
 /**
- * Configuración SendGrid para envío de correos
+ * Configuración de correo (SMTP, Resend o SendGrid)
  * 
- * IMPORTANTE: Configurar estas variables según tu cuenta de SendGrid
+ * IMPORTANTE: Configurar estas variables según tu proveedor de correo
  * 
  * Puedes configurar estas variables de dos formas:
  * 1. Modificando directamente este archivo
@@ -54,8 +54,10 @@ if (file_exists($localConfigPath)) {
 
 // Configuración por defecto (usa variables de entorno)
 return [
-    // Método de envío: 'smtp' (Outlook/Office365) o 'sendgrid'. Si smtp_host está definido se usa SMTP.
+    // Método de envío: 'smtp', 'resend' o 'sendgrid'. Si smtp_host está definido se usa SMTP.
     'driver' => getEnvOrDefault('EMAIL_DRIVER', 'sendgrid'),
+    'resend_api_key' => getEnvOrDefault('RESEND_API_KEY', ''),
+    'resend_base_url' => getEnvOrDefault('RESEND_BASE_URL', 'https://api.resend.com'),
     'sendgrid_api_key' => getEnvOrDefault('SENDGRID_API_KEY', ''),
     'smtp_host' => getEnvOrDefault('SMTP_HOST', ''),
     'smtp_port' => (int) getEnvOrDefault('SMTP_PORT', '587'),

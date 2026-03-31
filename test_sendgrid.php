@@ -1,6 +1,6 @@
 <?php
 /**
- * Prueba simple de envío de correo usando EmailService (SendGrid o SMTP Outlook).
+ * Prueba simple de envío de correo usando EmailService (SMTP, Resend o SendGrid).
  *
  * Uso en navegador:
  *   - /test_sendgrid.php?to=tu_correo@dominio.com
@@ -72,6 +72,10 @@ if ($diag) {
 if (!$to) {
     echo "Falta el parámetro ?to=correo@dominio.com\n";
     echo "(Opcional: ?diag=1 solo prueba conectividad TCP a Microsoft SMTP)\n\n";
+    echo "Resend en .env (recomendado si SMTP está bloqueado):\n";
+    echo "  EMAIL_DRIVER=resend\n";
+    echo "  RESEND_API_KEY=re_xxxxxxxxxxxxxxxxx\n";
+    echo "  SENDGRID_FROM_EMAIL=onboarding@resend.dev   (o tu dominio verificado)\n\n";
     echo "SMTP (Microsoft 365 / Outlook) en .env en la raíz del proyecto:\n";
     echo "  EMAIL_DRIVER=smtp\n";
     echo "  SMTP_HOST=smtp.office365.com\n";
@@ -85,12 +89,17 @@ if (!$to) {
 }
 
 $cfg = require __DIR__ . '/config/email.php';
-$driver = $cfg['driver'] ?? 'sendgrid';
+$driver = strtolower((string) ($cfg['driver'] ?? 'sendgrid'));
 $smtpOk = ($cfg['smtp_host'] ?? '') !== '' && ($cfg['smtp_user'] ?? '') !== '' && ($cfg['smtp_pass'] ?? '') !== '';
+$useResend = ($driver === 'resend') && !empty($cfg['resend_api_key']);
 $usaSmtp = ($driver === 'smtp' || ($cfg['smtp_host'] ?? '') !== '') && $smtpOk;
 
-echo "Modo: " . ($usaSmtp ? "SMTP ({$cfg['smtp_host']})" : "SendGrid API") . "\n";
-if ($usaSmtp) {
+if ($useResend) {
+    echo "Modo: Resend API\n";
+    echo "RESEND_API_KEY: " . (strlen((string) ($cfg['resend_api_key'] ?? '')) > 10 ? "sí (longitud " . strlen((string) $cfg['resend_api_key']) . ")" : "NO") . "\n";
+    echo "FROM: " . ($cfg['from_email'] ?? '') . "\n";
+} elseif ($usaSmtp) {
+    echo "Modo: SMTP ({$cfg['smtp_host']})\n";
     $h = strtolower((string) ($cfg['smtp_host'] ?? ''));
     if ($h === 'smtp-mail.outlook.com' || strpos($h, 'outlook.com') !== false && strpos($h, 'office365') === false) {
         echo "AVISO: Para correo Microsoft 365 empresarial suele ser SMTP_HOST=smtp.office365.com (no smtp-mail.outlook.com).\n";
@@ -100,8 +109,9 @@ if ($usaSmtp) {
     echo "SMTP_PASS: " . (strlen($cfg['smtp_pass'] ?? '') > 0 ? "sí (configurada)" : "NO") . "\n";
     echo "SMTP_TIMEOUT: {$tout}s (evita 504 de Cloudflare si el host bloquea el puerto 587)\n";
 } else {
+    echo "Modo: SendGrid API\n";
     $key = $cfg['sendgrid_api_key'] ?? '';
-    echo "SENDGRID_API_KEY: " . (strlen($key) > 10 ? "sí (longitud " . strlen($key) . ")" : "NO - define SMTP_* en .env o SENDGRID_API_KEY") . "\n";
+    echo "SENDGRID_API_KEY: " . (strlen($key) > 10 ? "sí (longitud " . strlen($key) . ")" : "NO - define RESEND_API_KEY, SMTP_* o SENDGRID_API_KEY") . "\n";
 }
 echo "\n";
 
@@ -111,7 +121,7 @@ try {
 
     set_time_limit(120);
     $emailService = new EmailService();
-    $subject = 'Prueba correo (SMTP/SendGrid) - Motus / Financiamiento';
+    $subject = 'Prueba correo (SMTP/Resend/SendGrid) - Motus / Financiamiento';
     $bodyHtml = '<p>Este es un correo de <strong>prueba</strong> enviado desde test_sendgrid.php.</p>'
         . '<p>Si recibes este mensaje, la configuración de correo está funcionando.</p>';
     $bodyText = "Este es un correo de PRUEBA enviado desde test_sendgrid.php.\n"
