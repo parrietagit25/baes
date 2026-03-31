@@ -15,9 +15,45 @@ if (!isset($_SESSION['user_id'])) {
 
 require_once '../config/database.php';
 
-// Configuración de Pipedrive
-define('PIPEDRIVE_API_KEY', '9c8606b29310e29b3880066aad0426b59a555cfc');
-define('PIPEDRIVE_BASE_URL', 'https://grupopcr.pipedrive.com/api/v1');
+// Cargar .env si existe (PHP no lo carga automáticamente)
+if ((getenv('PIPEDRIVE_API_KEY') === false || getenv('PIPEDRIVE_API_KEY') === '') && (getenv('PIPEDRIVE_BASE_URL') === false || getenv('PIPEDRIVE_BASE_URL') === '')) {
+    $envFile = __DIR__ . '/../.env';
+    if (is_file($envFile) && is_readable($envFile)) {
+        $lines = @file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        if ($lines) {
+            foreach ($lines as $line) {
+                $line = trim($line);
+                if ($line === '' || strpos($line, '#') === 0) continue;
+                if (preg_match('/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/', $line, $m)) {
+                    $key = trim($m[1]);
+                    $val = trim($m[2]);
+                    if (strpos($val, '"') === 0 && substr($val, -1) === '"') {
+                        $val = substr($val, 1, -1);
+                    } elseif (strpos($val, "'") === 0 && substr($val, -1) === "'") {
+                        $val = substr($val, 1, -1);
+                    }
+                    if (getenv($key) === false) {
+                        putenv("$key=$val");
+                        $_ENV[$key] = $val;
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Configuración de Pipedrive desde entorno
+define('PIPEDRIVE_API_KEY', trim((string) (getenv('PIPEDRIVE_API_KEY') ?: ($_ENV['PIPEDRIVE_API_KEY'] ?? ''))));
+define('PIPEDRIVE_BASE_URL', rtrim((string) (getenv('PIPEDRIVE_BASE_URL') ?: ($_ENV['PIPEDRIVE_BASE_URL'] ?? 'https://grupopcr.pipedrive.com/api/v1')), '/'));
+
+if (PIPEDRIVE_API_KEY === '') {
+    http_response_code(500);
+    echo json_encode([
+        'success' => false,
+        'message' => 'Falta PIPEDRIVE_API_KEY. Defínela en variables de entorno o en .env en la raíz del proyecto.'
+    ]);
+    exit();
+}
 
 $method = $_SERVER['REQUEST_METHOD'];
 
