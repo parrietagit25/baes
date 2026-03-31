@@ -38,7 +38,9 @@ COPY . /var/www/html/
 
 # Composer (dependencias PHP: Resend, Dompdf, etc.)
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
-RUN composer install --no-dev --no-interaction --optimize-autoloader --working-dir=/var/www/html
+# install usa composer.lock; si el lock no está al día con composer.json, actualiza (evita fallo en deploy)
+RUN composer install --no-dev --no-interaction --optimize-autoloader --working-dir=/var/www/html \
+    || composer update --no-dev --no-interaction --optimize-autoloader --working-dir=/var/www/html
 
 # Establecer permisos correctos
 RUN chown -R www-data:www-data /var/www/html \

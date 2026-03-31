@@ -10,9 +10,8 @@ config/email.local.php
 configurar_sendgrid_servidor.sh
 CREDENCIALES_SENDGRID.txt
 
-# Dependencias de Composer
+# Dependencias de Composer (vendor no; composer.lock sí, para Docker/build reproducible)
 vendor/
-composer.lock
 
 # Archivos temporales de desarrollo
 debug_*.php
