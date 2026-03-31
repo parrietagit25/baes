@@ -58,10 +58,13 @@ services:
       - DB_NAME=${MYSQL_DATABASE:-motus_baes}
       - DB_USER=${MYSQL_USER:-motus_user}
       - DB_PASS=${MYSQL_PASSWORD:-motus_pass_2024}
-      # SendGrid (el .env del host debe tener SENDGRID_API_KEY=SG.xxx...)
-      - SENDGRID_API_KEY=${SENDGRID_API_KEY:-}
-      - SENDGRID_FROM_EMAIL=${SENDGRID_FROM_EMAIL:-noreply.automarket@automarket.com.pa}
-      - SENDGRID_FROM_NAME=${SENDGRID_FROM_NAME:-AutoMarket}
+      - RESEND_API_KEY=${RESEND_API_KEY:-}
+      - RESEND_BASE_URL=${RESEND_BASE_URL:-api.resend.com}
+      - MAIL_FROM_EMAIL=${MAIL_FROM_EMAIL:-onboarding@resend.dev}
+      - MAIL_FROM_NAME=${MAIL_FROM_NAME:-AutoMarket Seminuevos}
+      - MAIL_REPLY_TO=${MAIL_REPLY_TO:-}
+      - MAIL_REPLY_TO_NAME=${MAIL_REPLY_TO_NAME:-AutoMarket - Soporte}
+      - APP_URL=${APP_URL:-http://localhost:8086}
 
 volumes:
   motus_db_data:

@@ -1,16 +1,10 @@
 <?php
 /**
- * Configuración de correo (SMTP, Resend o SendGrid)
- * 
- * IMPORTANTE: Configurar estas variables según tu proveedor de correo
- * 
- * Puedes configurar estas variables de dos formas:
- * 1. Modificando directamente este archivo
- * 2. Usando variables de entorno (getenv)
- * 3. Archivo .env en la raíz del proyecto (misma carpeta que composer.json)
+ * Configuración de correo: solo Resend.
+ *
+ * Variables: .env en la raíz, variables de entorno del sistema, o config/email.local.php (opcional).
  */
 
-// Cargar .env si existe (Apache/PHP no lo leen solos; igual que config/chatbot.php)
 $__emailEnvFile = __DIR__ . '/../.env';
 if (is_file($__emailEnvFile) && is_readable($__emailEnvFile)) {
     $__lines = @file($__emailEnvFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
@@ -38,7 +32,6 @@ if (is_file($__emailEnvFile) && is_readable($__emailEnvFile)) {
 }
 unset($__emailEnvFile, $__lines, $__line, $__m, $__key, $__val);
 
-// Función helper para obtener variables de entorno o valores por defecto
 if (!function_exists('getEnvOrDefault')) {
     function getEnvOrDefault($key, $default) {
         $value = getenv($key);
@@ -46,32 +39,18 @@ if (!function_exists('getEnvOrDefault')) {
     }
 }
 
-// Cargar configuración local si existe (no está en git)
 $localConfigPath = __DIR__ . '/email.local.php';
 if (file_exists($localConfigPath)) {
     return require $localConfigPath;
 }
 
-// Configuración por defecto (usa variables de entorno)
 return [
-    // Método de envío: 'smtp', 'resend' o 'sendgrid'. Si smtp_host está definido se usa SMTP.
-    'driver' => getEnvOrDefault('EMAIL_DRIVER', 'sendgrid'),
     'resend_api_key' => getEnvOrDefault('RESEND_API_KEY', ''),
-    'resend_base_url' => getEnvOrDefault('RESEND_BASE_URL', 'https://api.resend.com'),
-    'sendgrid_api_key' => getEnvOrDefault('SENDGRID_API_KEY', ''),
-    'smtp_host' => getEnvOrDefault('SMTP_HOST', ''),
-    'smtp_port' => (int) getEnvOrDefault('SMTP_PORT', '587'),
-    'smtp_user' => getEnvOrDefault('SMTP_USER', ''),
-    'smtp_pass' => getEnvOrDefault('SMTP_PASS', ''),
-    'smtp_secure' => getEnvOrDefault('SMTP_SECURE', 'tls'),
-    // Evitar 504 de Cloudflare si el servidor no alcanza el SMTP (PHPMailer por defecto ~300s)
-    'smtp_timeout' => (int) getEnvOrDefault('SMTP_TIMEOUT', '25'),
-    'from_email' => getEnvOrDefault('SENDGRID_FROM_EMAIL', 'noreply.automarket@automarket.com.pa'),
-    'from_name' => getEnvOrDefault('SENDGRID_FROM_NAME', 'AutoMarket'),
-    'reply_to_email' => getEnvOrDefault('SENDGRID_REPLY_TO', 'noreply.automarket@automarket.com.pa'),
-    'reply_to_name' => getEnvOrDefault('SENDGRID_REPLY_TO_NAME', 'AutoMarket - Soporte'),
+    'resend_base_url' => getEnvOrDefault('RESEND_BASE_URL', 'api.resend.com'),
+    'from_email' => getEnvOrDefault('MAIL_FROM_EMAIL', 'onboarding@resend.dev'),
+    'from_name' => getEnvOrDefault('MAIL_FROM_NAME', 'AutoMarket Seminuevos'),
+    'reply_to_email' => getEnvOrDefault('MAIL_REPLY_TO', ''),
+    'reply_to_name' => getEnvOrDefault('MAIL_REPLY_TO_NAME', 'AutoMarket - Soporte'),
     'app_url' => getEnvOrDefault('APP_URL', 'http://localhost:8086'),
     'app_name' => 'AutoMarket Seminuevos',
-    'debug' => getEnvOrDefault('SENDGRID_DEBUG', 'false') === 'true',
 ];
-

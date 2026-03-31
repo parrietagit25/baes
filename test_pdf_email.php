@@ -2,7 +2,7 @@
 /**
  * Prueba rápida: genera un PDF y lo envía por correo.
  * Uso: abre test_pdf_email.php en el navegador, escribe un correo y pulsa Enviar.
- * Requiere: config/email.local.php (SMTP o SendGrid) y composer (dompdf, phpmailer o sendgrid).
+ * Requiere: Resend configurado (.env) y composer (dompdf, resend/resend-php).
  */
 error_reporting(E_ALL & ~E_DEPRECATED & ~E_STRICT);
 header('Content-Type: text/html; charset=utf-8');

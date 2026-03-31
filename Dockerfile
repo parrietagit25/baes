@@ -36,6 +36,10 @@ WORKDIR /var/www/html
 # Copiar archivos de la aplicación
 COPY . /var/www/html/
 
+# Composer (dependencias PHP: Resend, Dompdf, etc.)
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+RUN composer install --no-dev --no-interaction --optimize-autoloader --working-dir=/var/www/html
+
 # Establecer permisos correctos
 RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 755 /var/www/html \

@@ -1,7 +1,6 @@
 <?php
 /**
- * Servicio de envío de correos: SMTP (Outlook), Resend o SendGrid
- * Si en config está driver=smtp y smtp_host/smtp_user/smtp_pass, se usa SMTP.
+ * Envío de correos vía Resend (único proveedor).
  */
 
 $autoloadPath = __DIR__ . '/../vendor/autoload.php';
@@ -11,67 +10,35 @@ if (file_exists($autoloadPath)) {
     die('Error: Composer no está instalado. Ejecuta: composer install');
 }
 
-if (file_exists(__DIR__ . '/../vendor/sendgrid/sendgrid/lib/SendGrid.php') && !class_exists('SendGrid\Mail\Mail')) {
-    require_once __DIR__ . '/../vendor/sendgrid/sendgrid/lib/SendGrid.php';
-}
-
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\SMTP;
-use PHPMailer\PHPMailer\Exception as PHPMailerException;
+use Resend\Exceptions\ErrorException;
 
 class EmailService {
     private $config;
-    private $sendgrid;
-    private $useSmtp = false;
-    private $useResend = false;
-    
+
     public function __construct() {
         $this->config = require __DIR__ . '/../config/email.php';
-        // Asegurar nombre correcto (evitar "Automarket Rent a Car" en correos)
         $nombreCorrecto = 'AutoMarket Seminuevos';
         foreach (['from_name', 'reply_to_name', 'app_name'] as $key) {
             if (!empty($this->config[$key]) && (stripos($this->config[$key], 'Rent a Car') !== false || stripos($this->config[$key], 'Automarket Rent') !== false)) {
                 $this->config[$key] = $key === 'reply_to_name' ? $nombreCorrecto . ' - Soporte' : $nombreCorrecto;
             }
         }
-        $driver = strtolower((string) ($this->config['driver'] ?? 'sendgrid'));
-        $smtpHost = $this->config['smtp_host'] ?? '';
-        $smtpUser = $this->config['smtp_user'] ?? '';
-        $smtpPass = $this->config['smtp_pass'] ?? '';
-        $resendApiKey = trim((string) ($this->config['resend_api_key'] ?? ''));
-        
-        if ($driver === 'smtp' && $smtpUser !== '' && $smtpPass !== '') {
-            $this->useSmtp = true;
-            return;
+
+        $apiKey = trim((string) ($this->config['resend_api_key'] ?? ''));
+        if ($apiKey === '') {
+            throw new RuntimeException('Falta RESEND_API_KEY en .env o variables de entorno.');
         }
 
-        if ($driver === 'resend' && $resendApiKey !== '') {
-            $this->useResend = true;
-            return;
-        }
-
-        // Compatibilidad hacia atrás: si no forzaron driver y hay SMTP completo, usar SMTP.
-        if ($driver === '' && $smtpHost !== '' && $smtpUser !== '' && $smtpPass !== '') {
-            $this->useSmtp = true;
-            return;
-        }
-        
-        try {
-            $this->sendgrid = new \SendGrid($this->config['sendgrid_api_key'] ?? '');
-        } catch (Exception $e) {
-            error_log("Error al inicializar SendGrid: " . $e->getMessage());
-            throw $e;
+        $base = trim((string) ($this->config['resend_base_url'] ?? 'api.resend.com'));
+        $base = preg_replace('#^https?://#i', '', rtrim($base, '/'));
+        if ($base !== '') {
+            putenv('RESEND_BASE_URL=' . $base);
+            $_ENV['RESEND_BASE_URL'] = $base;
         }
     }
-    
+
     /**
-     * Envía un correo genérico (SMTP Outlook, Resend o SendGrid)
-     * @param string $to Destinatario
-     * @param string $subject Asunto
-     * @param string $bodyHTML Cuerpo HTML
-     * @param string $toName Nombre del destinatario (opcional)
-     * @param string $bodyText Cuerpo texto plano (opcional)
-     * @param array $attachments Rutas de archivos a adjuntar (opcional)
+     * @param array $attachments Rutas locales de archivos
      */
     public function enviarCorreo(
         $to,
@@ -82,312 +49,92 @@ class EmailService {
         $attachments = []
     ) {
         try {
-            if ($this->useSmtp) {
-                return $this->enviarCorreoSMTP($to, $toName, $subject, $bodyHTML, $bodyText, $attachments);
-            }
-            if ($this->useResend) {
-                return $this->enviarCorreoResend($to, $toName, $subject, $bodyHTML, $bodyText, $attachments);
-            }
-            $tieneV7 = class_exists('SendGrid\Mail\Mail');
-            if ($tieneV7) {
-                return $this->enviarCorreoV7($to, $toName, $subject, $bodyHTML, $bodyText, $attachments);
-            }
-            return $this->enviarCorreoV6($to, $toName, $subject, $bodyHTML, $bodyText, $attachments);
-        } catch (Exception $e) {
-            error_log("Error al enviar correo: " . $e->getMessage());
+            return $this->enviarCorreoResend($to, $toName, $subject, $bodyHTML, $bodyText, $attachments);
+        } catch (Throwable $e) {
+            error_log('Error al enviar correo (Resend): ' . $e->getMessage());
             return ['success' => false, 'message' => 'Error al enviar correo: ' . $e->getMessage()];
         }
     }
-    
-    /**
-     * Envío por SMTP (Outlook/Office365) - mismo método que pasevistainter.py
-     */
-    private function enviarCorreoSMTP($to, $toName, $subject, $bodyHTML, $bodyText, $attachments) {
-        $mail = new PHPMailer(true);
-        try {
-            $mail->isSMTP();
-            $mail->Host       = $this->config['smtp_host'];
-            $mail->SMTPAuth   = true;
-            $mail->Username   = $this->config['smtp_user'];
-            $mail->Password   = $this->config['smtp_pass'];
-            $mail->SMTPSecure = $this->config['smtp_secure'] ?? 'tls';
-            $mail->Port       = (int) ($this->config['smtp_port'] ?? 587);
-            $mail->Timeout    = (int) ($this->config['smtp_timeout'] ?? 25);
-            $mail->CharSet    = 'UTF-8';
-            $mail->setFrom($this->config['from_email'], $this->config['from_name']);
-            $mail->addAddress($to, $toName ?: '');
-            $mail->addReplyTo($this->config['reply_to_email'] ?? $this->config['from_email'], $this->config['reply_to_name'] ?? '');
-            $mail->isHTML(true);
-            $mail->Subject = $subject;
-            $mail->Body    = $bodyHTML;
-            $mail->AltBody = $bodyText ?: strip_tags($bodyHTML);
-            foreach ($attachments as $path) {
-                if (file_exists($path)) {
-                    $mail->addAttachment($path, basename($path));
-                }
-            }
-            $mail->send();
-            return ['success' => true, 'message' => 'Correo enviado correctamente'];
-        } catch (PHPMailerException $e) {
-            error_log("PHPMailer SMTP: " . $mail->ErrorInfo);
-            return ['success' => false, 'message' => 'Error SMTP: ' . $mail->ErrorInfo];
-        }
-    }
 
-    /**
-     * Envío por Resend (API HTTP)
-     */
     private function enviarCorreoResend($to, $toName, $subject, $bodyHTML, $bodyText, $attachments) {
         $apiKey = trim((string) ($this->config['resend_api_key'] ?? ''));
-        if ($apiKey === '') {
-            return ['success' => false, 'message' => 'RESEND_API_KEY no configurada'];
-        }
-
-        $baseUrl = rtrim((string) ($this->config['resend_base_url'] ?? 'https://api.resend.com'), '/');
-        $url = $baseUrl . '/emails';
-
         $fromName = trim((string) ($this->config['from_name'] ?? ''));
         $fromEmail = trim((string) ($this->config['from_email'] ?? ''));
         $from = $fromName !== '' ? ($fromName . ' <' . $fromEmail . '>') : $fromEmail;
 
-        $payload = [
+        $params = [
             'from' => $from,
-            'to' => [$to],
+            'to' => $toName !== '' ? [$toName . ' <' . $to . '>'] : [$to],
             'subject' => $subject,
             'html' => $bodyHTML,
-            'text' => $bodyText ?: strip_tags($bodyHTML),
+            'text' => $bodyText !== '' ? $bodyText : strip_tags($bodyHTML),
         ];
-
-        if (!empty($toName)) {
-            $payload['to'] = [$toName . ' <' . $to . '>'];
-        }
 
         $replyTo = trim((string) ($this->config['reply_to_email'] ?? ''));
         if ($replyTo !== '') {
-            $payload['reply_to'] = $replyTo;
+            $params['reply_to'] = $replyTo;
         }
 
         if (!empty($attachments)) {
-            $payload['attachments'] = [];
+            $atts = [];
             foreach ($attachments as $path) {
-                if (!is_string($path) || !file_exists($path)) {
+                if (!is_string($path) || !is_file($path)) {
                     continue;
                 }
                 $content = @file_get_contents($path);
                 if ($content === false) {
                     continue;
                 }
-                $payload['attachments'][] = [
+                $atts[] = [
                     'filename' => basename($path),
                     'content' => base64_encode($content),
                 ];
             }
+            if ($atts !== []) {
+                $params['attachments'] = $atts;
+            }
         }
 
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'Authorization: Bearer ' . $apiKey,
-            'Content-Type: application/json',
-            'Accept: application/json',
-        ]);
-        curl_setopt($ch, CURLOPT_TIMEOUT, (int) ($this->config['smtp_timeout'] ?? 25));
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
-        $raw = curl_exec($ch);
-        $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $err = curl_error($ch);
-        curl_close($ch);
-
-        if ($err) {
-            return ['success' => false, 'message' => 'Error Resend: ' . $err];
-        }
-
-        $decoded = json_decode((string) $raw, true);
-        if ($httpCode >= 200 && $httpCode < 300) {
+        try {
+            $client = Resend::client($apiKey);
+            $result = $client->emails->send($params);
             return [
                 'success' => true,
                 'message' => 'Correo enviado correctamente',
-                'status_code' => $httpCode,
                 'provider' => 'resend',
-                'id' => $decoded['id'] ?? null,
+                'id' => $result->id ?? null,
+            ];
+        } catch (ErrorException $e) {
+            return [
+                'success' => false,
+                'message' => 'Error Resend: ' . $e->getMessage(),
+                'provider' => 'resend',
             ];
         }
+    }
 
-        $providerMsg = '';
-        if (is_array($decoded)) {
-            $providerMsg = $decoded['message'] ?? ($decoded['error'] ?? json_encode($decoded));
-        }
-        return [
-            'success' => false,
-            'message' => 'Error Resend: HTTP ' . $httpCode . ($providerMsg !== '' ? (' - ' . $providerMsg) : ''),
-            'status_code' => $httpCode,
-            'provider' => 'resend',
-        ];
-    }
-    
-    /**
-     * Envío usando SendGrid v7+ (API moderna)
-     */
-    private function enviarCorreoV7($to, $toName, $subject, $bodyHTML, $bodyText, $attachments) {
-        // Verificar que la clase existe antes de usarla
-        if (!class_exists('SendGrid\Mail\Mail')) {
-            throw new Exception('SendGrid v7 no está disponible, pero se intentó usar enviarCorreoV7');
-        }
-        
-        $email = new \SendGrid\Mail\Mail();
-        
-        $email->setFrom($this->config['from_email'], $this->config['from_name']);
-        $email->addTo($to, $toName ?: '');
-        $email->setReplyTo($this->config['reply_to_email'], $this->config['reply_to_name']);
-        $email->setSubject($subject);
-        $email->addContent("text/html", $bodyHTML);
-        $email->addContent("text/plain", $bodyText ?: strip_tags($bodyHTML));
-        
-        // Adjuntos
-        foreach ($attachments as $attachment) {
-            if (file_exists($attachment)) {
-                $fileContent = base64_encode(file_get_contents($attachment));
-                $fileName = basename($attachment);
-                $mimeType = function_exists('mime_content_type') 
-                    ? mime_content_type($attachment) 
-                    : 'application/octet-stream';
-                
-                $attachment_obj = new \SendGrid\Mail\Attachment();
-                $attachment_obj->setContent($fileContent);
-                $attachment_obj->setType($mimeType);
-                $attachment_obj->setFilename($fileName);
-                $attachment_obj->setDisposition("attachment");
-                $email->addAttachment($attachment_obj);
-            }
-        }
-        
-        $response = $this->sendgrid->send($email);
-        $statusCode = $response->statusCode();
-        
-        if ($statusCode >= 200 && $statusCode < 300) {
-            return ['success' => true, 'message' => 'Correo enviado correctamente', 'status_code' => $statusCode];
-        } else {
-            $body = $response->body();
-            error_log("SendGrid error: Status $statusCode - $body");
-            return ['success' => false, 'message' => "Error al enviar correo: Status $statusCode", 'status_code' => $statusCode];
-        }
-    }
-    
-    /**
-     * Envío usando SendGrid v6 o anterior (API antigua)
-     */
-    private function enviarCorreoV6($to, $toName, $subject, $bodyHTML, $bodyText, $attachments) {
-        // Suprimir warnings de deprecación de SendGrid
-        $errorLevel = error_reporting(E_ALL & ~E_DEPRECATED & ~E_STRICT);
-        ob_start();
-        
-        try {
-            // Verificar que las clases de la versión antigua existen
-            if (!class_exists('SendGrid\Email')) {
-                // Intentar cargar manualmente
-                $sendgridPath = __DIR__ . '/../vendor/sendgrid/sendgrid/lib/SendGrid.php';
-                if (file_exists($sendgridPath)) {
-                    require_once $sendgridPath;
-                }
-                
-                if (!class_exists('SendGrid\Email')) {
-                    throw new Exception('No se pudo cargar SendGrid. Verifica que esté instalado correctamente.');
-                }
-            }
-            
-            // Usar la API antigua de SendGrid
-            $from = new \SendGrid\Email($this->config['from_name'], $this->config['from_email']);
-            $to_email = new \SendGrid\Email($toName ?: '', $to);
-            $content_html = new \SendGrid\Content("text/html", $bodyHTML);
-            $content_text = new \SendGrid\Content("text/plain", $bodyText ?: strip_tags($bodyHTML));
-            
-            $mail = new \SendGrid\Mail($from, $subject, $to_email, $content_text);
-            $mail->addContent($content_html);
-            
-            // Reply-To
-            if (!empty($this->config['reply_to_email'])) {
-                $replyTo = new \SendGrid\Email($this->config['reply_to_name'], $this->config['reply_to_email']);
-                $mail->setReplyTo($replyTo);
-            }
-            
-            // Adjuntos
-            foreach ($attachments as $attachment) {
-                if (file_exists($attachment)) {
-                    $fileContent = base64_encode(file_get_contents($attachment));
-                    $fileName = basename($attachment);
-                    $mimeType = function_exists('mime_content_type') 
-                        ? mime_content_type($attachment) 
-                        : 'application/octet-stream';
-                    
-                    $attachment_obj = new \SendGrid\Attachment();
-                    $attachment_obj->setContent($fileContent);
-                    $attachment_obj->setType($mimeType);
-                    $attachment_obj->setFilename($fileName);
-                    $attachment_obj->setDisposition("attachment");
-                    $mail->addAttachment($attachment_obj);
-                }
-            }
-            
-            $response = $this->sendgrid->client->mail()->send()->post($mail);
-            $statusCode = $response->statusCode();
-            
-            if ($statusCode >= 200 && $statusCode < 300) {
-                $resultado = ['success' => true, 'message' => 'Correo enviado correctamente', 'status_code' => $statusCode];
-            } else {
-                $body = $response->body();
-                error_log("SendGrid error: Status $statusCode - $body");
-                $resultado = ['success' => false, 'message' => "Error al enviar correo: Status $statusCode", 'status_code' => $statusCode];
-            }
-        } finally {
-            // Limpiar cualquier salida de warnings
-            ob_end_clean();
-            error_reporting($errorLevel);
-        }
-        
-        return $resultado;
-    }
-    
-    /**
-     * Envía correo usando un template
-     * 
-     * @param string $to Email del destinatario
-     * @param string $toName Nombre del destinatario
-     * @param string $template Nombre del template (sin extensión)
-     * @param array $data Datos para reemplazar en el template
-     * @return array ['success' => bool, 'message' => string]
-     */
     public function enviarTemplate($to, $toName, $template, $data = []) {
         $templatePath = __DIR__ . '/../templates/email/' . $template . '.php';
-        
+
         if (!file_exists($templatePath)) {
             return [
                 'success' => false,
-                'message' => "Template no encontrado: {$template}"
+                'message' => "Template no encontrado: {$template}",
             ];
         }
-        
-        // Extraer variables del array $data para usarlas en el template
+
         extract($data);
-        
-        // Capturar el contenido del template
+
         ob_start();
         include $templatePath;
         $bodyHTML = ob_get_clean();
-        
-        // Generar texto plano desde HTML
+
         $bodyText = strip_tags($bodyHTML);
-        
-        // Obtener asunto del template si está definido
         $subject = $data['subject'] ?? 'Notificación de AutoMarket Seminuevos';
-        
+
         return $this->enviarCorreo($to, $subject, $bodyHTML, $toName, $bodyText, []);
     }
-    
-    /**
-     * Notifica al vendedor cuando el banco responde
-     */
+
     public function notificarVendedorBancoResponde($vendedorEmail, $vendedorNombre, $solicitud) {
         return $this->enviarTemplate(
             $vendedorEmail,
@@ -397,14 +144,11 @@ class EmailService {
                 'subject' => 'Respuesta del Banco - Solicitud #' . $solicitud['id'],
                 'vendedor_nombre' => $vendedorNombre,
                 'solicitud' => $solicitud,
-                'app_url' => $this->config['app_url']
+                'app_url' => $this->config['app_url'],
             ]
         );
     }
-    
-    /**
-     * Envía recordatorio al banco sobre una solicitud pendiente
-     */
+
     public function enviarRecordatorioBanco($bancoEmail, $bancoNombre, $solicitud) {
         return $this->enviarTemplate(
             $bancoEmail,
@@ -414,14 +158,11 @@ class EmailService {
                 'subject' => 'Recordatorio: Solicitud Pendiente #' . $solicitud['id'],
                 'banco_nombre' => $bancoNombre,
                 'solicitud' => $solicitud,
-                'app_url' => $this->config['app_url']
+                'app_url' => $this->config['app_url'],
             ]
         );
     }
-    
-    /**
-     * Notifica al banco cuando se le asigna una nueva solicitud
-     */
+
     public function notificarBancoNuevaSolicitud($bancoEmail, $bancoNombre, $solicitud) {
         return $this->enviarTemplate(
             $bancoEmail,
@@ -431,14 +172,11 @@ class EmailService {
                 'subject' => 'Nueva Solicitud Asignada #' . $solicitud['id'],
                 'banco_nombre' => $bancoNombre,
                 'solicitud' => $solicitud,
-                'app_url' => $this->config['app_url']
+                'app_url' => $this->config['app_url'],
             ]
         );
     }
-    
-    /**
-     * Notifica al cliente cuando su solicitud es aprobada
-     */
+
     public function notificarClienteAprobacion($clienteEmail, $clienteNombre, $solicitud) {
         return $this->enviarTemplate(
             $clienteEmail,
@@ -448,14 +186,11 @@ class EmailService {
                 'subject' => '¡Felicidades! Su solicitud de crédito ha sido aprobada',
                 'cliente_nombre' => $clienteNombre,
                 'solicitud' => $solicitud,
-                'app_url' => $this->config['app_url']
+                'app_url' => $this->config['app_url'],
             ]
         );
     }
-    
-    /**
-     * Notifica al gestor sobre cambios importantes en la solicitud
-     */
+
     public function notificarGestorCambioEstado($gestorEmail, $gestorNombre, $solicitud, $estadoAnterior, $estadoNuevo) {
         return $this->enviarTemplate(
             $gestorEmail,
@@ -467,14 +202,11 @@ class EmailService {
                 'solicitud' => $solicitud,
                 'estado_anterior' => $estadoAnterior,
                 'estado_nuevo' => $estadoNuevo,
-                'app_url' => $this->config['app_url']
+                'app_url' => $this->config['app_url'],
             ]
         );
     }
-    
-    /**
-     * Notifica cuando se solicita una reevaluación
-     */
+
     public function notificarReevaluacion($bancoEmail, $bancoNombre, $solicitud, $comentario) {
         return $this->enviarTemplate(
             $bancoEmail,
@@ -485,7 +217,7 @@ class EmailService {
                 'banco_nombre' => $bancoNombre,
                 'solicitud' => $solicitud,
                 'comentario' => $comentario,
-                'app_url' => $this->config['app_url']
+                'app_url' => $this->config['app_url'],
             ]
         );
     }
