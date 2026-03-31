@@ -5,6 +5,8 @@
  * Uso:
  *  - /test_pipedrive_api.php
  *  - /test_pipedrive_api.php?limit=20
+ *  - /test_pipedrive_api.php?from_year=2026
+ *  - /test_pipedrive_api.php?from_year=2026&max_pages=15
  *  - /test_pipedrive_api.php?lead_id=123
  *  - /test_pipedrive_api.php?person_id=456
  */
@@ -100,6 +102,17 @@ function extractPersonIdFromLead(array $lead): ?int {
     return null;
 }
 
+function isLeadFromYearOrLater(array $lead, int $fromYear): bool {
+    $addTime = $lead['add_time'] ?? null;
+    if (!$addTime) return false;
+    try {
+        $dt = new DateTime((string) $addTime);
+        return (int) $dt->format('Y') >= $fromYear;
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+
 loadDotEnvIfNeeded();
 $token = trim((string) (getenv('PIPEDRIVE_API_KEY') ?: ($_ENV['PIPEDRIVE_API_KEY'] ?? '')));
 $baseUrl = rtrim((string) (getenv('PIPEDRIVE_BASE_URL') ?: ($_ENV['PIPEDRIVE_BASE_URL'] ?? 'https://grupopcr.pipedrive.com/api/v1')), '/');
@@ -116,6 +129,9 @@ if ($token === '') {
 $limit = isset($_GET['limit']) ? max(1, min(100, (int) $_GET['limit'])) : 10;
 $leadId = isset($_GET['lead_id']) ? (int) $_GET['lead_id'] : 0;
 $personId = isset($_GET['person_id']) ? (int) $_GET['person_id'] : 0;
+$fromYear = isset($_GET['from_year']) ? (int) $_GET['from_year'] : 0;
+$maxPages = isset($_GET['max_pages']) ? max(1, min(100, (int) $_GET['max_pages'])) : 10;
+$start = isset($_GET['start']) ? max(0, (int) $_GET['start']) : 0;
 
 $out = [
     'success' => true,
@@ -124,6 +140,9 @@ $out = [
         'token_present' => true,
         'token_last4' => substr($token, -4),
         'limit' => $limit,
+        'start' => $start,
+        'from_year' => $fromYear > 0 ? $fromYear : null,
+        'max_pages' => $maxPages,
     ],
     'requests' => [],
 ];
@@ -131,9 +150,51 @@ $out = [
 $out['requests']['users_me'] = pdRequest($baseUrl, $token, '/users/me');
 $out['requests']['leads'] = pdRequest($baseUrl, $token, '/leads', [
     'limit' => $limit,
+    'start' => $start,
     'sort' => 'add_time',
     'sort_direction' => 'desc',
 ]);
+
+if ($fromYear > 0 && !empty($out['requests']['leads']['ok'])) {
+    $filtered = [];
+    $pagesScanned = 0;
+    $nextStart = $start;
+    $more = true;
+    while ($more && $pagesScanned < $maxPages) {
+        $page = pdRequest($baseUrl, $token, '/leads', [
+            'limit' => $limit,
+            'start' => $nextStart,
+            'sort' => 'add_time',
+            'sort_direction' => 'desc',
+        ]);
+        $pagesScanned++;
+        if (empty($page['ok'])) {
+            $out['filtered_scan_error'] = $page;
+            break;
+        }
+        $leadsPage = $page['response']['data'] ?? [];
+        if (!is_array($leadsPage) || empty($leadsPage)) {
+            $more = false;
+            break;
+        }
+        foreach ($leadsPage as $lead) {
+            if (is_array($lead) && isLeadFromYearOrLater($lead, $fromYear)) {
+                $filtered[] = $lead;
+            }
+        }
+        $pagination = $page['response']['additional_data']['pagination'] ?? [];
+        $more = !empty($pagination['more_items_in_collection']);
+        $nextStart = isset($pagination['next_start']) ? (int) $pagination['next_start'] : ($nextStart + $limit);
+    }
+
+    $out['requests']['leads_from_year'] = [
+        'from_year' => $fromYear,
+        'pages_scanned' => $pagesScanned,
+        'max_pages' => $maxPages,
+        'result_count' => count($filtered),
+        'data' => $filtered,
+    ];
+}
 
 if ($leadId > 0) {
     $out['requests']['lead_by_id'] = pdRequest($baseUrl, $token, '/leads/' . $leadId);
@@ -142,7 +203,7 @@ if ($leadId > 0) {
 if ($personId > 0) {
     $out['requests']['person_by_id'] = pdRequest($baseUrl, $token, '/persons/' . $personId);
 } else {
-    $leadData = $out['requests']['leads']['response']['data'] ?? [];
+    $leadData = $out['requests']['leads_from_year']['data'] ?? ($out['requests']['leads']['response']['data'] ?? []);
     if (is_array($leadData) && !empty($leadData[0]) && is_array($leadData[0])) {
         $autoPersonId = extractPersonIdFromLead($leadData[0]);
         if ($autoPersonId) {
