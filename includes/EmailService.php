@@ -40,13 +40,19 @@ class EmailService {
         $smtpPass = $this->config['smtp_pass'] ?? '';
         $resendApiKey = trim((string) ($this->config['resend_api_key'] ?? ''));
         
-        if (($driver === 'smtp' || $smtpHost !== '') && $smtpUser !== '' && $smtpPass !== '') {
+        if ($driver === 'smtp' && $smtpUser !== '' && $smtpPass !== '') {
             $this->useSmtp = true;
             return;
         }
 
         if ($driver === 'resend' && $resendApiKey !== '') {
             $this->useResend = true;
+            return;
+        }
+
+        // Compatibilidad hacia atrás: si no forzaron driver y hay SMTP completo, usar SMTP.
+        if ($driver === '' && $smtpHost !== '' && $smtpUser !== '' && $smtpPass !== '') {
+            $this->useSmtp = true;
             return;
         }
         

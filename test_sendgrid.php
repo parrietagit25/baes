@@ -92,7 +92,7 @@ $cfg = require __DIR__ . '/config/email.php';
 $driver = strtolower((string) ($cfg['driver'] ?? 'sendgrid'));
 $smtpOk = ($cfg['smtp_host'] ?? '') !== '' && ($cfg['smtp_user'] ?? '') !== '' && ($cfg['smtp_pass'] ?? '') !== '';
 $useResend = ($driver === 'resend') && !empty($cfg['resend_api_key']);
-$usaSmtp = ($driver === 'smtp' || ($cfg['smtp_host'] ?? '') !== '') && $smtpOk;
+$usaSmtp = ($driver === 'smtp') && $smtpOk;
 
 if ($useResend) {
     echo "Modo: Resend API\n";
