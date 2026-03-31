@@ -113,6 +113,45 @@ function isLeadFromYearOrLater(array $lead, int $fromYear): bool {
     }
 }
 
+function fetchAllLeads(string $baseUrl, string $token, int $limit, int $start = 0, int $maxPages = 0): array {
+    $all = [];
+    $pagesScanned = 0;
+    $nextStart = $start;
+    $more = true;
+    while ($more) {
+        if ($maxPages > 0 && $pagesScanned >= $maxPages) {
+            break;
+        }
+        $page = pdRequest($baseUrl, $token, '/leads', [
+            'limit' => $limit,
+            'start' => $nextStart,
+            'sort' => 'add_time',
+            'sort_direction' => 'desc',
+        ]);
+        $pagesScanned++;
+        if (empty($page['ok'])) {
+            return [
+                'ok' => false,
+                'pages_scanned' => $pagesScanned,
+                'error_page' => $page,
+                'data' => $all,
+            ];
+        }
+        $leadsPage = $page['response']['data'] ?? [];
+        if (is_array($leadsPage) && !empty($leadsPage)) {
+            $all = array_merge($all, $leadsPage);
+        }
+        $pagination = $page['response']['additional_data']['pagination'] ?? [];
+        $more = !empty($pagination['more_items_in_collection']);
+        $nextStart = isset($pagination['next_start']) ? (int) $pagination['next_start'] : ($nextStart + $limit);
+    }
+    return [
+        'ok' => true,
+        'pages_scanned' => $pagesScanned,
+        'data' => $all,
+    ];
+}
+
 loadDotEnvIfNeeded();
 $token = trim((string) (getenv('PIPEDRIVE_API_KEY') ?: ($_ENV['PIPEDRIVE_API_KEY'] ?? '')));
 $baseUrl = rtrim((string) (getenv('PIPEDRIVE_BASE_URL') ?: ($_ENV['PIPEDRIVE_BASE_URL'] ?? 'https://grupopcr.pipedrive.com/api/v1')), '/');
@@ -126,12 +165,13 @@ if ($token === '') {
     exit;
 }
 
-$limit = isset($_GET['limit']) ? max(1, min(100, (int) $_GET['limit'])) : 10;
+$limit = isset($_GET['limit']) ? max(1, (int) $_GET['limit']) : 100;
 $leadId = isset($_GET['lead_id']) ? (int) $_GET['lead_id'] : 0;
 $personId = isset($_GET['person_id']) ? (int) $_GET['person_id'] : 0;
 $fromYear = isset($_GET['from_year']) ? (int) $_GET['from_year'] : 0;
-$maxPages = isset($_GET['max_pages']) ? max(1, min(100, (int) $_GET['max_pages'])) : 10;
+$maxPages = isset($_GET['max_pages']) ? max(0, (int) $_GET['max_pages']) : 0;
 $start = isset($_GET['start']) ? max(0, (int) $_GET['start']) : 0;
+$allPages = !isset($_GET['all_pages']) || $_GET['all_pages'] !== '0';
 
 $out = [
     'success' => true,
@@ -142,55 +182,39 @@ $out = [
         'limit' => $limit,
         'start' => $start,
         'from_year' => $fromYear > 0 ? $fromYear : null,
-        'max_pages' => $maxPages,
+        'all_pages' => $allPages,
+        'max_pages' => $maxPages > 0 ? $maxPages : null,
     ],
     'requests' => [],
 ];
 
 $out['requests']['users_me'] = pdRequest($baseUrl, $token, '/users/me');
-$out['requests']['leads'] = pdRequest($baseUrl, $token, '/leads', [
-    'limit' => $limit,
-    'start' => $start,
-    'sort' => 'add_time',
-    'sort_direction' => 'desc',
-]);
+$out['requests']['leads'] = $allPages
+    ? fetchAllLeads($baseUrl, $token, $limit, $start, $maxPages)
+    : pdRequest($baseUrl, $token, '/leads', [
+        'limit' => $limit,
+        'start' => $start,
+        'sort' => 'add_time',
+        'sort_direction' => 'desc',
+    ]);
 
 if ($fromYear > 0 && !empty($out['requests']['leads']['ok'])) {
     $filtered = [];
-    $pagesScanned = 0;
-    $nextStart = $start;
-    $more = true;
-    while ($more && $pagesScanned < $maxPages) {
-        $page = pdRequest($baseUrl, $token, '/leads', [
-            'limit' => $limit,
-            'start' => $nextStart,
-            'sort' => 'add_time',
-            'sort_direction' => 'desc',
-        ]);
-        $pagesScanned++;
-        if (empty($page['ok'])) {
-            $out['filtered_scan_error'] = $page;
-            break;
-        }
-        $leadsPage = $page['response']['data'] ?? [];
-        if (!is_array($leadsPage) || empty($leadsPage)) {
-            $more = false;
-            break;
-        }
-        foreach ($leadsPage as $lead) {
+    $sourceLeads = $allPages
+        ? ($out['requests']['leads']['data'] ?? [])
+        : ($out['requests']['leads']['response']['data'] ?? []);
+    if (is_array($sourceLeads)) {
+        foreach ($sourceLeads as $lead) {
             if (is_array($lead) && isLeadFromYearOrLater($lead, $fromYear)) {
                 $filtered[] = $lead;
             }
         }
-        $pagination = $page['response']['additional_data']['pagination'] ?? [];
-        $more = !empty($pagination['more_items_in_collection']);
-        $nextStart = isset($pagination['next_start']) ? (int) $pagination['next_start'] : ($nextStart + $limit);
     }
 
     $out['requests']['leads_from_year'] = [
         'from_year' => $fromYear,
-        'pages_scanned' => $pagesScanned,
-        'max_pages' => $maxPages,
+        'pages_scanned' => $out['requests']['leads']['pages_scanned'] ?? 1,
+        'max_pages' => $maxPages > 0 ? $maxPages : null,
         'result_count' => count($filtered),
         'data' => $filtered,
     ];
