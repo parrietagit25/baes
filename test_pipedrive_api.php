@@ -7,6 +7,7 @@
  *  - /test_pipedrive_api.php?limit=20
  *  - /test_pipedrive_api.php?from_year=2026
  *  - /test_pipedrive_api.php?from_year=2026&max_pages=15
+ *  - /test_pipedrive_api.php?include_extra=1
  *  - /test_pipedrive_api.php?lead_id=123
  *  - /test_pipedrive_api.php?person_id=456
  */
@@ -172,6 +173,7 @@ $fromYear = isset($_GET['from_year']) ? (int) $_GET['from_year'] : 0;
 $maxPages = isset($_GET['max_pages']) ? max(0, (int) $_GET['max_pages']) : 0;
 $start = isset($_GET['start']) ? max(0, (int) $_GET['start']) : 0;
 $allPages = !isset($_GET['all_pages']) || $_GET['all_pages'] !== '0';
+$includeExtra = isset($_GET['include_extra']) && $_GET['include_extra'] === '1';
 
 $out = [
     'success' => true,
@@ -184,6 +186,7 @@ $out = [
         'from_year' => $fromYear > 0 ? $fromYear : null,
         'all_pages' => $allPages,
         'max_pages' => $maxPages > 0 ? $maxPages : null,
+        'include_extra' => $includeExtra,
     ],
     'requests' => [],
 ];
@@ -235,6 +238,35 @@ if ($personId > 0) {
             $out['auto_person_id_from_first_lead'] = $autoPersonId;
         }
     }
+}
+
+if ($includeExtra) {
+    // Endpoints útiles para analizar más contexto de negocio en Pipedrive
+    $out['requests']['deals'] = pdRequest($baseUrl, $token, '/deals', [
+        'limit' => $limit,
+        'start' => $start,
+        'sort' => 'update_time',
+        'sort_direction' => 'desc',
+        'status' => 'open',
+    ]);
+    $out['requests']['activities'] = pdRequest($baseUrl, $token, '/activities', [
+        'limit' => $limit,
+        'start' => $start,
+        'done' => 0,
+    ]);
+    $out['requests']['organizations'] = pdRequest($baseUrl, $token, '/organizations', [
+        'limit' => $limit,
+        'start' => $start,
+        'sort' => 'update_time',
+    ]);
+    $out['requests']['pipelines'] = pdRequest($baseUrl, $token, '/pipelines');
+    $out['requests']['stages'] = pdRequest($baseUrl, $token, '/stages');
+    $out['requests']['notes'] = pdRequest($baseUrl, $token, '/notes', [
+        'limit' => $limit,
+        'start' => $start,
+        'sort' => 'update_time',
+        'sort_direction' => 'desc',
+    ]);
 }
 
 echo json_encode($out, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
