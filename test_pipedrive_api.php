@@ -12,8 +12,22 @@ session_start();
 header('Content-Type: application/json; charset=utf-8');
 
 if (!isset($_SESSION['user_id'])) {
+    // En navegador, comportarse como el resto del sistema (redirigir a login)
+    if (!empty($_SERVER['HTTP_ACCEPT']) && strpos($_SERVER['HTTP_ACCEPT'], 'text/html') !== false) {
+        header('Location: /index.php');
+        exit;
+    }
     http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'No autorizado']);
+    exit;
+}
+
+$userRoles = $_SESSION['user_roles'] ?? [];
+$isAdmin = in_array('ROLE_ADMIN', $userRoles, true);
+$isGestor = in_array('ROLE_GESTOR', $userRoles, true);
+if (!$isAdmin && !$isGestor) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Sin permisos para este diagnóstico']);
     exit;
 }
 
