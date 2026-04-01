@@ -324,9 +324,20 @@ function cargarSolicitudes() {
                 console.log('Datos recibidos:', response.data);
                 let filasGeneradas = 0;
                 const isBancoNoAdmin = window.userRoles && window.userRoles.isBanco && !window.userRoles.isAdmin;
+                function escDataAttr(s) {
+                    return String(s == null ? '' : s)
+                        .replace(/&/g, '&amp;')
+                        .replace(/"/g, '&quot;')
+                        .replace(/</g, '&lt;')
+                        .replace(/\r|\n/g, ' ');
+                }
                 response.data.forEach(function(solicitud) {
                     const estadoClass = getEstadoClass(solicitud.estado);
                     const respuestaClass = getRespuestaClass(solicitud.respuesta_banco);
+                    const idCelda = (window.userRoles && window.userRoles.isAdmin)
+                        ? ('<a href="javascript:void(0);" class="link-cronologia-solicitud text-primary fw-semibold text-decoration-underline" role="button" data-id="' +
+                            solicitud.id + '" data-nombre="' + escDataAttr(solicitud.nombre_cliente) + '" title="Ver cronología de la solicitud">#' + solicitud.id + '</a>')
+                        : String(solicitud.id);
                     
                     const accionesComunes = `
                                 <div class="btn-group-vertical btn-group-sm" role="group">
@@ -373,7 +384,7 @@ function cargarSolicitudes() {
                     if (isBancoNoAdmin) {
                         row = `
                         <tr>
-                            <td>${solicitud.id}</td>
+                            <td>${idCelda}</td>
                             <td>${solicitud.nombre_cliente}</td>
                             <td>${solicitud.cedula}</td>
                             <td>
@@ -390,7 +401,7 @@ function cargarSolicitudes() {
                     } else {
                         row = `
                         <tr>
-                            <td>${solicitud.id}</td>
+                            <td>${idCelda}</td>
                             <td>${solicitud.nombre_cliente}</td>
                             <td>${solicitud.cedula}</td>
                             <td>${solicitud.marca_auto || '-'} ${solicitud.modelo_auto || ''} ${solicitud.año_auto || ''}</td>

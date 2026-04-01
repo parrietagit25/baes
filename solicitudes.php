@@ -253,7 +253,7 @@ if ($isBanco && !$isAdmin) {
                                 <table id="solicitudesTable" class="table table-striped table-hover">
                                     <thead>
                                         <tr>
-                                            <th>ID</th>
+                                            <th<?php echo $isAdmin ? ' title="Clic en el número para ver la cronología (solo administrador)"' : ''; ?>>ID</th>
                                             <th>Cliente</th>
                                             <?php if ($esUsuarioBancoLista): ?>
                                             <th>Cédula</th>
@@ -326,7 +326,16 @@ if ($isBanco && !$isAdmin) {
                                             }
                                         ?>
                                         <tr>
-                                            <td><?php echo $solicitud['id']; ?></td>
+                                            <td>
+                                                <?php if ($isAdmin): ?>
+                                                <a href="javascript:void(0);" class="link-cronologia-solicitud text-primary fw-semibold text-decoration-underline" role="button"
+                                                   data-id="<?php echo (int) $solicitud['id']; ?>"
+                                                   data-nombre="<?php echo htmlspecialchars($solicitud['nombre_cliente'] ?? '', ENT_QUOTES, 'UTF-8'); ?>"
+                                                   title="Ver cronología de la solicitud">#<?php echo (int) $solicitud['id']; ?></a>
+                                                <?php else: ?>
+                                                <?php echo (int) $solicitud['id']; ?>
+                                                <?php endif; ?>
+                                            </td>
                                             <td><?php echo htmlspecialchars($solicitud['nombre_cliente']); ?></td>
                                             <?php if ($esUsuarioBancoLista): ?>
                                             <td><?php echo htmlspecialchars($solicitud['cedula']); ?></td>
@@ -2052,6 +2061,65 @@ if ($isBanco && !$isAdmin) {
             return '<div class="small text-break" style="max-width:260px;max-height:120px;overflow:auto;white-space:pre-wrap;">' + t + '</div>';
         }
 
+        function abrirCronologiaSolicitud(solicitudId, nombreCliente) {
+            if (!window.userRoles || !window.userRoles.isAdmin) {
+                return;
+            }
+            nombreCliente = nombreCliente || '';
+            var spanTit = document.createElement('span');
+            spanTit.textContent = ' Cronología — Solicitud #' + solicitudId + (nombreCliente ? ' · ' + nombreCliente : '');
+            $('#modalCronologiaTitulo').empty().append($('<i class="fas fa-history me-2"></i>')).append(spanTit);
+            $('#modalCronologiaBody').html('<div class="text-center py-4"><div class="spinner-border text-secondary" role="status"></div><p class="small text-muted mt-2 mb-0">Cargando eventos…</p></div>');
+            $('#modalCronologiaSolicitud').modal('show');
+            $.ajax({
+                url: 'api/cronologia_solicitud.php',
+                type: 'GET',
+                data: { solicitud_id: solicitudId },
+                dataType: 'json'
+            }).done(function (response) {
+                if (!response.success) {
+                    $('#modalCronologiaBody').html('<div class="alert alert-danger mb-0">' + escapeHtmlText(response.message || 'Error al cargar la cronología.') + '</div>');
+                    return;
+                }
+                var data = response.data || [];
+                if (data.length === 0) {
+                    $('#modalCronologiaBody').html('<p class="text-muted mb-0">No hay eventos registrados para esta solicitud.</p>');
+                    return;
+                }
+                var html = '<p class="text-muted small mb-3">Orden: del más antiguo al más reciente.</p><div class="cronologia-lista">';
+                for (var i = 0; i < data.length; i++) {
+                    var ev = data[i];
+                    var fecha = ev.fecha ? new Date(ev.fecha).toLocaleString('es-PA') : '—';
+                    html += '<div class="border-start border-3 border-secondary ps-3 pb-3 mb-3 ms-1">';
+                    html += '<div class="text-muted small">' + escapeHtmlText(fecha) + '</div>';
+                    html += '<div class="fw-semibold">' + escapeHtmlText(ev.tipo_label || ev.tipo || '') + '</div>';
+                    if (ev.titulo) {
+                        html += '<div class="small text-primary">' + escapeHtmlText(ev.titulo) + '</div>';
+                    }
+                    html += '<div class="small"><i class="fas fa-user me-1 text-muted"></i>' + escapeHtmlText(ev.usuario_nombre || '') + '</div>';
+                    if (ev.detalle) {
+                        html += '<div class="mt-2 small text-break" style="white-space:pre-wrap;">' + escapeHtmlText(ev.detalle) + '</div>';
+                    }
+                    html += '</div>';
+                }
+                html += '</div>';
+                $('#modalCronologiaBody').html(html);
+            }).fail(function () {
+                $('#modalCronologiaBody').html('<div class="alert alert-danger mb-0">Error de conexión al cargar la cronología.</div>');
+            });
+        }
+
+        $(function () {
+            $(document).on('click', '.link-cronologia-solicitud', function (e) {
+                e.preventDefault();
+                if (!window.userRoles || !window.userRoles.isAdmin) return;
+                var id = $(this).data('id');
+                var nom = $(this).attr('data-nombre') || '';
+                if (!id) return;
+                abrirCronologiaSolicitud(id, nom);
+            });
+        });
+
           // Función para ver respuestas del banco
         function verRespuestasBanco(solicitudId) {
             $('#respuestasBancoContent').html(`
@@ -2305,6 +2373,24 @@ if ($isBanco && !$isAdmin) {
             });
         }
     </script>
+
+    <!-- Modal cronología de solicitud -->
+    <div class="modal fade" id="modalCronologiaSolicitud" tabindex="-1" aria-labelledby="modalCronologiaTitulo" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title d-flex align-items-center" id="modalCronologiaTitulo">
+                        <i class="fas fa-history me-2"></i><span>Cronología</span>
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body" id="modalCronologiaBody"></div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Modal para ver mis respuestas (usuario banco) — mismo criterio visual que admin/gestor -->
     <div class="modal fade" id="modalRespuestasBanco" tabindex="-1">
