@@ -2046,6 +2046,11 @@ if ($isBanco && !$isAdmin) {
             partes.push('<strong>Solicitud:</strong> #' + sid);
             return '<div class="alert alert-light border mb-3"><i class="fas fa-user me-2 text-primary"></i>' + partes.join(' &nbsp;&middot;&nbsp; ') + '</div>';
         }
+        function celdaComentarioGestor(texto) {
+            var t = escapeHtmlText(texto || '');
+            if (!t) return '<span class="text-muted">—</span>';
+            return '<div class="small text-break" style="max-width:260px;max-height:120px;overflow:auto;white-space:pre-wrap;">' + t + '</div>';
+        }
 
           // Función para ver respuestas del banco
         function verRespuestasBanco(solicitudId) {
@@ -2073,9 +2078,10 @@ if ($isBanco && !$isAdmin) {
                     }
                     var headerHtml = bloqueEncabezadoClienteRespuestas(solicitudId, response.solicitud_cliente);
                     var evaluacionSeleccionada = response.evaluacion_seleccionada;
+                    var comentarioSeleccionGlobal = response.comentario_seleccion_propuesta || '';
                     if (response.data.length > 0) {
                         let html = '<div class="table-responsive"><table class="table table-striped">';
-                        html += '<thead><tr><th>Fecha</th><th>Vehículo</th><th>Decisión</th><th>Tasa %</th><th>Valor a Financiar</th><th>Abono</th><th>Plazo</th><th>Letra</th><th>Promoción</th><th>Comentarios</th><th>Selección</th></tr></thead>';
+                        html += '<thead><tr><th>Fecha</th><th>Vehículo</th><th>Decisión</th><th>Tasa %</th><th>Valor a Financiar</th><th>Abono</th><th>Plazo</th><th>Letra</th><th>Promoción</th><th>Comentarios</th><th>Comentario al seleccionar</th><th>Motivo reevaluación</th><th>Selección</th></tr></thead>';
                         html += '<tbody>';
                         
                         response.data.forEach(function(evaluacion) {
@@ -2090,6 +2096,9 @@ if ($isBanco && !$isAdmin) {
                             html += '<td>' + (evaluacion.letra ? '$' + parseFloat(evaluacion.letra).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
                             html += '<td>' + (evaluacion.promocion || '-') + '</td>';
                             html += '<td>' + (evaluacion.comentarios || '-') + '</td>';
+                            var textoSeleccionFila = (evaluacionSeleccionada && String(evaluacion.id) === String(evaluacionSeleccionada)) ? comentarioSeleccionGlobal : '';
+                            html += '<td>' + celdaComentarioGestor(textoSeleccionFila) + '</td>';
+                            html += '<td>' + celdaComentarioGestor(evaluacion.comentario_reevaluacion_solicitada) + '</td>';
                             html += '<td>';
                             if (evaluacionSeleccionada && String(evaluacion.id) === String(evaluacionSeleccionada)) {
                                 html += '<span class="badge bg-success"><i class="fas fa-check-circle me-1"></i>Propuesta seleccionada</span>';
@@ -2143,12 +2152,15 @@ if ($isBanco && !$isAdmin) {
                     var headerHtml = bloqueEncabezadoClienteRespuestas(solicitudId, response.solicitud_cliente);
                     if (response.data.length > 0) {
                           const evaluacionSeleccionada = response.evaluacion_seleccionada;
+                          const comentarioSeleccionGlobal = response.comentario_seleccion_propuesta || '';
                           const mostrarAcciones = !evaluacionSeleccionada; // No mostrar acciones si hay una evaluación seleccionada
                           
                           let html = '<div class="table-responsive"><table class="table table-striped">';
-                          html += '<thead><tr><th>Fecha</th><th>Banco</th><th>Vehículo</th><th>Decisión</th><th>Tasa %</th><th>Valor a Financiar</th><th>Abono</th><th>Plazo</th><th>Letra</th><th>Promoción</th><th>Comentarios</th>';
+                          html += '<thead><tr><th>Fecha</th><th>Banco</th><th>Vehículo</th><th>Decisión</th><th>Tasa %</th><th>Valor a Financiar</th><th>Abono</th><th>Plazo</th><th>Letra</th><th>Promoción</th><th>Comentarios</th><th>Comentario al seleccionar</th><th>Motivo reevaluación</th>';
                           if (mostrarAcciones) {
                               html += '<th>Acciones</th>';
+                          } else {
+                              html += '<th>Selección</th>';
                           }
                           html += '</tr></thead>';
                           html += '<tbody>';
@@ -2166,13 +2178,22 @@ if ($isBanco && !$isAdmin) {
                               html += '<td>' + (evaluacion.letra ? '$' + parseFloat(evaluacion.letra).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
                               html += '<td>' + (evaluacion.promocion || '-') + '</td>';
                               html += '<td>' + (evaluacion.comentarios || '-') + '</td>';
+                              var textoSel = (evaluacionSeleccionada && String(evaluacion.id) === String(evaluacionSeleccionada)) ? comentarioSeleccionGlobal : '';
+                              html += '<td>' + celdaComentarioGestor(textoSel) + '</td>';
+                              html += '<td>' + celdaComentarioGestor(evaluacion.comentario_reevaluacion_solicitada) + '</td>';
                               if (mostrarAcciones) {
                                   html += '<td><div class="btn-group-vertical btn-group-sm">';
                                   html += '<button class="btn btn-success btn-sm mb-1" onclick="seleccionarPropuesta(' + evaluacion.id + ', ' + solicitudId + ', \'' + evaluacion.usuario_banco_id + '\')" title="Seleccionar Propuesta"><i class="fas fa-check me-1"></i>Seleccionar</button>';
                                   html += '<button class="btn btn-warning btn-sm" onclick="solicitarReevaluacion(' + evaluacion.id + ', ' + solicitudId + ', \'' + evaluacion.usuario_banco_id + '\')" title="Solicitar Reevaluación"><i class="fas fa-redo me-1"></i>Reevaluar</button>';
                                   html += '</div></td>';
-                              } else if (evaluacion.id == evaluacionSeleccionada) {
-                                  html += '<td><span class="badge bg-success"><i class="fas fa-check-circle me-1"></i>Propuesta Seleccionada</span></td>';
+                              } else {
+                                  html += '<td>';
+                                  if (evaluacion.id == evaluacionSeleccionada) {
+                                      html += '<span class="badge bg-success"><i class="fas fa-check-circle me-1"></i>Propuesta seleccionada</span>';
+                                  } else {
+                                      html += '<span class="text-muted">—</span>';
+                                  }
+                                  html += '</td>';
                               }
                               html += '</tr>';
                           });

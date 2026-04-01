@@ -227,6 +227,8 @@ CREATE TABLE `evaluaciones_banco` (
   `promocion` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `tasa_bancaria` decimal(6,2) NOT NULL DEFAULT 0 COMMENT 'Tasa nominal anual (%)',
   `comentarios` text COLLATE utf8mb4_unicode_ci,
+  `comentario_reevaluacion_solicitada` text COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Motivo al solicitar reevaluación (gestor/admin)',
+  `fecha_solicitud_reevaluacion` datetime DEFAULT NULL,
   `fecha_evaluacion` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_solicitud` (`solicitud_id`),

@@ -117,6 +117,7 @@ function obtenerEvaluaciones($solicitudId, $usuarioBancoId = null) {
               SELECT s.evaluacion_seleccionada,
                      s.nombre_cliente,
                      s.cedula,
+                     s.comentario_seleccion_propuesta,
                      (SELECT eb2.usuario_banco_id FROM evaluaciones_banco eb2 WHERE eb2.id = s.evaluacion_seleccionada) AS usuario_banco_id_seleccionado
               FROM solicitudes_credito s
               WHERE s.id = ?
@@ -161,6 +162,7 @@ function obtenerEvaluaciones($solicitudId, $usuarioBancoId = null) {
               'data' => $evaluaciones,
               'evaluacion_seleccionada' => $evaluacionSeleccionada,
               'usuario_banco_id_seleccionado' => $usuarioBancoIdSeleccionado,
+              'comentario_seleccion_propuesta' => $solicitud['comentario_seleccion_propuesta'] ?? '',
               'solicitud_cliente' => [
                   'nombre_cliente' => $solicitud['nombre_cliente'] ?? '',
                   'cedula' => $solicitud['cedula'] ?? '',
@@ -407,6 +409,15 @@ function solicitarReevaluacion() {
             WHERE id = ?
         ");
         $stmt->execute([$evaluacionId, $solicitudId]);
+
+        // Guardar el motivo en la evaluación para que el banco lo vea en «Ver mis respuestas»
+        $stmt = $pdo->prepare("
+            UPDATE evaluaciones_banco
+            SET comentario_reevaluacion_solicitada = ?,
+                fecha_solicitud_reevaluacion = NOW()
+            WHERE id = ?
+        ");
+        $stmt->execute([$comentario, $evaluacionId]);
         
         // Enviar notificación al banco sobre la reevaluación (solo si email_helper está disponible)
         try {
