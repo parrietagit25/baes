@@ -9,6 +9,47 @@
 require_once __DIR__ . '/EmailService.php';
 
 /**
+ * Correos en copia para el resumen enviado al usuario banco: quien envía (sesión) y Email Pipedrive si existe.
+ *
+ * @return list<string>
+ */
+function obtenerCopiasResumenSolicitudBanco(PDO $pdo, array $solicitud, string $emailDestinoBanco): array {
+    if (session_status() !== PHP_SESSION_ACTIVE) {
+        @session_start();
+    }
+    $cc = [];
+    if (!empty($_SESSION['user_id'])) {
+        $stmt = $pdo->prepare('SELECT email FROM usuarios WHERE id = ? LIMIT 1');
+        $stmt->execute([(int) $_SESSION['user_id']]);
+        $u = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($u && !empty($u['email'])) {
+            $e = trim((string) $u['email']);
+            if ($e !== '' && filter_var($e, FILTER_VALIDATE_EMAIL)) {
+                $cc[] = $e;
+            }
+        }
+    }
+    if (!empty($solicitud['email_pipedrive'])) {
+        $e = trim((string) $solicitud['email_pipedrive']);
+        if ($e !== '' && filter_var($e, FILTER_VALIDATE_EMAIL)) {
+            $cc[] = $e;
+        }
+    }
+    $destLower = strtolower(trim($emailDestinoBanco));
+    $seen = [];
+    $out = [];
+    foreach ($cc as $e) {
+        $k = strtolower($e);
+        if ($k === $destLower || isset($seen[$k])) {
+            continue;
+        }
+        $seen[$k] = true;
+        $out[] = $e;
+    }
+    return $out;
+}
+
+/**
  * Envía notificación al vendedor cuando el banco responde
  */
 function enviarNotificacionVendedor($solicitudId) {
@@ -296,6 +337,8 @@ function enviarResumenSolicitudBanco($solicitudId, $usuarioBancoId) {
             $mostrarEnlaceMotus
         );
 
+        $copias = obtenerCopiasResumenSolicitudBanco($pdo, $solicitud, (string) $banco['banco_email']);
+
         $emailService = new EmailService();
         return $emailService->enviarCorreo(
             $banco['banco_email'],
@@ -303,7 +346,8 @@ function enviarResumenSolicitudBanco($solicitudId, $usuarioBancoId) {
             $html,
             $bancoNombre ?: 'Usuario Banco',
             strip_tags(preg_replace('/<br\s*\/?>/i', "\n", $html)),
-            []
+            [],
+            $copias
         );
     } catch (Exception $e) {
         error_log("Error enviarResumenSolicitudBanco: " . $e->getMessage());

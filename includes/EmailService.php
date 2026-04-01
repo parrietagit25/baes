@@ -39,6 +39,7 @@ class EmailService {
 
     /**
      * @param array $attachments Rutas locales de archivos
+     * @param array $cc Lista de correos en copia (solo dirección, sin nombre)
      */
     public function enviarCorreo(
         $to,
@@ -46,10 +47,11 @@ class EmailService {
         $bodyHTML,
         $toName = '',
         $bodyText = '',
-        $attachments = []
+        $attachments = [],
+        array $cc = []
     ) {
         try {
-            return $this->enviarCorreoResend($to, $toName, $subject, $bodyHTML, $bodyText, $attachments);
+            return $this->enviarCorreoResend($to, $toName, $subject, $bodyHTML, $bodyText, $attachments, $cc);
         } catch (Throwable $e) {
             error_log('Error al enviar correo (Resend): ' . $e->getMessage());
             return ['success' => false, 'message' => 'Error al enviar correo: ' . $e->getMessage()];
@@ -71,19 +73,25 @@ class EmailService {
         return 'Error Resend: ' . $raw;
     }
 
-    private function enviarCorreoResend($to, $toName, $subject, $bodyHTML, $bodyText, $attachments) {
+    private function enviarCorreoResend($to, $toName, $subject, $bodyHTML, $bodyText, $attachments, array $cc = []) {
         $apiKey = trim((string) ($this->config['resend_api_key'] ?? ''));
         $fromName = trim((string) ($this->config['from_name'] ?? ''));
         $fromEmail = trim((string) ($this->config['from_email'] ?? ''));
         $from = $fromName !== '' ? ($fromName . ' <' . $fromEmail . '>') : $fromEmail;
 
+        $toAddr = trim((string) $to);
         $params = [
             'from' => $from,
-            'to' => $toName !== '' ? [$toName . ' <' . $to . '>'] : [$to],
+            'to' => $toName !== '' ? [$toName . ' <' . $toAddr . '>'] : [$toAddr],
             'subject' => $subject,
             'html' => $bodyHTML,
             'text' => $bodyText !== '' ? $bodyText : strip_tags($bodyHTML),
         ];
+
+        $ccList = $this->normalizarListaCorreosCc($cc, $toAddr, $fromEmail);
+        if ($ccList !== []) {
+            $params['cc'] = $ccList;
+        }
 
         $replyTo = trim((string) ($this->config['reply_to_email'] ?? ''));
         if ($replyTo !== '') {
@@ -126,6 +134,36 @@ class EmailService {
                 'provider' => 'resend',
             ];
         }
+    }
+
+    /**
+     * @param array<int, string> $cc
+     * @return list<string>
+     */
+    private function normalizarListaCorreosCc(array $cc, string $toPrincipal, string $fromEmail): array {
+        $toLower = strtolower($toPrincipal);
+        $fromLower = strtolower(trim($fromEmail));
+        $seen = [];
+        $out = [];
+        foreach ($cc as $raw) {
+            if (!is_string($raw)) {
+                continue;
+            }
+            $e = trim($raw);
+            if ($e === '' || !filter_var($e, FILTER_VALIDATE_EMAIL)) {
+                continue;
+            }
+            $k = strtolower($e);
+            if ($k === $toLower || ($fromLower !== '' && $k === $fromLower)) {
+                continue;
+            }
+            if (isset($seen[$k])) {
+                continue;
+            }
+            $seen[$k] = true;
+            $out[] = $e;
+        }
+        return $out;
     }
 
     public function enviarTemplate($to, $toName, $template, $data = []) {
