@@ -117,6 +117,17 @@ function guardarEvaluacion() {
         
         $solicitudId = $_POST['solicitud_id'];
         $decision = $_POST['decision'];
+
+        $tasaRaw = isset($_POST['tasa_bancaria']) ? trim((string) $_POST['tasa_bancaria']) : '';
+        if ($tasaRaw === '' || !is_numeric($tasaRaw)) {
+            echo json_encode(['success' => false, 'message' => 'La tasa bancaria (%) es obligatoria y debe ser un número']);
+            return;
+        }
+        $tasaBancaria = round((float) $tasaRaw, 2);
+        if ($tasaBancaria < 0 || $tasaBancaria > 100) {
+            echo json_encode(['success' => false, 'message' => 'La tasa bancaria debe estar entre 0 y 100']);
+            return;
+        }
         
         // Verificar que el usuario es banco
         if (!isset($_SESSION['user_roles']) || !in_array('ROLE_BANCO', $_SESSION['user_roles'])) {
@@ -142,8 +153,8 @@ function guardarEvaluacion() {
         // Guardar evaluación en la tabla de historial
         $stmt = $pdo->prepare("
             INSERT INTO evaluaciones_banco 
-            (solicitud_id, vehiculo_id, usuario_banco_id, decision, valor_financiar, abono, plazo, letra, promocion, comentarios)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (solicitud_id, vehiculo_id, usuario_banco_id, decision, valor_financiar, abono, plazo, letra, promocion, tasa_bancaria, comentarios)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         
         $stmt->execute([
@@ -156,6 +167,7 @@ function guardarEvaluacion() {
             $_POST['plazo_evaluacion'] ?? null,
             $_POST['letra_evaluacion'] ?? null,
             $_POST['promocion_evaluacion'] ?? null,
+            $tasaBancaria,
             $_POST['comentarios_evaluacion'] ?? null
         ]);
         

@@ -1276,6 +1276,15 @@ if ($isBanco && !$isAdmin) {
                                 <option value="rechazado">Rechazado</option>
                             </select>
                         </div>
+
+                        <div class="mb-4">
+                            <label for="tasa_bancaria_evaluacion" class="form-label">Tasa bancaria (%) *</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" id="tasa_bancaria_evaluacion" name="tasa_bancaria" step="0.01" min="0" max="100" required placeholder="Ej: 8.50">
+                                <span class="input-group-text">%</span>
+                            </div>
+                            <div class="form-text">Porcentaje nominal anual ofrecido por el banco.</div>
+                        </div>
                         
                         <!-- Campos Condicionales -->
                         <div id="camposDecision" style="display: none;">
@@ -2031,7 +2040,7 @@ if ($isBanco && !$isAdmin) {
                 success: function(response) {
                     if (response.success && response.data.length > 0) {
                         let html = '<div class="table-responsive"><table class="table table-striped">';
-                        html += '<thead><tr><th>Fecha</th><th>Vehículo</th><th>Decisión</th><th>Valor a Financiar</th><th>Abono</th><th>Plazo</th><th>Letra</th><th>Promoción</th><th>Comentarios</th></tr></thead>';
+                        html += '<thead><tr><th>Fecha</th><th>Vehículo</th><th>Decisión</th><th>Tasa %</th><th>Valor a Financiar</th><th>Abono</th><th>Plazo</th><th>Letra</th><th>Promoción</th><th>Comentarios</th></tr></thead>';
                         html += '<tbody>';
                         
                         response.data.forEach(function(evaluacion) {
@@ -2039,6 +2048,7 @@ if ($isBanco && !$isAdmin) {
                             html += '<td>' + new Date(evaluacion.fecha_evaluacion).toLocaleString('es-PA') + '</td>';
                             html += '<td>' + (evaluacion.vehiculo_marca ? `${evaluacion.vehiculo_marca} ${evaluacion.vehiculo_modelo || ''}`.trim() : '-') + '</td>';
                             html += '<td><span class="badge badge-estado estado-revision">' + evaluacion.decision.toUpperCase().replace('_', ' ') + '</span></td>';
+                            html += '<td>' + (evaluacion.tasa_bancaria != null && evaluacion.tasa_bancaria !== '' ? parseFloat(evaluacion.tasa_bancaria).toLocaleString('es-PA', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%' : '-') + '</td>';
                             html += '<td>' + (evaluacion.valor_financiar ? '$' + parseFloat(evaluacion.valor_financiar).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
                             html += '<td>' + (evaluacion.abono ? '$' + parseFloat(evaluacion.abono).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
                             html += '<td>' + (evaluacion.plazo ? evaluacion.plazo + ' meses' : '-') + '</td>';
@@ -2086,7 +2096,7 @@ if ($isBanco && !$isAdmin) {
                           const mostrarAcciones = !evaluacionSeleccionada; // No mostrar acciones si hay una evaluación seleccionada
                           
                           let html = '<div class="table-responsive"><table class="table table-striped">';
-                          html += '<thead><tr><th>Fecha</th><th>Banco</th><th>Vehículo</th><th>Decisión</th><th>Valor a Financiar</th><th>Abono</th><th>Plazo</th><th>Letra</th><th>Promoción</th><th>Comentarios</th>';
+                          html += '<thead><tr><th>Fecha</th><th>Banco</th><th>Vehículo</th><th>Decisión</th><th>Tasa %</th><th>Valor a Financiar</th><th>Abono</th><th>Plazo</th><th>Letra</th><th>Promoción</th><th>Comentarios</th>';
                           if (mostrarAcciones) {
                               html += '<th>Acciones</th>';
                           }
@@ -2099,6 +2109,7 @@ if ($isBanco && !$isAdmin) {
                               html += '<td>' + (evaluacion.nombre ? `${evaluacion.nombre} ${evaluacion.apellido || ''}`.trim() : '-') + '</td>';
                               html += '<td>' + (evaluacion.vehiculo_marca ? `${evaluacion.vehiculo_marca} ${evaluacion.vehiculo_modelo || ''}`.trim() : '-') + '</td>';
                               html += '<td><span class="badge badge-estado estado-revision">' + evaluacion.decision.toUpperCase().replace('_', ' ') + '</span></td>';
+                              html += '<td>' + (evaluacion.tasa_bancaria != null && evaluacion.tasa_bancaria !== '' ? parseFloat(evaluacion.tasa_bancaria).toLocaleString('es-PA', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%' : '-') + '</td>';
                               html += '<td>' + (evaluacion.valor_financiar ? '$' + parseFloat(evaluacion.valor_financiar).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
                               html += '<td>' + (evaluacion.abono ? '$' + parseFloat(evaluacion.abono).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
                               html += '<td>' + (evaluacion.plazo ? evaluacion.plazo + ' meses' : '-') + '</td>';

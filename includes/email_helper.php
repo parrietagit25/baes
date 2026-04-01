@@ -463,7 +463,11 @@ function construirResumenSolicitudHtml($solicitud, $vehiculos, $evaluaciones, $a
     if (!empty($evaluaciones)) {
         $html .= '<h3>Análisis / Evaluaciones</h3><div class="info-box" style="background:#f8f9fa;border-left:4px solid #17a2b8;padding:12px;margin:10px 0;">';
         foreach ($evaluaciones as $e) {
-            $html .= '<p><strong>Evaluación:</strong> ' . $h($e['decision'] ?? '') . ' - ' . $h($e['comentarios'] ?? '') . ' (Fecha: ' . $h($e['fecha_evaluacion'] ?? '') . ')</p>';
+            $tasaStr = '';
+            if (isset($e['tasa_bancaria']) && $e['tasa_bancaria'] !== null && $e['tasa_bancaria'] !== '') {
+                $tasaStr = ' — <strong>Tasa:</strong> ' . $n($e['tasa_bancaria'], 2) . '%';
+            }
+            $html .= '<p><strong>Evaluación:</strong> ' . $h($e['decision'] ?? '') . $tasaStr . ' — ' . $h($e['comentarios'] ?? '') . ' (Fecha: ' . $h($e['fecha_evaluacion'] ?? '') . ')</p>';
         }
         $html .= '</div>';
     }
