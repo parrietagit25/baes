@@ -35,12 +35,6 @@ $content .= '
     
     <p>Por favor, revise y evalúe esta solicitud a la brevedad posible.</p>
     
-    <p style="text-align: center;">
-        <a href="' . htmlspecialchars($app_url) . '/solicitudes.php?id=' . $solicitud['id'] . '" class="button">
-            Ver y Evaluar Solicitud
-        </a>
-    </p>
-    
     <p>Saludos cordiales,<br>AutoMarket Seminuevos</p>
 ';
 
