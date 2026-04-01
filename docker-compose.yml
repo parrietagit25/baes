@@ -60,10 +60,11 @@ services:
       - DB_PASS=${MYSQL_PASSWORD:-motus_pass_2024}
       - RESEND_API_KEY=${RESEND_API_KEY:-}
       - RESEND_BASE_URL=${RESEND_BASE_URL:-api.resend.com}
-      - MAIL_FROM_EMAIL=${MAIL_FROM_EMAIL:-onboarding@resend.dev}
-      - MAIL_FROM_NAME=${MAIL_FROM_NAME:-AutoMarket Seminuevos}
+      # Sin default onboarding: si no defines MAIL_* en .env, PHP lee config/email.php + archivo .env (SENDGRID_* legado)
+      - MAIL_FROM_EMAIL=${MAIL_FROM_EMAIL:-}
+      - MAIL_FROM_NAME=${MAIL_FROM_NAME:-}
       - MAIL_REPLY_TO=${MAIL_REPLY_TO:-}
-      - MAIL_REPLY_TO_NAME=${MAIL_REPLY_TO_NAME:-AutoMarket - Soporte}
+      - MAIL_REPLY_TO_NAME=${MAIL_REPLY_TO_NAME:-}
       - APP_URL=${APP_URL:-http://localhost:8086}
 
 volumes:
