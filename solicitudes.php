@@ -14,6 +14,7 @@ $userRoles = $_SESSION['user_roles'] ?? [];
 $isAdmin = in_array('ROLE_ADMIN', $userRoles);
 $isGestor = in_array('ROLE_GESTOR', $userRoles);
 $isBanco = in_array('ROLE_BANCO', $userRoles);
+$esUsuarioBancoLista = $isBanco && !$isAdmin; // Vista lista tipo banco (sin columna «todos los bancos» de admin)
 
 // Ejecutivos de ventas para el select (Datos Generales)
 $ejecutivosVentas = [];
@@ -254,8 +255,9 @@ if ($isBanco && !$isAdmin) {
                                         <tr>
                                             <th>ID</th>
                                             <th>Cliente</th>
-                                            <?php if ($isBanco): ?>
+                                            <?php if ($esUsuarioBancoLista): ?>
                                             <th>Cédula</th>
+                                            <th>Mis respuestas</th>
                                             <?php else: ?>
                                             <th>Respuestas del Banco</th>
                                             <?php endif; ?>
@@ -326,8 +328,13 @@ if ($isBanco && !$isAdmin) {
                                         <tr>
                                             <td><?php echo $solicitud['id']; ?></td>
                                             <td><?php echo htmlspecialchars($solicitud['nombre_cliente']); ?></td>
-                                            <?php if ($isBanco): ?>
+                                            <?php if ($esUsuarioBancoLista): ?>
                                             <td><?php echo htmlspecialchars($solicitud['cedula']); ?></td>
+                                            <td>
+                                                <button type="button" class="btn btn-sm btn-primary" onclick="verRespuestasBanco(<?php echo (int) $solicitud['id']; ?>)" title="Ver mis evaluaciones en esta solicitud">
+                                                    <i class="fas fa-clipboard-list me-1"></i>Ver mis respuestas
+                                                </button>
+                                            </td>
                                             <?php else: ?>
                                             <td>
                                                 <button class="btn btn-sm btn-primary" onclick="verRespuestasBancoAdmin(<?php echo $solicitud['id']; ?>)" title="Ver Respuestas del Banco">
@@ -354,7 +361,7 @@ if ($isBanco && !$isAdmin) {
                                                     <?php echo htmlspecialchars($solicitud['gestor_nombre'] . ' ' . $solicitud['gestor_apellido']); ?>
                                                 <?php endif; ?>
                                             </td>
-                                            <?php if (!$isBanco): ?>
+                                            <?php if (!$esUsuarioBancoLista): ?>
                                             <td>
                                                 <?php 
                                                 $totalBancos = $solicitud['total_usuarios_banco'] ?? 0;
@@ -2044,7 +2051,7 @@ if ($isBanco && !$isAdmin) {
         function verRespuestasBanco(solicitudId) {
             $('#respuestasBancoContent').html(`
                 <div class="text-center">
-                    <div class="spinner-border text-warning" role="status">
+                    <div class="spinner-border text-primary" role="status">
                         <span class="visually-hidden">Cargando...</span>
                     </div>
                 </div>
@@ -2065,9 +2072,10 @@ if ($isBanco && !$isAdmin) {
                         return;
                     }
                     var headerHtml = bloqueEncabezadoClienteRespuestas(solicitudId, response.solicitud_cliente);
+                    var evaluacionSeleccionada = response.evaluacion_seleccionada;
                     if (response.data.length > 0) {
                         let html = '<div class="table-responsive"><table class="table table-striped">';
-                        html += '<thead><tr><th>Fecha</th><th>Vehículo</th><th>Decisión</th><th>Tasa %</th><th>Valor a Financiar</th><th>Abono</th><th>Plazo</th><th>Letra</th><th>Promoción</th><th>Comentarios</th></tr></thead>';
+                        html += '<thead><tr><th>Fecha</th><th>Vehículo</th><th>Decisión</th><th>Tasa %</th><th>Valor a Financiar</th><th>Abono</th><th>Plazo</th><th>Letra</th><th>Promoción</th><th>Comentarios</th><th>Selección</th></tr></thead>';
                         html += '<tbody>';
                         
                         response.data.forEach(function(evaluacion) {
@@ -2082,6 +2090,15 @@ if ($isBanco && !$isAdmin) {
                             html += '<td>' + (evaluacion.letra ? '$' + parseFloat(evaluacion.letra).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
                             html += '<td>' + (evaluacion.promocion || '-') + '</td>';
                             html += '<td>' + (evaluacion.comentarios || '-') + '</td>';
+                            html += '<td>';
+                            if (evaluacionSeleccionada && String(evaluacion.id) === String(evaluacionSeleccionada)) {
+                                html += '<span class="badge bg-success"><i class="fas fa-check-circle me-1"></i>Propuesta seleccionada</span>';
+                            } else if (evaluacionSeleccionada) {
+                                html += '<span class="text-muted">—</span>';
+                            } else {
+                                html += '<span class="text-muted"><small>Pendiente de selección</small></span>';
+                            }
+                            html += '</td>';
                             html += '</tr>';
                         });
                         
@@ -2268,15 +2285,15 @@ if ($isBanco && !$isAdmin) {
         }
     </script>
 
-    <!-- Modal para ver Respuestas del Banco -->
+    <!-- Modal para ver mis respuestas (usuario banco) — mismo criterio visual que admin/gestor -->
     <div class="modal fade" id="modalRespuestasBanco" tabindex="-1">
         <div class="modal-dialog modal-xl">
             <div class="modal-content">
-                <div class="modal-header bg-warning text-dark">
+                <div class="modal-header bg-primary text-white">
                     <h5 class="modal-title">
-                        <i class="fas fa-clipboard-list me-2"></i>Respuestas del Banco
+                        <i class="fas fa-clipboard-list me-2"></i>Mis respuestas en esta solicitud
                     </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <div id="respuestasBancoContent">

@@ -323,30 +323,12 @@ function cargarSolicitudes() {
                 
                 console.log('Datos recibidos:', response.data);
                 let filasGeneradas = 0;
+                const isBancoNoAdmin = window.userRoles && window.userRoles.isBanco && !window.userRoles.isAdmin;
                 response.data.forEach(function(solicitud) {
                     const estadoClass = getEstadoClass(solicitud.estado);
                     const respuestaClass = getRespuestaClass(solicitud.respuesta_banco);
                     
-                    const row = `
-                        <tr>
-                            <td>${solicitud.id}</td>
-                            <td>${solicitud.nombre_cliente}</td>
-                            <td>${solicitud.cedula}</td>
-                            <td>${solicitud.marca_auto || '-'} ${solicitud.modelo_auto || ''} ${solicitud.año_auto || ''}</td>
-                            <td>${solicitud.gestor_nombre} ${solicitud.gestor_apellido}</td>
-                            <td>
-                                ${solicitud.banco_nombre ? 
-                                    `<span class="badge bg-info">
-                                        ${solicitud.banco_nombre} ${solicitud.banco_apellido}
-                                        ${solicitud.banco_institucion ? `<br><small>(${solicitud.banco_institucion})</small>` : ''}
-                                    </span>` : 
-                                    '<span class="text-muted">Sin asignar</span>'
-                                }
-                            </td>
-                            <td><span class="badge badge-estado ${estadoClass}">${solicitud.estado}</span></td>
-                            <!-- <td><span class="badge badge-estado ${respuestaClass}">${solicitud.respuesta_banco}</span></td> -->
-                            <td>${formatearFecha(solicitud.fecha_creacion)}</td>
-                            <td>
+                    const accionesComunes = `
                                 <div class="btn-group-vertical btn-group-sm" role="group">
                                     <div class="btn-group btn-group-sm mb-1" role="group">
                                         <button class="btn btn-info btn-action" onclick="verDetalles(${solicitud.id})" title="Ver Detalles">
@@ -385,10 +367,49 @@ function cargarSolicitudes() {
                                         </button>
                                     </div>
                                     ` : ''}
-                                </div>
+                                </div>`;
+
+                    let row;
+                    if (isBancoNoAdmin) {
+                        row = `
+                        <tr>
+                            <td>${solicitud.id}</td>
+                            <td>${solicitud.nombre_cliente}</td>
+                            <td>${solicitud.cedula}</td>
+                            <td>
+                                <button type="button" class="btn btn-sm btn-primary" onclick="verRespuestasBanco(${solicitud.id})" title="Ver mis evaluaciones en esta solicitud">
+                                    <i class="fas fa-clipboard-list me-1"></i>Ver mis respuestas
+                                </button>
                             </td>
-                        </tr>
-                    `;
+                            <td>${solicitud.marca_auto || '-'} ${solicitud.modelo_auto || ''} ${solicitud.año_auto || ''}</td>
+                            <td>${solicitud.gestor_nombre} ${solicitud.gestor_apellido}</td>
+                            <td><span class="badge badge-estado ${estadoClass}">${solicitud.estado}</span></td>
+                            <td>${formatearFecha(solicitud.fecha_creacion)}</td>
+                            <td>${accionesComunes}</td>
+                        </tr>`;
+                    } else {
+                        row = `
+                        <tr>
+                            <td>${solicitud.id}</td>
+                            <td>${solicitud.nombre_cliente}</td>
+                            <td>${solicitud.cedula}</td>
+                            <td>${solicitud.marca_auto || '-'} ${solicitud.modelo_auto || ''} ${solicitud.año_auto || ''}</td>
+                            <td>${solicitud.gestor_nombre} ${solicitud.gestor_apellido}</td>
+                            <td>
+                                ${solicitud.banco_nombre ? 
+                                    `<span class="badge bg-info">
+                                        ${solicitud.banco_nombre} ${solicitud.banco_apellido}
+                                        ${solicitud.banco_institucion ? `<br><small>(${solicitud.banco_institucion})</small>` : ''}
+                                    </span>` : 
+                                    '<span class="text-muted">Sin asignar</span>'
+                                }
+                            </td>
+                            <td><span class="badge badge-estado ${estadoClass}">${solicitud.estado}</span></td>
+                            <!-- <td><span class="badge badge-estado ${respuestaClass}">${solicitud.respuesta_banco}</span></td> -->
+                            <td>${formatearFecha(solicitud.fecha_creacion)}</td>
+                            <td>${accionesComunes}</td>
+                        </tr>`;
+                    }
                     tbody.append(row);
                     filasGeneradas++;
                 });
