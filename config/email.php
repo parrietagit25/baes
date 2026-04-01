@@ -39,18 +39,38 @@ if (!function_exists('getEnvOrDefault')) {
     }
 }
 
+/**
+ * MAIL_* tiene prioridad; si está vacío se usan SENDGRID_* (legado cuando el correo era SendGrid).
+ */
+if (!function_exists('emailEnvPrimaryOrLegacy')) {
+    function emailEnvPrimaryOrLegacy(string $primaryKey, string $legacyKey, string $default): string {
+        $v = getenv($primaryKey);
+        if ($v !== false && trim((string) $v) !== '') {
+            return trim((string) $v);
+        }
+        $legacy = getenv($legacyKey);
+        if ($legacy !== false && trim((string) $legacy) !== '') {
+            return trim((string) $legacy);
+        }
+        return $default;
+    }
+}
+
 $localConfigPath = __DIR__ . '/email.local.php';
 if (file_exists($localConfigPath)) {
     return require $localConfigPath;
 }
 
+$resendBase = getEnvOrDefault('RESEND_BASE_URL', 'api.resend.com');
+$resendBase = preg_replace('#^https?://#i', '', rtrim((string) $resendBase, '/'));
+
 return [
     'resend_api_key' => getEnvOrDefault('RESEND_API_KEY', ''),
-    'resend_base_url' => getEnvOrDefault('RESEND_BASE_URL', 'api.resend.com'),
-    'from_email' => getEnvOrDefault('MAIL_FROM_EMAIL', 'onboarding@resend.dev'),
-    'from_name' => getEnvOrDefault('MAIL_FROM_NAME', 'AutoMarket Seminuevos'),
-    'reply_to_email' => getEnvOrDefault('MAIL_REPLY_TO', ''),
-    'reply_to_name' => getEnvOrDefault('MAIL_REPLY_TO_NAME', 'AutoMarket - Soporte'),
+    'resend_base_url' => $resendBase !== '' ? $resendBase : 'api.resend.com',
+    'from_email' => emailEnvPrimaryOrLegacy('MAIL_FROM_EMAIL', 'SENDGRID_FROM_EMAIL', 'onboarding@resend.dev'),
+    'from_name' => emailEnvPrimaryOrLegacy('MAIL_FROM_NAME', 'SENDGRID_FROM_NAME', 'AutoMarket Seminuevos'),
+    'reply_to_email' => emailEnvPrimaryOrLegacy('MAIL_REPLY_TO', 'SENDGRID_REPLY_TO', ''),
+    'reply_to_name' => emailEnvPrimaryOrLegacy('MAIL_REPLY_TO_NAME', 'SENDGRID_REPLY_TO_NAME', 'AutoMarket - Soporte'),
     'app_url' => getEnvOrDefault('APP_URL', 'http://localhost:8086'),
     'app_name' => 'AutoMarket Seminuevos',
 ];

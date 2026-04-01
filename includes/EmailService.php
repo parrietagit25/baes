@@ -56,6 +56,21 @@ class EmailService {
         }
     }
 
+    private function mensajeErrorResend(string $raw): string {
+        $raw = trim($raw);
+        if ($raw === '') {
+            return 'Error Resend: respuesta vacía';
+        }
+        if (stripos($raw, 'only send testing emails') !== false
+            || stripos($raw, 'verify a domain') !== false) {
+            return 'Resend (modo prueba): con onboarding@resend.dev solo puedes enviar a tu propio correo. '
+                . 'Para notificar a bancos u otros destinatarios, verifica un dominio en https://resend.com/domains '
+                . 'y configura MAIL_FROM_EMAIL (y opcionalmente MAIL_REPLY_TO) con una dirección de ese dominio. '
+                . 'Detalle: ' . $raw;
+        }
+        return 'Error Resend: ' . $raw;
+    }
+
     private function enviarCorreoResend($to, $toName, $subject, $bodyHTML, $bodyText, $attachments) {
         $apiKey = trim((string) ($this->config['resend_api_key'] ?? ''));
         $fromName = trim((string) ($this->config['from_name'] ?? ''));
@@ -107,7 +122,7 @@ class EmailService {
         } catch (ErrorException $e) {
             return [
                 'success' => false,
-                'message' => 'Error Resend: ' . $e->getMessage(),
+                'message' => $this->mensajeErrorResend($e->getMessage()),
                 'provider' => 'resend',
             ];
         }

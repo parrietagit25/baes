@@ -28,9 +28,9 @@ if (!$to) {
     echo "Variables en .env (o entorno Docker):\n";
     echo "  RESEND_API_KEY=re_...\n";
     echo "  RESEND_BASE_URL=api.resend.com\n";
-    echo "  MAIL_FROM_EMAIL=onboarding@resend.dev\n";
-    echo "  MAIL_FROM_NAME=AutoMarket Seminuevos\n";
-    echo "  MAIL_REPLY_TO= (opcional)\n";
+    echo "  MAIL_FROM_EMAIL=notificaciones@tudominio.com (o SENDGRID_FROM_EMAIL si MAIL_* vacío)\n";
+    echo "  MAIL_FROM_NAME=...\n";
+    echo "  MAIL_REPLY_TO= (opcional; o SENDGRID_REPLY_TO)\n";
     exit;
 }
 
@@ -40,7 +40,7 @@ $cfg = require __DIR__ . '/config/email.php';
 $key = (string) ($cfg['resend_api_key'] ?? '');
 echo "Proveedor: Resend\n";
 echo "RESEND_API_KEY: " . (strlen($key) > 10 ? 'sí (longitud ' . strlen($key) . ')' : 'NO configurada') . "\n";
-echo "MAIL_FROM_EMAIL: " . ($cfg['from_email'] ?? '') . "\n\n";
+echo "Remitente efectivo (from_email): " . ($cfg['from_email'] ?? '') . "\n\n";
 
 try {
     echo "Enviando...\n";
