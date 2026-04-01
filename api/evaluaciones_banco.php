@@ -114,14 +114,21 @@ function obtenerEvaluaciones($solicitudId, $usuarioBancoId = null) {
       try {
           // Primero obtener información sobre la evaluación seleccionada
           $stmt = $pdo->prepare("
-              SELECT evaluacion_seleccionada, 
-                     (SELECT usuario_banco_id FROM evaluaciones_banco WHERE id = evaluacion_seleccionada) as usuario_banco_id_seleccionado
-              FROM solicitudes_credito 
-              WHERE id = ?
+              SELECT s.evaluacion_seleccionada,
+                     s.nombre_cliente,
+                     s.cedula,
+                     (SELECT eb2.usuario_banco_id FROM evaluaciones_banco eb2 WHERE eb2.id = s.evaluacion_seleccionada) AS usuario_banco_id_seleccionado
+              FROM solicitudes_credito s
+              WHERE s.id = ?
           ");
           $stmt->execute([$solicitudId]);
           $solicitud = $stmt->fetch();
-          
+
+          if (!$solicitud) {
+              echo json_encode(['success' => false, 'message' => 'Solicitud no encontrada']);
+              return;
+          }
+
           $evaluacionSeleccionada = $solicitud['evaluacion_seleccionada'] ?? null;
           $usuarioBancoIdSeleccionado = $solicitud['usuario_banco_id_seleccionado'] ?? null;
           
@@ -150,10 +157,14 @@ function obtenerEvaluaciones($solicitudId, $usuarioBancoId = null) {
           $evaluaciones = $stmt->fetchAll();
           
           echo json_encode([
-              'success' => true, 
+              'success' => true,
               'data' => $evaluaciones,
               'evaluacion_seleccionada' => $evaluacionSeleccionada,
-              'usuario_banco_id_seleccionado' => $usuarioBancoIdSeleccionado
+              'usuario_banco_id_seleccionado' => $usuarioBancoIdSeleccionado,
+              'solicitud_cliente' => [
+                  'nombre_cliente' => $solicitud['nombre_cliente'] ?? '',
+                  'cedula' => $solicitud['cedula'] ?? '',
+              ],
           ]);
     } catch (PDOException $e) {
         http_response_code(500);

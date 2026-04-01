@@ -2019,6 +2019,27 @@ if ($isBanco && !$isAdmin) {
               });
           }
 
+        function escapeHtmlText(str) {
+            if (str == null || str === '') return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+        function bloqueEncabezadoClienteRespuestas(solicitudId, solicitudCliente) {
+            var sc = solicitudCliente || {};
+            var nombre = escapeHtmlText(sc.nombre_cliente || '');
+            var cedula = escapeHtmlText(sc.cedula || '');
+            var sid = parseInt(solicitudId, 10);
+            if (isNaN(sid)) sid = solicitudId;
+            var partes = [];
+            partes.push('<strong>Cliente:</strong> ' + (nombre || '-'));
+            if (cedula) partes.push('<strong>Cédula:</strong> ' + cedula);
+            partes.push('<strong>Solicitud:</strong> #' + sid);
+            return '<div class="alert alert-light border mb-3"><i class="fas fa-user me-2 text-primary"></i>' + partes.join(' &nbsp;&middot;&nbsp; ') + '</div>';
+        }
+
           // Función para ver respuestas del banco
         function verRespuestasBanco(solicitudId) {
             $('#respuestasBancoContent').html(`
@@ -2038,7 +2059,13 @@ if ($isBanco && !$isAdmin) {
                     usuario_banco_id: <?php echo $_SESSION['user_id']; ?>
                 },
                 success: function(response) {
-                    if (response.success && response.data.length > 0) {
+                    if (!response.success) {
+                        $('#respuestasBancoContent').html('<div class="alert alert-danger">' + escapeHtmlText(response.message || 'Error al cargar las respuestas.') + '</div>');
+                        $('#modalRespuestasBanco').modal('show');
+                        return;
+                    }
+                    var headerHtml = bloqueEncabezadoClienteRespuestas(solicitudId, response.solicitud_cliente);
+                    if (response.data.length > 0) {
                         let html = '<div class="table-responsive"><table class="table table-striped">';
                         html += '<thead><tr><th>Fecha</th><th>Vehículo</th><th>Decisión</th><th>Tasa %</th><th>Valor a Financiar</th><th>Abono</th><th>Plazo</th><th>Letra</th><th>Promoción</th><th>Comentarios</th></tr></thead>';
                         html += '<tbody>';
@@ -2059,9 +2086,9 @@ if ($isBanco && !$isAdmin) {
                         });
                         
                         html += '</tbody></table></div>';
-                        $('#respuestasBancoContent').html(html);
+                        $('#respuestasBancoContent').html(headerHtml + html);
                     } else {
-                        $('#respuestasBancoContent').html('<div class="alert alert-info">No hay respuestas registradas para esta solicitud.</div>');
+                        $('#respuestasBancoContent').html(headerHtml + '<div class="alert alert-info">No hay respuestas registradas para esta solicitud.</div>');
                     }
                     
                     $('#modalRespuestasBanco').modal('show');
@@ -2090,8 +2117,14 @@ if ($isBanco && !$isAdmin) {
                 data: {
                     solicitud_id: solicitudId
                 },
-                                  success: function(response) {
-                      if (response.success && response.data.length > 0) {
+                success: function(response) {
+                    if (!response.success) {
+                        $('#respuestasBancoAdminContent').html('<div class="alert alert-danger">' + escapeHtmlText(response.message || 'Error al cargar las respuestas.') + '</div>');
+                        $('#modalRespuestasBancoAdmin').modal('show');
+                        return;
+                    }
+                    var headerHtml = bloqueEncabezadoClienteRespuestas(solicitudId, response.solicitud_cliente);
+                    if (response.data.length > 0) {
                           const evaluacionSeleccionada = response.evaluacion_seleccionada;
                           const mostrarAcciones = !evaluacionSeleccionada; // No mostrar acciones si hay una evaluación seleccionada
                           
@@ -2128,9 +2161,9 @@ if ($isBanco && !$isAdmin) {
                           });
                           
                           html += '</tbody></table></div>';
-                          $('#respuestasBancoAdminContent').html(html);
+                          $('#respuestasBancoAdminContent').html(headerHtml + html);
                     } else {
-                        $('#respuestasBancoAdminContent').html('<div class="alert alert-info">No hay respuestas registradas para esta solicitud.</div>');
+                        $('#respuestasBancoAdminContent').html(headerHtml + '<div class="alert alert-info">No hay respuestas registradas para esta solicitud.</div>');
                     }
                     
                     $('#modalRespuestasBancoAdmin').modal('show');
