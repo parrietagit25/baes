@@ -31,6 +31,12 @@ $isVendedor = in_array('ROLE_VENDEDOR', $_SESSION['user_roles']);
         </a>
         <?php endif; ?>
 
+        <?php if ($isBanco): ?>
+        <a class="nav-link <?php echo ($current_page == 'mis_propuestas_banco.php') ? 'active' : ''; ?>" href="mis_propuestas_banco.php">
+            <i class="fas fa-hand-holding-usd me-2"></i>Mis propuestas
+        </a>
+        <?php endif; ?>
+
         <!-- Sol Financiamiento - Registros del formulario público (Admin y Gestor) -->
         <?php if ($isAdmin || $isGestor): ?>
         <a class="nav-link <?php echo ($current_page == 'sol_financiamiento.php') ? 'active' : ''; ?>" href="sol_financiamiento.php">

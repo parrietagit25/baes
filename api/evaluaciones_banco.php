@@ -20,7 +20,9 @@ $method = $_SERVER['REQUEST_METHOD'];
 
 switch ($method) {
     case 'GET':
-        if (isset($_GET['solicitud_id'])) {
+        if (!empty($_GET['mis_propuestas']) && $_GET['mis_propuestas'] === '1') {
+            listarMisPropuestasBanco();
+        } elseif (isset($_GET['solicitud_id'])) {
             $usuarioBancoId = isset($_GET['usuario_banco_id']) ? $_GET['usuario_banco_id'] : null;
             obtenerEvaluaciones($_GET['solicitud_id'], $usuarioBancoId);
         } else {
@@ -50,6 +52,60 @@ switch ($method) {
         http_response_code(405);
         echo json_encode(['success' => false, 'message' => 'Método no permitido']);
         break;
+}
+
+/**
+ * Lista todas las evaluaciones (propuestas) emitidas por el usuario banco logueado, en todas las solicitudes.
+ */
+function listarMisPropuestasBanco(): void {
+    global $pdo;
+
+    if (!isset($_SESSION['user_roles']) || !in_array('ROLE_BANCO', $_SESSION['user_roles'], true)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Solo usuarios banco pueden ver esta lista']);
+        return;
+    }
+
+    $uid = (int) $_SESSION['user_id'];
+
+    try {
+        $sql = "
+            SELECT
+                e.*,
+                s.id AS solicitud_id,
+                s.nombre_cliente,
+                s.cedula,
+                s.estado AS solicitud_estado,
+                s.evaluacion_seleccionada,
+                (s.evaluacion_seleccionada = e.id) AS es_propuesta_seleccionada,
+                v.marca AS vehiculo_marca,
+                v.modelo AS vehiculo_modelo,
+                v.anio AS vehiculo_anio
+            FROM evaluaciones_banco e
+            INNER JOIN usuarios_banco_solicitudes ubs ON e.usuario_banco_id = ubs.id
+            INNER JOIN solicitudes_credito s ON e.solicitud_id = s.id
+            LEFT JOIN vehiculos_solicitud v ON e.vehiculo_id = v.id
+            WHERE ubs.usuario_banco_id = ?
+            ORDER BY e.fecha_evaluacion DESC
+        ";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([$uid]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($rows as &$r) {
+            $r['es_propuesta_seleccionada'] = !empty($r['es_propuesta_seleccionada']);
+        }
+        unset($r);
+
+        echo json_encode([
+            'success' => true,
+            'data' => $rows,
+        ]);
+    } catch (PDOException $e) {
+        http_response_code(500);
+        error_log('listarMisPropuestasBanco: ' . $e->getMessage());
+        echo json_encode(['success' => false, 'message' => 'Error al cargar sus propuestas']);
+    }
 }
 
 function obtenerEvaluaciones($solicitudId, $usuarioBancoId = null) {

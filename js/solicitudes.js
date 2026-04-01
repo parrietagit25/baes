@@ -9,6 +9,20 @@ $(document).ready(function() {
     
     cargarSolicitudes();
 
+    // Abrir solicitud desde enlaces externos (ej. Mis propuestas)
+    var urlParams = new URLSearchParams(window.location.search);
+    var abrirSolicitudId = urlParams.get('abrir_solicitud');
+    if (abrirSolicitudId && /^\d+$/.test(abrirSolicitudId)) {
+        setTimeout(function () {
+            if (typeof editarSolicitud === 'function') {
+                editarSolicitud(parseInt(abrirSolicitudId, 10));
+            }
+            try {
+                window.history.replaceState({}, document.title, window.location.pathname);
+            } catch (e) { /* ignore */ }
+        }, 600);
+    }
+
     // Configurar formulario de solicitudes usando delegación de eventos
     $(document).on('submit', '#solicitudForm', function(e) {
         console.log('=== FORMULARIO ENVIADO (delegado) ===');

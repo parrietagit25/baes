@@ -22,7 +22,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 // Definir páginas permitidas por rol
 $paginasAdmin = ['dashboard.php', 'usuarios.php', 'roles.php', 'bancos.php', 'solicitudes.php', 'sol_financiamiento.php', 'pipedrive.php', 'reportes.php'];
 $paginasGestor = ['dashboard.php', 'solicitudes.php', 'sol_financiamiento.php', 'pipedrive.php'];
-$paginasBanco = ['dashboard.php', 'solicitudes.php'];
+$paginasBanco = ['dashboard.php', 'solicitudes.php', 'mis_propuestas_banco.php'];
 $paginasVendedor = ['dashboard.php', 'solicitudes.php'];
 
 // Función para verificar acceso
