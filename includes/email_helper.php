@@ -278,14 +278,23 @@ function enviarResumenSolicitudBanco($solicitudId, $usuarioBancoId) {
         $stmt->execute([$solicitudId]);
         $adjuntos = $stmt->fetchAll();
 
+        $cfg = file_exists(__DIR__ . '/../config/email.php') ? require __DIR__ . '/../config/email.php' : [];
         $app_url = (function_exists('getenv') && getenv('APP_URL')) ? getenv('APP_URL') : '';
-        if (empty($app_url) && file_exists(__DIR__ . '/../config/email.php')) {
-            $cfg = require __DIR__ . '/../config/email.php';
+        if ($app_url === '' || $app_url === false) {
             $app_url = $cfg['app_url'] ?? '';
         }
+        $mostrarEnlaceMotus = !empty($cfg['mail_show_app_link_in_emails']);
 
         $bancoNombre = trim(($banco['banco_nombre'] ?? '') . ' ' . ($banco['banco_apellido'] ?? ''));
-        $html = construirResumenSolicitudHtml($solicitud, $vehiculos, $evaluaciones, $adjuntos, $bancoNombre, $app_url);
+        $html = construirResumenSolicitudHtml(
+            $solicitud,
+            $vehiculos,
+            $evaluaciones,
+            $adjuntos,
+            $bancoNombre,
+            $app_url,
+            $mostrarEnlaceMotus
+        );
 
         $emailService = new EmailService();
         return $emailService->enviarCorreo(
@@ -302,11 +311,13 @@ function enviarResumenSolicitudBanco($solicitudId, $usuarioBancoId) {
     }
 }
 
-function construirResumenSolicitudHtml($solicitud, $vehiculos, $evaluaciones, $adjuntos, $bancoNombre, $app_url) {
+function construirResumenSolicitudHtml($solicitud, $vehiculos, $evaluaciones, $adjuntos, $bancoNombre, $app_url, $mostrarEnlaceMotus = false) {
     $h = function($s) { return htmlspecialchars($s ?? '', ENT_QUOTES, 'UTF-8'); };
     $n = function($v, $dec = 0) { return $v !== null && $v !== '' ? number_format((float)$v, $dec, ',', '.') : 'N/A'; };
     
-    $linkVer = $app_url ? '<p><a href="' . $h($app_url) . '/solicitudes.php?id=' . (int)$solicitud['id'] . '" style="display:inline-block;padding:12px 24px;background:#0d6efd;color:#fff;text-decoration:none;border-radius:6px;">Ver solicitud en MOTUS</a></p>' : '';
+    $linkVer = ($mostrarEnlaceMotus && $app_url)
+        ? '<p><a href="' . $h($app_url) . '/solicitudes.php?id=' . (int)$solicitud['id'] . '" style="display:inline-block;padding:12px 24px;background:#0d6efd;color:#fff;text-decoration:none;border-radius:6px;">Ver solicitud en MOTUS</a></p>'
+        : '';
     
     $html = '<h2>Resumen de Solicitud de Crédito #' . (int)$solicitud['id'] . '</h2>';
     $html .= '<p>Estimado/a <strong>' . $h($bancoNombre) . '</strong>,</p>';

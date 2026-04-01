@@ -11,6 +11,7 @@ $__emailEnvKeysFromFileAlways = [
     'RESEND_API_KEY', 'RESEND_BASE_URL',
     'MAIL_FROM_EMAIL', 'MAIL_FROM_NAME', 'MAIL_REPLY_TO', 'MAIL_REPLY_TO_NAME',
     'SENDGRID_FROM_EMAIL', 'SENDGRID_FROM_NAME', 'SENDGRID_REPLY_TO', 'SENDGRID_REPLY_TO_NAME',
+    'MAIL_SHOW_APP_LINK_IN_EMAILS',
 ];
 if (is_file($__emailEnvFile) && is_readable($__emailEnvFile)) {
     $__lines = @file($__emailEnvFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
@@ -99,4 +100,9 @@ return [
     'reply_to_name' => emailEnvPrimaryOrLegacy('MAIL_REPLY_TO_NAME', 'SENDGRID_REPLY_TO_NAME', 'AutoMarket - Soporte'),
     'app_url' => getEnvOrDefault('APP_URL', 'http://localhost:8086'),
     'app_name' => 'AutoMarket Seminuevos',
+    // Resumen a bancos: botón "Ver solicitud en MOTUS" (0/false por defecto)
+    'mail_show_app_link_in_emails' => filter_var(
+        getEnvOrDefault('MAIL_SHOW_APP_LINK_IN_EMAILS', '0'),
+        FILTER_VALIDATE_BOOLEAN
+    ),
 ];
