@@ -50,6 +50,65 @@ function obtenerCopiasResumenSolicitudBanco(PDO $pdo, array $solicitud, string $
 }
 
 /**
+ * Rutas absolutas de adjuntos de solicitud listas para EmailService (con nombre original en el correo).
+ * Omite archivos inexistentes, rutas sospechosas y archivos &gt; 20 MB (límite práctico de proveedores).
+ *
+ * @param array<int, array<string, mixed>> $filas Filas con ruta_archivo y nombre_original
+ * @return array<int, array{path: string, filename: string}>
+ */
+function adjuntosArchivosParaCorreoResumen(array $filas): array {
+    $root = realpath(__DIR__ . '/..');
+    if ($root === false) {
+        $root = __DIR__ . '/..';
+    }
+    $maxBytes = 20 * 1024 * 1024;
+    $out = [];
+    $nombreUsos = [];
+
+    foreach ($filas as $row) {
+        $rel = trim((string) ($row['ruta_archivo'] ?? ''));
+        if ($rel === '' || str_contains($rel, '..')) {
+            continue;
+        }
+        $relNorm = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $rel);
+        $abs = $root . DIRECTORY_SEPARATOR . $relNorm;
+        $absReal = realpath($abs);
+        if ($absReal !== false) {
+            $abs = $absReal;
+        }
+        if (!is_file($abs) || !is_readable($abs)) {
+            continue;
+        }
+        if (filesize($abs) > $maxBytes) {
+            error_log('adjuntosArchivosParaCorreoResumen: omitido por tamaño: ' . $abs);
+            continue;
+        }
+
+        $nom = trim((string) ($row['nombre_original'] ?? ''));
+        if ($nom === '') {
+            $nom = basename($rel);
+        }
+        $nom = str_replace(["\0", "\r", "\n"], '', $nom);
+
+        $clave = strtolower($nom);
+        if (!isset($nombreUsos[$clave])) {
+            $nombreUsos[$clave] = 0;
+            $nombreFinal = $nom;
+        } else {
+            $nombreUsos[$clave]++;
+            $info = pathinfo($nom);
+            $stem = $info['filename'] !== '' ? $info['filename'] : 'archivo';
+            $ext = isset($info['extension']) && $info['extension'] !== '' ? '.' . $info['extension'] : '';
+            $nombreFinal = $stem . '_' . $nombreUsos[$clave] . $ext;
+        }
+
+        $out[] = ['path' => $abs, 'filename' => $nombreFinal];
+    }
+
+    return $out;
+}
+
+/**
  * Envía notificación al vendedor cuando el banco responde
  */
 function enviarNotificacionVendedor($solicitudId) {
@@ -315,7 +374,12 @@ function enviarResumenSolicitudBanco($solicitudId, $usuarioBancoId) {
         $stmt->execute([$solicitudId]);
         $evaluaciones = $stmt->fetchAll();
 
-        $stmt = $pdo->prepare("SELECT nombre_original, tipo_archivo FROM adjuntos_solicitud WHERE solicitud_id = ? ORDER BY fecha_subida DESC");
+        $stmt = $pdo->prepare("
+            SELECT nombre_original, tipo_archivo, ruta_archivo
+            FROM adjuntos_solicitud
+            WHERE solicitud_id = ?
+            ORDER BY fecha_subida DESC
+        ");
         $stmt->execute([$solicitudId]);
         $adjuntos = $stmt->fetchAll();
 
@@ -338,6 +402,7 @@ function enviarResumenSolicitudBanco($solicitudId, $usuarioBancoId) {
         );
 
         $copias = obtenerCopiasResumenSolicitudBanco($pdo, $solicitud, (string) $banco['banco_email']);
+        $archivosAdjuntos = adjuntosArchivosParaCorreoResumen($adjuntos);
 
         $emailService = new EmailService();
         return $emailService->enviarCorreo(
@@ -346,7 +411,7 @@ function enviarResumenSolicitudBanco($solicitudId, $usuarioBancoId) {
             $html,
             $bancoNombre ?: 'Usuario Banco',
             strip_tags(preg_replace('/<br\s*\/?>/i', "\n", $html)),
-            [],
+            $archivosAdjuntos,
             $copias
         );
     } catch (Exception $e) {

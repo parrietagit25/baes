@@ -38,7 +38,7 @@ class EmailService {
     }
 
     /**
-     * @param array $attachments Rutas locales de archivos
+     * @param array $attachments Rutas locales (string) o items ['path' => abs, 'filename' => 'nombre.pdf'] para el nombre en el correo
      * @param array $cc Lista de correos en copia (solo dirección, sin nombre)
      */
     public function enviarCorreo(
@@ -100,8 +100,19 @@ class EmailService {
 
         if (!empty($attachments)) {
             $atts = [];
-            foreach ($attachments as $path) {
-                if (!is_string($path) || !is_file($path)) {
+            foreach ($attachments as $item) {
+                $path = null;
+                $filename = null;
+                if (is_string($item)) {
+                    $path = $item;
+                    $filename = basename($path);
+                } elseif (is_array($item) && !empty($item['path']) && is_string($item['path'])) {
+                    $path = $item['path'];
+                    $filename = (!empty($item['filename']) && is_string($item['filename']))
+                        ? $item['filename']
+                        : basename($path);
+                }
+                if ($path === null || !is_file($path) || !is_readable($path)) {
                     continue;
                 }
                 $content = @file_get_contents($path);
@@ -109,7 +120,7 @@ class EmailService {
                     continue;
                 }
                 $atts[] = [
-                    'filename' => basename($path),
+                    'filename' => $filename,
                     'content' => base64_encode($content),
                 ];
             }
