@@ -9,7 +9,8 @@
 require_once __DIR__ . '/EmailService.php';
 
 /**
- * Correos en copia para el resumen enviado al usuario banco: quien envía (sesión) y Email Pipedrive si existe.
+ * Correos en copia para el resumen enviado al usuario banco: quien envía (sesión), email Pipedrive si existe,
+ * y el ejecutivo de ventas asignado en Datos Generales (si tiene email válido).
  *
  * @return list<string>
  */
@@ -33,6 +34,22 @@ function obtenerCopiasResumenSolicitudBanco(PDO $pdo, array $solicitud, string $
         $e = trim((string) $solicitud['email_pipedrive']);
         if ($e !== '' && filter_var($e, FILTER_VALIDATE_EMAIL)) {
             $cc[] = $e;
+        }
+    }
+    $ejecutivoVentasId = isset($solicitud['ejecutivo_ventas_id']) ? (int) $solicitud['ejecutivo_ventas_id'] : 0;
+    if ($ejecutivoVentasId > 0) {
+        try {
+            $stmtEv = $pdo->prepare('SELECT email FROM ejecutivos_ventas WHERE id = ? LIMIT 1');
+            $stmtEv->execute([$ejecutivoVentasId]);
+            $ev = $stmtEv->fetch(PDO::FETCH_ASSOC);
+            if ($ev && !empty($ev['email'])) {
+                $e = trim((string) $ev['email']);
+                if ($e !== '' && filter_var($e, FILTER_VALIDATE_EMAIL)) {
+                    $cc[] = $e;
+                }
+            }
+        } catch (PDOException $e) {
+            error_log('obtenerCopiasResumenSolicitudBanco ejecutivos_ventas: ' . $e->getMessage());
         }
     }
     $destLower = strtolower(trim($emailDestinoBanco));

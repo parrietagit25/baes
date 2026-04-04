@@ -1817,7 +1817,8 @@ if ($isBanco && !$isAdmin) {
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <p class="mb-0">¿Desea enviar por correo un resumen de la solicitud (datos generales, perfil financiero, datos del auto, análisis y adjuntos) a <strong class="resumen-destino"></strong>?</p>
+                    <p class="mb-2">¿Desea enviar por correo un resumen de la solicitud (datos generales, perfil financiero, datos del auto, análisis y adjuntos) a <strong class="resumen-destino"></strong>?</p>
+                    <p class="small text-muted mb-0">En copia (CC) también recibirán el correo quien envía, el email Pipedrive de la solicitud si existe, y el <strong>ejecutivo de ventas</strong> seleccionado en Datos generales cuando tenga correo registrado.</p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
