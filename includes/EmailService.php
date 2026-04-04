@@ -39,7 +39,8 @@ class EmailService {
 
     /**
      * @param array $attachments Rutas locales (string) o items ['path' => abs, 'filename' => 'nombre.pdf'] para el nombre en el correo
-     * @param array $cc Lista de correos en copia (solo dirección, sin nombre)
+     * @param array $cc Lista de correos en copia visible (solo dirección, sin nombre)
+     * @param array $bcc Lista de correos en copia oculta (no visible para el destinatario principal)
      */
     public function enviarCorreo(
         $to,
@@ -48,10 +49,11 @@ class EmailService {
         $toName = '',
         $bodyText = '',
         $attachments = [],
-        array $cc = []
+        array $cc = [],
+        array $bcc = []
     ) {
         try {
-            return $this->enviarCorreoResend($to, $toName, $subject, $bodyHTML, $bodyText, $attachments, $cc);
+            return $this->enviarCorreoResend($to, $toName, $subject, $bodyHTML, $bodyText, $attachments, $cc, $bcc);
         } catch (Throwable $e) {
             error_log('Error al enviar correo (Resend): ' . $e->getMessage());
             return ['success' => false, 'message' => 'Error al enviar correo: ' . $e->getMessage()];
@@ -73,7 +75,7 @@ class EmailService {
         return 'Error Resend: ' . $raw;
     }
 
-    private function enviarCorreoResend($to, $toName, $subject, $bodyHTML, $bodyText, $attachments, array $cc = []) {
+    private function enviarCorreoResend($to, $toName, $subject, $bodyHTML, $bodyText, $attachments, array $cc = [], array $bcc = []) {
         $apiKey = trim((string) ($this->config['resend_api_key'] ?? ''));
         $fromName = trim((string) ($this->config['from_name'] ?? ''));
         $fromEmail = trim((string) ($this->config['from_email'] ?? ''));
@@ -91,6 +93,11 @@ class EmailService {
         $ccList = $this->normalizarListaCorreosCc($cc, $toAddr, $fromEmail);
         if ($ccList !== []) {
             $params['cc'] = $ccList;
+        }
+
+        $bccList = $this->normalizarListaCorreosCc($bcc, $toAddr, $fromEmail);
+        if ($bccList !== []) {
+            $params['bcc'] = $bccList;
         }
 
         $replyTo = trim((string) ($this->config['reply_to_email'] ?? ''));

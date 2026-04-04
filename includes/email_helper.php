@@ -9,8 +9,8 @@
 require_once __DIR__ . '/EmailService.php';
 
 /**
- * Correos en copia para el resumen enviado al usuario banco: quien envía (sesión), email Pipedrive si existe,
- * y el ejecutivo de ventas asignado en Datos Generales (si tiene email válido).
+ * Correos en copia oculta (BCC) para el resumen al usuario banco: quien envía (sesión), email Pipedrive si existe,
+ * y el ejecutivo de ventas asignado en Datos Generales (si tiene email válido). El banco solo ve su dirección en Para.
  *
  * @return list<string>
  */
@@ -429,6 +429,7 @@ function enviarResumenSolicitudBanco($solicitudId, $usuarioBancoId) {
             $bancoNombre ?: 'Usuario Banco',
             strip_tags(preg_replace('/<br\s*\/?>/i', "\n", $html)),
             $archivosAdjuntos,
+            [],
             $copias
         );
     } catch (Exception $e) {
