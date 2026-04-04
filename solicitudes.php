@@ -19,10 +19,15 @@ $esUsuarioBancoLista = $isBanco && !$isAdmin; // Vista lista tipo banco (sin col
 // Ejecutivos de ventas para el select (Datos Generales)
 $ejecutivosVentas = [];
 try {
-    $stmtEj = $pdo->query("SELECT id, nombre, sucursal, email FROM ejecutivos_ventas ORDER BY sucursal, nombre");
+    $stmtEj = $pdo->query("SELECT id, nombre, sucursal, email FROM ejecutivos_ventas WHERE activo = 1 ORDER BY sucursal, nombre");
     $ejecutivosVentas = $stmtEj->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
-    error_log('Error cargando ejecutivos_ventas: ' . $e->getMessage());
+    try {
+        $stmtEj = $pdo->query("SELECT id, nombre, sucursal, email FROM ejecutivos_ventas ORDER BY sucursal, nombre");
+        $ejecutivosVentas = $stmtEj->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e2) {
+        error_log('Error cargando ejecutivos_ventas: ' . $e2->getMessage());
+    }
 }
 
 // Obtener estadísticas (filtrar por usuario banco si aplica)

@@ -63,6 +63,9 @@ $isVendedor = in_array('ROLE_VENDEDOR', $_SESSION['user_roles']);
         <a class="nav-link <?php echo ($current_page == 'bancos.php') ? 'active' : ''; ?>" href="bancos.php">
             <i class="fas fa-university me-2"></i>Gestión de Bancos
         </a>
+        <a class="nav-link <?php echo ($current_page == 'ejecutivos_ventas.php') ? 'active' : ''; ?>" href="ejecutivos_ventas.php">
+            <i class="fas fa-user-tie me-2"></i>Ejecutivos de Ventas
+        </a>
         <?php endif; ?>
         
         <!-- Integración Pipedrive - Admin y Gestor -->
