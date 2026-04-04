@@ -14,6 +14,15 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
+require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../includes/configuracion_sistema_helper.php';
+if (!motus_chatbot_habilitado()) {
+    http_response_code(403);
+    header('Content-Type: application/json');
+    echo json_encode(['error' => 'El asistente de IA está deshabilitado']);
+    exit;
+}
+
 require_once __DIR__ . '/../config/chatbot.php';
 
 $apiKey = defined('CHATBOT_OPENAI_API_KEY') ? CHATBOT_OPENAI_API_KEY : '';

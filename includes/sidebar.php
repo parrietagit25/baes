@@ -37,8 +37,8 @@ $isVendedor = in_array('ROLE_VENDEDOR', $_SESSION['user_roles']);
         </a>
         <?php endif; ?>
 
-        <!-- Sol Financiamiento - Registros del formulario público (Admin y Gestor) -->
-        <?php if ($isAdmin || $isGestor): ?>
+        <!-- Sol Financiamiento - Solo administrador -->
+        <?php if ($isAdmin): ?>
         <a class="nav-link <?php echo ($current_page == 'sol_financiamiento.php') ? 'active' : ''; ?>" href="sol_financiamiento.php">
             <i class="fas fa-file-invoice-dollar me-2"></i>Sol Financiamiento
         </a>
@@ -68,10 +68,16 @@ $isVendedor = in_array('ROLE_VENDEDOR', $_SESSION['user_roles']);
         </a>
         <?php endif; ?>
         
-        <!-- Integración Pipedrive - Admin y Gestor -->
-        <?php if ($isAdmin || $isGestor): ?>
+        <!-- Integración Pipedrive - Solo administrador -->
+        <?php if ($isAdmin): ?>
         <a class="nav-link <?php echo ($current_page == 'pipedrive.php') ? 'active' : ''; ?>" href="pipedrive.php">
             <i class="fas fa-plug me-2"></i>Integración Pipedrive
+        </a>
+        <?php endif; ?>
+
+        <?php if ($isAdmin): ?>
+        <a class="nav-link <?php echo ($current_page == 'configuracion.php') ? 'active' : ''; ?>" href="configuracion.php">
+            <i class="fas fa-sliders-h me-2"></i>Configuración
         </a>
         <?php endif; ?>
 

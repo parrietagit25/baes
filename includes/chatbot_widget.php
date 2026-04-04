@@ -6,6 +6,10 @@
 if (empty($_SESSION['user_id'])) {
     return;
 }
+require_once __DIR__ . '/configuracion_sistema_helper.php';
+if (!motus_chatbot_habilitado()) {
+    return;
+}
 $chatbotCss = 'css/chatbot.css';
 $chatbotJs = 'js/chatbot.js';
 $v = file_exists(__DIR__ . '/../' . $chatbotCss) ? filemtime(__DIR__ . '/../' . $chatbotCss) : time();

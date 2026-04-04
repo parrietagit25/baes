@@ -13,6 +13,12 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../includes/configuracion_sistema_helper.php';
+if (!motus_chatbot_habilitado()) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'El asistente de IA está deshabilitado. Consulte al administrador.']);
+    exit;
+}
 require_once __DIR__ . '/../config/chatbot.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {

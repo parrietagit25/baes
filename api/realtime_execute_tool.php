@@ -9,6 +9,7 @@ session_start();
 header('Content-Type: application/json; charset=utf-8');
 
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../includes/configuracion_sistema_helper.php';
 
 if (getenv('REALTIME_INTERNAL_BASE_URL') === false || getenv('REALTIME_INTERNAL_BASE_URL') === '') {
     $envFile = __DIR__ . '/../.env';
@@ -34,6 +35,12 @@ if (getenv('REALTIME_INTERNAL_BASE_URL') === false || getenv('REALTIME_INTERNAL_
 if (!isset($_SESSION['user_id'])) {
     http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'No autorizado']);
+    exit;
+}
+
+if (!motus_chatbot_habilitado()) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'El asistente de IA está deshabilitado']);
     exit;
 }
 
