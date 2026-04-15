@@ -467,6 +467,15 @@ function construirResumenSolicitudHtml($solicitud, $vehiculos, $evaluaciones, $a
     $html .= '<p><strong>Estabilidad laboral:</strong> ' . $h($solicitud['estabilidad_laboral']) . '</p>';
     $html .= '</div>';
 
+    $comentariosGestor = trim((string)($solicitud['comentarios_gestor'] ?? ''));
+    $html .= '<h3>Análisis del gestor</h3><div class="info-box" style="background:#f8f9fa;border-left:4px solid #6f42c1;padding:12px;margin:10px 0;">';
+    if ($comentariosGestor !== '') {
+        $html .= '<p style="margin:0;white-space:pre-wrap;">' . nl2br($h($comentariosGestor)) . '</p>';
+    } else {
+        $html .= '<p style="margin:0;color:#6c757d;">Sin análisis registrado.</p>';
+    }
+    $html .= '</div>';
+
     $html .= '<h3>Datos del auto</h3><div class="info-box" style="background:#f8f9fa;border-left:4px solid #ffc107;padding:12px;margin:10px 0;">';
     if (!empty($vehiculos)) {
         foreach ($vehiculos as $v) {
