@@ -226,25 +226,6 @@ function asignarUsuarioBanco($pdo) {
         error_log("usuarios_banco_solicitudes: historial no registrado: " . $e->getMessage());
     }
     
-    // Enviar notificación por correo al banco asignado (opcional; errores no deben afectar la respuesta)
-    try {
-        if (file_exists(__DIR__ . '/../includes/email_helper.php')) {
-            require_once __DIR__ . '/../includes/email_helper.php';
-            $sql_solicitud = "SELECT * FROM solicitudes_credito WHERE id = ?";
-            $stmt = $pdo->prepare($sql_solicitud);
-            $stmt->execute([$solicitud_id]);
-            $solicitud = $stmt->fetch();
-            if ($solicitud) {
-                $resultadoEmail = notificarBancoNuevaSolicitud($solicitud_id, $usuario_banco_id);
-                if (!$resultadoEmail['success']) {
-                    error_log("No se pudo enviar correo al banco asignado: " . ($resultadoEmail['message'] ?? ''));
-                }
-            }
-        }
-    } catch (Throwable $e) {
-        error_log("Notificación banco (asignar usuario): " . $e->getMessage());
-    }
-    
     if (ob_get_length()) ob_clean();
     header('Content-Type: application/json');
     $resp = ['success' => true, 'message' => 'Usuario asignado correctamente y solicitud enviada a revisión bancaria'];

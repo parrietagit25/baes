@@ -500,11 +500,17 @@ function construirResumenSolicitudHtml($solicitud, $vehiculos, $evaluaciones, $a
     $html .= '<h3>Datos del auto</h3><div class="info-box" style="background:#f8f9fa;border-left:4px solid #ffc107;padding:12px;margin:10px 0;">';
     if (!empty($vehiculos)) {
         foreach ($vehiculos as $v) {
-            $html .= '<p><strong>Vehículo:</strong> ' . $h($v['marca'] ?? '') . ' ' . $h($v['modelo'] ?? '') . ' ' . $h($v['anio'] ?? '') . ' - Precio: $' . $n($v['precio']) . '</p>';
+            $html .= '<p><strong>Vehículo:</strong> ' . $h($v['marca'] ?? '') . ' ' . $h($v['modelo'] ?? '') . ' ' . $h($v['anio'] ?? '') . '</p>';
+            $html .= '<p><strong>Kilometraje:</strong> ' . $n($v['kilometraje']) . '</p>';
+            $html .= '<p><strong>Precio:</strong> $' . $n($v['precio']) . '</p>';
+            $html .= '<p><strong>Abono:</strong> ' . $n($v['abono_porcentaje'], 2) . '% / $' . $n($v['abono_monto'], 2) . '</p>';
+            $html .= '<hr style="border:none;border-top:1px solid #e5e7eb;margin:10px 0;">';
         }
     } else {
         $html .= '<p>Marca: ' . $h($solicitud['marca_auto']) . ', Modelo: ' . $h($solicitud['modelo_auto']) . ', Año: ' . $h($solicitud['año_auto'] ?? $solicitud['ao_auto'] ?? '') . '</p>';
-        $html .= '<p>Precio especial: $' . $n($solicitud['precio_especial']) . ', Abono: ' . $n($solicitud['abono_porcentaje']) . '% / $' . $n($solicitud['abono_monto']) . '</p>';
+        $html .= '<p>Kilometraje: ' . $n($solicitud['kilometraje']) . '</p>';
+        $html .= '<p>Precio especial: $' . $n($solicitud['precio_especial']) . '</p>';
+        $html .= '<p>Abono: ' . $n($solicitud['abono_porcentaje'], 2) . '% / $' . $n($solicitud['abono_monto'], 2) . '</p>';
     }
     $html .= '</div>';
 
