@@ -6,6 +6,52 @@
  */
 function buildPdfHtmlFinanciamiento($input, $firmaBase64, $nombreCliente) {
     $h = function($s) { return htmlspecialchars($s ?? '', ENT_QUOTES, 'UTF-8'); };
+    $enhanceSignatureBase64 = function($b64) {
+        $b64 = trim((string)$b64);
+        if ($b64 === '') return $b64;
+        if (!function_exists('imagecreatefromstring')) return $b64;
+
+        $bin = @base64_decode($b64, true);
+        if ($bin === false) return $b64;
+        $img = @imagecreatefromstring($bin);
+        if (!$img) return $b64;
+
+        $w = imagesx($img);
+        $h = imagesy($img);
+        if ($w <= 0 || $h <= 0) {
+            imagedestroy($img);
+            return $b64;
+        }
+
+        imagesavealpha($img, true);
+        imagealphablending($img, false);
+
+        // Convertir trazos claros a tinta más oscura sin perder transparencia.
+        for ($y = 0; $y < $h; $y++) {
+            for ($x = 0; $x < $w; $x++) {
+                $rgba = imagecolorat($img, $x, $y);
+                $a = ($rgba >> 24) & 0x7F;
+                $r = ($rgba >> 16) & 0xFF;
+                $g = ($rgba >> 8) & 0xFF;
+                $b = $rgba & 0xFF;
+                $lum = (0.299 * $r) + (0.587 * $g) + (0.114 * $b);
+
+                // Solo tocar píxeles con trazo visible (no totalmente transparentes).
+                if ($a < 120) {
+                    // Entre más claro el trazo, más lo oscurecemos.
+                    $new = (int)max(12, min(255, ($lum * 0.35)));
+                    $col = imagecolorallocatealpha($img, $new, $new, $new, $a);
+                    imagesetpixel($img, $x, $y, $col);
+                }
+            }
+        }
+
+        ob_start();
+        imagepng($img);
+        $out = ob_get_clean();
+        imagedestroy($img);
+        return $out ? base64_encode($out) : $b64;
+    };
     $baseDir = dirname(__DIR__);
     $logoPath = $baseDir . '/img/seminuevos.jpg';
     $logoImg = '';
@@ -139,9 +185,10 @@ function buildPdfHtmlFinanciamiento($input, $firmaBase64, $nombreCliente) {
         '   CELULAR:' => $h($input['reff2_cel'] ?? ''),
     ]);
 
-    if ($firmaBase64 !== '' && $firmaBase64 !== null) {
+    $firmaPdf = $enhanceSignatureBase64($firmaBase64);
+    if ($firmaPdf !== '' && $firmaPdf !== null) {
         $html .= '<tr><td colspan="2" style="background:#eee;padding:6px 8px;font-weight:bold">Firma del solicitante</td></tr>';
-        $html .= '<tr><td colspan="2" style="padding:10px;"><img class="firma" src="data:image/png;base64,' . $firmaBase64 . '" alt="Firma"/></td></tr>';
+        $html .= '<tr><td colspan="2" style="padding:10px;"><img class="firma" src="data:image/png;base64,' . $firmaPdf . '" alt="Firma"/></td></tr>';
     }
     $firmantesExtra = isset($input['firmantes_adicionales']) ? $input['firmantes_adicionales'] : '';
     if ($firmantesExtra !== '') {
@@ -151,8 +198,9 @@ function buildPdfHtmlFinanciamiento($input, $firmaBase64, $nombreCliente) {
                 $nom = isset($fa['nombre']) ? $h($fa['nombre']) : '';
                 $img = isset($fa['firma']) && $fa['firma'] !== '' ? $fa['firma'] : null;
                 if ($nom !== '' && $img !== null) {
+                    $imgPdf = $enhanceSignatureBase64($img);
                     $html .= '<tr><td colspan="2" style="background:#eee;padding:6px 8px;font-weight:bold">Firma: ' . $nom . '</td></tr>';
-                    $html .= '<tr><td colspan="2" style="padding:10px;"><img class="firma" src="data:image/png;base64,' . $img . '" alt="Firma ' . $nom . '"/></td></tr>';
+                    $html .= '<tr><td colspan="2" style="padding:10px;"><img class="firma" src="data:image/png;base64,' . $imgPdf . '" alt="Firma ' . $nom . '"/></td></tr>';
                 }
             }
         }

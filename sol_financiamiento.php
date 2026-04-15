@@ -100,6 +100,37 @@ $isGestor = in_array('ROLE_GESTOR', $userRoles);
     <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
     <script>
     $(function() {
+        function enhanceSignatureForView(imgEl, base64) {
+            try {
+                if (!imgEl || !base64 || String(base64).length < 50) return;
+                var img = new Image();
+                img.onload = function() {
+                    var canvas = document.createElement('canvas');
+                    canvas.width = img.width || 500;
+                    canvas.height = img.height || 180;
+                    var ctx = canvas.getContext('2d');
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    var id = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    var d = id.data;
+                    for (var i = 0; i < d.length; i += 4) {
+                        var a = d[i + 3];
+                        if (a === 0) continue;
+                        var lum = (0.299 * d[i]) + (0.587 * d[i + 1]) + (0.114 * d[i + 2]);
+                        var v = Math.max(12, Math.min(255, lum * 0.35));
+                        d[i] = v;
+                        d[i + 1] = v;
+                        d[i + 2] = v;
+                        d[i + 3] = 255;
+                    }
+                    ctx.putImageData(id, 0, 0);
+                    imgEl.src = canvas.toDataURL('image/png');
+                };
+                img.src = 'data:image/png;base64,' + base64;
+            } catch (e) {}
+        }
+
         var table = $('#tablaSolFinanciamiento').DataTable({
             ajax: { url: 'api/sol_financiamiento.php', dataSrc: 'data' },
             columns: [
@@ -166,18 +197,21 @@ $isGestor = in_array('ROLE_GESTOR', $userRoles);
                     }
                     // Sección Firma(s): imagen principal + firmantes adicionales
                     if (d.firma && String(d.firma).length > 50) {
-                        html += '<div class="detalle-seccion"><h6>Firma del solicitante</h6><div class="firma-wrap"><img class="img-firma" src="data:image/png;base64,' + d.firma + '" alt="Firma" /></div></div>';
+                        html += '<div class="detalle-seccion"><h6>Firma del solicitante</h6><div class="firma-wrap"><img class="img-firma js-firma-enhance" data-firma-b64="' + d.firma + '" src="data:image/png;base64,' + d.firma + '" alt="Firma" /></div></div>';
                     }
                     var fa = null;
                     try { fa = d.firmantes_adicionales ? JSON.parse(d.firmantes_adicionales) : null; } catch (e) {}
                     if (fa && Array.isArray(fa) && fa.length) {
                         fa.forEach(function(item, idx) {
                             if (item.firma && String(item.firma).length > 50) {
-                                html += '<div class="detalle-seccion"><h6>Firma adicional' + (fa.length > 1 ? ' ' + (idx + 1) : '') + (item.nombre ? ': ' + $('<div>').text(item.nombre).html() : '') + '</h6><div class="firma-wrap"><img class="img-firma" src="data:image/png;base64,' + item.firma + '" alt="Firma" /></div></div>';
+                                html += '<div class="detalle-seccion"><h6>Firma adicional' + (fa.length > 1 ? ' ' + (idx + 1) : '') + (item.nombre ? ': ' + $('<div>').text(item.nombre).html() : '') + '</h6><div class="firma-wrap"><img class="img-firma js-firma-enhance" data-firma-b64="' + item.firma + '" src="data:image/png;base64,' + item.firma + '" alt="Firma" /></div></div>';
                             }
                         });
                     }
                     $content.html(html || '<p class="text-muted">Sin datos.</p>');
+                    $content.find('.js-firma-enhance').each(function() {
+                        enhanceSignatureForView(this, this.getAttribute('data-firma-b64'));
+                    });
                 })
                 .fail(function() {
                     $content.html('<p class="text-danger">Error al cargar.</p>');
