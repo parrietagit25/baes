@@ -419,6 +419,27 @@ function enviarResumenSolicitudBanco($solicitudId, $usuarioBancoId) {
         );
 
         $copias = obtenerCopiasResumenSolicitudBanco($pdo, $solicitud, (string) $banco['banco_email']);
+        $ccVisibles = [];
+        $gestorId = isset($solicitud['gestor_id']) ? (int)$solicitud['gestor_id'] : 0;
+        if ($gestorId > 0) {
+            try {
+                $stmtGestor = $pdo->prepare('SELECT email FROM usuarios WHERE id = ? LIMIT 1');
+                $stmtGestor->execute([$gestorId]);
+                $gestor = $stmtGestor->fetch(PDO::FETCH_ASSOC);
+                if ($gestor && !empty($gestor['email'])) {
+                    $emailGestor = trim((string)$gestor['email']);
+                    if ($emailGestor !== '' && filter_var($emailGestor, FILTER_VALIDATE_EMAIL)) {
+                        $ccVisibles[] = $emailGestor;
+                        // Si el gestor aparece en BCC, eliminarlo para que no vaya duplicado.
+                        $copias = array_values(array_filter($copias, function($e) use ($emailGestor) {
+                            return strtolower((string)$e) !== strtolower($emailGestor);
+                        }));
+                    }
+                }
+            } catch (PDOException $e) {
+                error_log('enviarResumenSolicitudBanco gestor cc: ' . $e->getMessage());
+            }
+        }
         $archivosAdjuntos = adjuntosArchivosParaCorreoResumen($adjuntos);
 
         $emailService = new EmailService();
@@ -429,7 +450,7 @@ function enviarResumenSolicitudBanco($solicitudId, $usuarioBancoId) {
             $bancoNombre ?: 'Usuario Banco',
             strip_tags(preg_replace('/<br\s*\/?>/i', "\n", $html)),
             $archivosAdjuntos,
-            [],
+            $ccVisibles,
             $copias
         );
     } catch (Exception $e) {
