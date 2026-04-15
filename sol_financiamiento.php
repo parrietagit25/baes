@@ -109,23 +109,23 @@ $isGestor = in_array('ROLE_GESTOR', $userRoles);
                     canvas.width = img.width || 500;
                     canvas.height = img.height || 180;
                     var ctx = canvas.getContext('2d');
-                    ctx.fillStyle = '#ffffff';
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    // Importante: no pre-rellenar blanco para conservar alpha original.
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
                     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                     var id = ctx.getImageData(0, 0, canvas.width, canvas.height);
                     var d = id.data;
                     for (var i = 0; i < d.length; i += 4) {
                         var a = d[i + 3];
-                        if (a === 0) continue;
-                        var lum = (0.299 * d[i]) + (0.587 * d[i + 1]) + (0.114 * d[i + 2]);
-                        // Mantener fondo blanco: solo reforzar trazos (no zonas claras).
-                        if (lum > 225) {
+                        // Fondo transparente -> blanco sólido.
+                        if (a === 0) {
                             d[i] = 255;
                             d[i + 1] = 255;
                             d[i + 2] = 255;
                             d[i + 3] = 255;
                             continue;
                         }
+                        var lum = (0.299 * d[i]) + (0.587 * d[i + 1]) + (0.114 * d[i + 2]);
+                        // Cualquier trazo visible se oscurece para mayor legibilidad.
                         var v = Math.max(12, Math.min(255, lum * 0.35));
                         d[i] = v;
                         d[i + 1] = v;
