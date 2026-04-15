@@ -420,6 +420,7 @@ function enviarResumenSolicitudBanco($solicitudId, $usuarioBancoId) {
 
         $copias = obtenerCopiasResumenSolicitudBanco($pdo, $solicitud, (string) $banco['banco_email']);
         $ccVisibles = [];
+        $replyToGestor = '';
         $gestorId = isset($solicitud['gestor_id']) ? (int)$solicitud['gestor_id'] : 0;
         if ($gestorId > 0) {
             try {
@@ -429,6 +430,7 @@ function enviarResumenSolicitudBanco($solicitudId, $usuarioBancoId) {
                 if ($gestor && !empty($gestor['email'])) {
                     $emailGestor = trim((string)$gestor['email']);
                     if ($emailGestor !== '' && filter_var($emailGestor, FILTER_VALIDATE_EMAIL)) {
+                        $replyToGestor = $emailGestor;
                         $ccVisibles[] = $emailGestor;
                         // Si el gestor aparece en BCC, eliminarlo para que no vaya duplicado.
                         $copias = array_values(array_filter($copias, function($e) use ($emailGestor) {
@@ -451,7 +453,8 @@ function enviarResumenSolicitudBanco($solicitudId, $usuarioBancoId) {
             strip_tags(preg_replace('/<br\s*\/?>/i', "\n", $html)),
             $archivosAdjuntos,
             $ccVisibles,
-            $copias
+            $copias,
+            $replyToGestor
         );
     } catch (Exception $e) {
         error_log("Error enviarResumenSolicitudBanco: " . $e->getMessage());
@@ -474,7 +477,7 @@ function construirResumenSolicitudHtml($solicitud, $vehiculos, $evaluaciones, $a
     };
     
     $linkVer = ($mostrarEnlaceMotus && $app_url)
-        ? '<p><a href="' . $h($app_url) . '/solicitudes.php?id=' . (int)$solicitud['id'] . '" style="display:inline-block;padding:12px 24px;background:#0d6efd;color:#fff;text-decoration:none;border-radius:6px;">Ver solicitud en MOTUS</a></p>'
+        ? '<p><a href="' . $h($app_url) . '/solicitudes.php?id=' . (int)$solicitud['id'] . '" style="display:inline-block;padding:12px 24px;background:#e8f1ff;color:#0b3a6f;text-decoration:none;border-radius:6px;border:1px solid #cddff7;">Ver solicitud en MOTUS</a></p>'
         : '';
     
     $html = '<h2>Resumen de Solicitud de Crédito #' . (int)$solicitud['id'] . '</h2>';

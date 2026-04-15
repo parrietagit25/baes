@@ -50,10 +50,11 @@ class EmailService {
         $bodyText = '',
         $attachments = [],
         array $cc = [],
-        array $bcc = []
+        array $bcc = [],
+        $replyToOverride = ''
     ) {
         try {
-            return $this->enviarCorreoResend($to, $toName, $subject, $bodyHTML, $bodyText, $attachments, $cc, $bcc);
+            return $this->enviarCorreoResend($to, $toName, $subject, $bodyHTML, $bodyText, $attachments, $cc, $bcc, $replyToOverride);
         } catch (Throwable $e) {
             error_log('Error al enviar correo (Resend): ' . $e->getMessage());
             return ['success' => false, 'message' => 'Error al enviar correo: ' . $e->getMessage()];
@@ -75,7 +76,7 @@ class EmailService {
         return 'Error Resend: ' . $raw;
     }
 
-    private function enviarCorreoResend($to, $toName, $subject, $bodyHTML, $bodyText, $attachments, array $cc = [], array $bcc = []) {
+    private function enviarCorreoResend($to, $toName, $subject, $bodyHTML, $bodyText, $attachments, array $cc = [], array $bcc = [], $replyToOverride = '') {
         $apiKey = trim((string) ($this->config['resend_api_key'] ?? ''));
         $fromName = trim((string) ($this->config['from_name'] ?? ''));
         $fromEmail = trim((string) ($this->config['from_email'] ?? ''));
@@ -100,7 +101,10 @@ class EmailService {
             $params['bcc'] = $bccList;
         }
 
-        $replyTo = trim((string) ($this->config['reply_to_email'] ?? ''));
+        $replyTo = trim((string)$replyToOverride);
+        if ($replyTo === '') {
+            $replyTo = trim((string) ($this->config['reply_to_email'] ?? ''));
+        }
         if ($replyTo !== '') {
             $params['reply_to'] = $replyTo;
         }

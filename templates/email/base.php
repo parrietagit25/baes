@@ -8,7 +8,7 @@
         body {
             font-family: Arial, sans-serif;
             line-height: 1.6;
-            color: #333;
+            color: #0f2f57;
             max-width: 600px;
             margin: 0 auto;
             padding: 20px;
@@ -21,12 +21,13 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         .header {
-            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-            color: white;
+            background: #e8f1ff;
+            color: #0b3a6f;
             padding: 20px;
             border-radius: 8px 8px 0 0;
             margin: -30px -30px 20px -30px;
             text-align: center;
+            border-bottom: 1px solid #cddff7;
         }
         .header h1 {
             margin: 0;
@@ -38,14 +39,15 @@
         .button {
             display: inline-block;
             padding: 12px 30px;
-            background-color: #28a745;
-            color: white;
+            background-color: #e8f1ff;
+            color: #0b3a6f;
             text-decoration: none;
             border-radius: 5px;
             margin: 20px 0;
+            border: 1px solid #cddff7;
         }
         .button:hover {
-            background-color: #218838;
+            background-color: #d9e8ff;
         }
         .info-box {
             background-color: #f8f9fa;
@@ -58,7 +60,7 @@
             padding-top: 20px;
             border-top: 1px solid #ddd;
             font-size: 12px;
-            color: #666;
+            color: #355b86;
             text-align: center;
         }
         .badge {
@@ -70,7 +72,7 @@
         }
         .badge-success {
             background-color: #28a745;
-            color: white;
+            color: #0b3a6f;
         }
         .badge-warning {
             background-color: #ffc107;
@@ -78,11 +80,11 @@
         }
         .badge-danger {
             background-color: #dc3545;
-            color: white;
+            color: #0b3a6f;
         }
         .badge-info {
             background-color: #17a2b8;
-            color: white;
+            color: #0b3a6f;
         }
     </style>
 </head>
@@ -95,7 +97,7 @@
             <?php echo $content ?? ''; ?>
         </div>
         <div class="footer">
-            <p>Este es un correo automático del sistema. Por favor no responda a este mensaje.</p>
+            <p><strong>Por favor responder a todos</strong></p>
             <p>&copy; <?php echo date('Y'); ?> AutoMarket Seminuevos. Todos los derechos reservados.</p>
         </div>
     </div>
