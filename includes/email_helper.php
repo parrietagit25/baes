@@ -462,6 +462,16 @@ function enviarResumenSolicitudBanco($solicitudId, $usuarioBancoId) {
 function construirResumenSolicitudHtml($solicitud, $vehiculos, $evaluaciones, $adjuntos, $bancoNombre, $app_url, $mostrarEnlaceMotus = false) {
     $h = function($s) { return htmlspecialchars($s ?? '', ENT_QUOTES, 'UTF-8'); };
     $n = function($v, $dec = 0) { return $v !== null && $v !== '' ? number_format((float)$v, $dec, ',', '.') : 'N/A'; };
+    $formatAbono = function($porcentaje, $monto) use ($n) {
+        $partes = [];
+        if ($porcentaje !== null && $porcentaje !== '') {
+            $partes[] = $n($porcentaje, 2) . '%';
+        }
+        if ($monto !== null && $monto !== '') {
+            $partes[] = '$' . $n($monto, 2);
+        }
+        return $partes ? implode(' / ', $partes) : 'N/A';
+    };
     
     $linkVer = ($mostrarEnlaceMotus && $app_url)
         ? '<p><a href="' . $h($app_url) . '/solicitudes.php?id=' . (int)$solicitud['id'] . '" style="display:inline-block;padding:12px 24px;background:#0d6efd;color:#fff;text-decoration:none;border-radius:6px;">Ver solicitud en MOTUS</a></p>'
@@ -503,14 +513,14 @@ function construirResumenSolicitudHtml($solicitud, $vehiculos, $evaluaciones, $a
             $html .= '<p><strong>Vehículo:</strong> ' . $h($v['marca'] ?? '') . ' ' . $h($v['modelo'] ?? '') . ' ' . $h($v['anio'] ?? '') . '</p>';
             $html .= '<p><strong>Kilometraje:</strong> ' . $n($v['kilometraje']) . '</p>';
             $html .= '<p><strong>Precio:</strong> $' . $n($v['precio']) . '</p>';
-            $html .= '<p><strong>Abono:</strong> ' . $n($v['abono_porcentaje'], 2) . '% / $' . $n($v['abono_monto'], 2) . '</p>';
+            $html .= '<p><strong>Abono:</strong> ' . $formatAbono($v['abono_porcentaje'] ?? null, $v['abono_monto'] ?? null) . '</p>';
             $html .= '<hr style="border:none;border-top:1px solid #e5e7eb;margin:10px 0;">';
         }
     } else {
         $html .= '<p>Marca: ' . $h($solicitud['marca_auto']) . ', Modelo: ' . $h($solicitud['modelo_auto']) . ', Año: ' . $h($solicitud['año_auto'] ?? $solicitud['ao_auto'] ?? '') . '</p>';
         $html .= '<p>Kilometraje: ' . $n($solicitud['kilometraje']) . '</p>';
         $html .= '<p>Precio especial: $' . $n($solicitud['precio_especial']) . '</p>';
-        $html .= '<p>Abono: ' . $n($solicitud['abono_porcentaje'], 2) . '% / $' . $n($solicitud['abono_monto'], 2) . '</p>';
+        $html .= '<p>Abono: ' . $formatAbono($solicitud['abono_porcentaje'] ?? null, $solicitud['abono_monto'] ?? null) . '</p>';
     }
     $html .= '</div>';
 
