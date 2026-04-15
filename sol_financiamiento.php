@@ -37,8 +37,6 @@ $isGestor = in_array('ROLE_GESTOR', $userRoles);
             display: block;
             background: #fff;
             border: 1px solid #d1d5db;
-            /* Refuerza firmas claras almacenadas en base64 */
-            filter: contrast(260%) brightness(55%) grayscale(100%);
         }
     </style>
 </head>
