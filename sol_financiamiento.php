@@ -118,6 +118,14 @@ $isGestor = in_array('ROLE_GESTOR', $userRoles);
                         var a = d[i + 3];
                         if (a === 0) continue;
                         var lum = (0.299 * d[i]) + (0.587 * d[i + 1]) + (0.114 * d[i + 2]);
+                        // Mantener fondo blanco: solo reforzar trazos (no zonas claras).
+                        if (lum > 225) {
+                            d[i] = 255;
+                            d[i + 1] = 255;
+                            d[i + 2] = 255;
+                            d[i + 3] = 255;
+                            continue;
+                        }
                         var v = Math.max(12, Math.min(255, lum * 0.35));
                         d[i] = v;
                         d[i + 1] = v;
