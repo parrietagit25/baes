@@ -88,6 +88,24 @@ if ($nombre === '' || $cedula === '') {
     exit();
 }
 
+// Compatibilidad: si llegan campos de dirección estilo Motus, consolidarlos al formato legacy.
+if (empty($input['prov_dist_corr'])) {
+    $provincia = trim((string)($input['provincia'] ?? ''));
+    $distrito = trim((string)($input['distrito'] ?? ''));
+    $corregimiento = trim((string)($input['corregimiento'] ?? ''));
+    $input['prov_dist_corr'] = implode(', ', array_values(array_filter([$provincia, $distrito, $corregimiento], function($x){ return $x !== ''; })));
+}
+if (empty($input['barriada_calle_casa'])) {
+    $barriada = trim((string)($input['barriada'] ?? ''));
+    $direccion = trim((string)($input['direccion'] ?? ''));
+    $input['barriada_calle_casa'] = implode(' - ', array_values(array_filter([$barriada, $direccion], function($x){ return $x !== ''; })));
+}
+if (empty($input['edificio_apto'])) {
+    $casaEdif = trim((string)($input['casa_edif'] ?? ''));
+    $numeroCasaApto = trim((string)($input['numero_casa_apto'] ?? ''));
+    $input['edificio_apto'] = implode(', ', array_values(array_filter([$casaEdif, $numeroCasaApto], function($x){ return $x !== ''; })));
+}
+
 function getDefaultGestorId($pdo) {
     try {
         $stmt = $pdo->query("

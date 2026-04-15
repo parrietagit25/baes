@@ -555,8 +555,21 @@ function prefillFormularioDesdeFinanciamiento(d) {
     set('email', d.cliente_correo);
     set('casado', d.tiene_conyuge);
     set('hijos', d.cliente_dependientes);
-    set('direccion', [d.prov_dist_corr, d.barriada_calle_casa].filter(Boolean).join(' '));
-    set('casa_edif', d.edificio_apto);
+    set('direccion', d.direccion || [d.prov_dist_corr, d.barriada_calle_casa].filter(Boolean).join(' '));
+    if (d.barriada) {
+        set('barriada', d.barriada);
+    } else if (d.barriada_calle_casa) {
+        var partesBarriada = String(d.barriada_calle_casa).split(' - ');
+        if (partesBarriada.length) set('barriada', partesBarriada[0].trim());
+    }
+    if (d.casa_edif) {
+        set('casa_edif', d.casa_edif);
+    } else if (d.edificio_apto) {
+        var partesCasa = String(d.edificio_apto).split(',');
+        if (partesCasa.length >= 1) set('casa_edif', partesCasa[0].trim());
+        if (partesCasa.length >= 2) set('numero_casa_apto', partesCasa.slice(1).join(',').trim());
+    }
+    if (d.numero_casa_apto) set('numero_casa_apto', d.numero_casa_apto);
     set('ingreso', d.empresa_salario);
     set('tiempo_laborar', d.empresa_anios);
     set('profesion', d.empresa_ocupacion);
