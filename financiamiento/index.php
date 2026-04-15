@@ -455,10 +455,20 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
             </div>
             <div class="error" data-error-for="vivienda"></div>
           </div>
-          <div class="col-6">
-            <label for="prov_dist_corr">Provincia, Distrito, Corregimiento *</label>
-            <input id="prov_dist_corr" name="prov_dist_corr" required maxlength="120" />
-            <div class="error" data-error-for="prov_dist_corr"></div>
+          <div class="col-3">
+            <label for="provincia">Provincia *</label>
+            <input id="provincia" name="provincia" required maxlength="60" />
+            <div class="error" data-error-for="provincia"></div>
+          </div>
+          <div class="col-3">
+            <label for="distrito">Distrito *</label>
+            <input id="distrito" name="distrito" required maxlength="60" />
+            <div class="error" data-error-for="distrito"></div>
+          </div>
+          <div class="col-3">
+            <label for="corregimiento">Corregimiento *</label>
+            <input id="corregimiento" name="corregimiento" required maxlength="60" />
+            <div class="error" data-error-for="corregimiento"></div>
           </div>
           <div class="col-6">
             <label for="tel_residencia">Teléfono de residencia</label>
@@ -466,9 +476,9 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
             <div class="error" data-error-for="tel_residencia"></div>
           </div>
           <div class="col-6">
-            <label for="barriada_calle_casa">Barriada, No. calle, Casa No. *</label>
-            <input id="barriada_calle_casa" name="barriada_calle_casa" required maxlength="140" />
-            <div class="error" data-error-for="barriada_calle_casa"></div>
+            <label for="barriada">Barriada *</label>
+            <input id="barriada" name="barriada" required maxlength="120" />
+            <div class="error" data-error-for="barriada"></div>
           </div>
           <div class="col-6">
             <label for="celular_cliente">Celular *</label>
@@ -476,9 +486,19 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
             <div class="error" data-error-for="celular_cliente"></div>
           </div>
           <div class="col-6">
-            <label for="edificio_apto">Edificio, Apartamento No.</label>
-            <input id="edificio_apto" name="edificio_apto" maxlength="120" />
-            <div class="error" data-error-for="edificio_apto"></div>
+            <label for="casa_edif">Casa / Edif</label>
+            <input id="casa_edif" name="casa_edif" maxlength="120" />
+            <div class="error" data-error-for="casa_edif"></div>
+          </div>
+          <div class="col-6">
+            <label for="numero_casa_apto"># de casa / Apto</label>
+            <input id="numero_casa_apto" name="numero_casa_apto" maxlength="120" />
+            <div class="error" data-error-for="numero_casa_apto"></div>
+          </div>
+          <div class="col-12">
+            <label for="direccion">Dirección completa *</label>
+            <textarea id="direccion" name="direccion" required maxlength="300"></textarea>
+            <div class="error" data-error-for="direccion"></div>
           </div>
           <div class="col-6">
             <label for="correo_residencial">Correo electrónico</label>
@@ -1058,6 +1078,20 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
         } catch(e) {}
       }
 
+      function aplicarCompatibilidadDireccion(payload){
+        var provincia = String(payload.provincia || "").trim();
+        var distrito = String(payload.distrito || "").trim();
+        var corregimiento = String(payload.corregimiento || "").trim();
+        var barriada = String(payload.barriada || "").trim();
+        var casaEdif = String(payload.casa_edif || "").trim();
+        var numeroCasaApto = String(payload.numero_casa_apto || "").trim();
+        var direccion = String(payload.direccion || "").trim();
+
+        payload.prov_dist_corr = [provincia, distrito, corregimiento].filter(Boolean).join(", ");
+        payload.barriada_calle_casa = [barriada, direccion].filter(Boolean).join(" - ");
+        payload.edificio_apto = [casaEdif, numeroCasaApto].filter(Boolean).join(", ");
+      }
+
       function loadDraft(){
         try {
           var raw = localStorage.getItem(STORAGE_KEY);
@@ -1229,6 +1263,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           var payload = readFormToObject();
           delete payload.__meta;
           delete payload.acepta;
+          aplicarCompatibilidadDireccion(payload);
           if(TOKEN_LINK) payload.token = TOKEN_LINK;
           if(firmaDataInput && firmaDataInput.value) payload.firma = firmaDataInput.value;
           var faBlocks = document.querySelectorAll(".firmante-adicional-block");
