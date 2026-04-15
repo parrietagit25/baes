@@ -846,9 +846,11 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
         if(!canvasEl || !canvasEl.getContext) return;
         var ctx = canvasEl.getContext("2d");
         var drawing = false, lastX = 0, lastY = 0;
-        ctx.strokeStyle = "#eaf0ff";
-        ctx.lineWidth = 2;
+        // Trazo más oscuro y grueso para mejorar legibilidad en detalle/PDF.
+        ctx.strokeStyle = "#111827";
+        ctx.lineWidth = 3;
         ctx.lineCap = "round";
+        ctx.lineJoin = "round";
         function getPos(e){
           var r = canvasEl.getBoundingClientRect();
           var scaleX = canvasEl.width / r.width, scaleY = canvasEl.height / r.height;

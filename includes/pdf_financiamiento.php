@@ -33,7 +33,14 @@ function buildPdfHtmlFinanciamiento($input, $firmaBase64, $nombreCliente) {
         .pdf-title{font-size:14px;font-weight:bold;margin:0 0 6px 0;}
         .banner{background:' . $secHeader . ';color:#fff;padding:8px 10px;text-align:center;font-weight:bold;font-size:11px;margin:10px 0;width:100%;}
         table{width:100%;border-collapse:collapse;} td,th{border:1px solid #ccc;padding:5px 8px;text-align:left;}
-        .firma{max-width:280px;max-height:120px;}
+        .firma{
+            max-width:280px;
+            max-height:120px;
+            background:#fff;
+            border:1px solid #d1d5db;
+            /* Dompdf puede ignorar filtros avanzados; se mantiene por compatibilidad */
+            filter: contrast(260%) brightness(55%) grayscale(100%);
+        }
         .grid2{width:100%;border-collapse:collapse;font-size:10px;}
         .grid2 td{padding:4px 8px;border:1px solid #ddd;vertical-align:top;}
         .header-row{width:100%;border:none;}

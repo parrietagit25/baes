@@ -31,7 +31,15 @@ $isGestor = in_array('ROLE_GESTOR', $userRoles);
         .detalle-seccion { margin-bottom: 1rem; }
         .detalle-seccion h6 { color: #495057; border-bottom: 1px solid #dee2e6; padding-bottom: 0.25rem; }
         .firma-wrap { margin-top: 0.5rem; padding: 10px; background: #f8f9fa; border-radius: 8px; border: 1px solid #dee2e6; display: inline-block; }
-        .img-firma { max-width: 320px; max-height: 140px; display: block; }
+        .img-firma {
+            max-width: 320px;
+            max-height: 140px;
+            display: block;
+            background: #fff;
+            border: 1px solid #d1d5db;
+            /* Refuerza firmas claras almacenadas en base64 */
+            filter: contrast(260%) brightness(55%) grayscale(100%);
+        }
     </style>
 </head>
 <body>
