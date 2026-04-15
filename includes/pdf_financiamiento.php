@@ -185,10 +185,15 @@ function buildPdfHtmlFinanciamiento($input, $firmaBase64, $nombreCliente) {
         '   CELULAR:' => $h($input['reff2_cel'] ?? ''),
     ]);
 
+    $html .= '</table>';
+    $html .= '<div style="margin-top:10px;page-break-inside:avoid;">';
+    $html .= '<p class="footer-note">Con la firma de esta solicitud, autorizo a PANAMA CAR RENTAL, S.A., MULTIBANK, INC., THE BANK OF NOVA SCOTIA (PANAMÁ), S.A., BANCO GENERAL, S.A., GLOBAL BANK CORPORATION, BAC International Bank, Inc., BANISTMO, S.A., BANCO DELTA, S.A., BANESCO (Panamá), S.A., BANISI, S.A., MULTIFINANCIAMIENTOS, S.A., FOSTRIAN Apoyo Financiera, CORPORACION DE CREDITO, S.A., CORPORACION DE FINANZAS DEL PAIS, S.A., FINANCIERA PACIFICO, DAVIVIENDA, ALIADO LEASING, CENTRO FINANCIERO EMPRESARIAL, SUMA FINANCIERA; a solicitar, consultar, recopilar, transmitir y revelar cualquier información, datos y documentos brindados en esta solicitud; se trate, comparta, transfiera, intercambie y utilice con terceros, ya sea que se concluya o no la adquisición del producto o servicio.</p>';
+    $html .= '<p class="footer-note">En cumplimiento de lo establecido en la Ley 81 de 2019 de Protección de Datos Personales, le comunicamos que los datos que usted nos facilite quedarán incorporados y serán tratados en nuestra base de datos con el fin de poderle prestar nuevos servicios, así como para mantenerle informado sobre temas relacionados con la empresa y sus servicios. Por este medio exonero expresamente a PANAMA CAR RENTAL, S.A. y/o a sus afiliadas, empleados, ejecutivos, dignatarios y apoderados, de cualquier consecuencia o responsabilidad resultante del ejercicio que ustedes hagan el derecho a solicitar o suministrar información o por razón de cualquier autorización de la presente.</p>';
+
     $firmaPdf = $enhanceSignatureBase64($firmaBase64);
     if ($firmaPdf !== '' && $firmaPdf !== null) {
-        $html .= '<tr><td colspan="2" style="background:#eee;padding:6px 8px;font-weight:bold">Firma del solicitante</td></tr>';
-        $html .= '<tr><td colspan="2" style="padding:10px;"><img class="firma" src="data:image/png;base64,' . $firmaPdf . '" alt="Firma"/></td></tr>';
+        $html .= '<table style="margin-top:8px;"><tr><td style="background:#eee;padding:6px 8px;font-weight:bold">Firma del solicitante</td></tr>';
+        $html .= '<tr><td style="padding:10px;"><img class="firma" src="data:image/png;base64,' . $firmaPdf . '" alt="Firma"/></td></tr></table>';
     }
     $firmantesExtra = isset($input['firmantes_adicionales']) ? $input['firmantes_adicionales'] : '';
     if ($firmantesExtra !== '') {
@@ -199,23 +204,21 @@ function buildPdfHtmlFinanciamiento($input, $firmaBase64, $nombreCliente) {
                 $img = isset($fa['firma']) && $fa['firma'] !== '' ? $fa['firma'] : null;
                 if ($nom !== '' && $img !== null) {
                     $imgPdf = $enhanceSignatureBase64($img);
-                    $html .= '<tr><td colspan="2" style="background:#eee;padding:6px 8px;font-weight:bold">Firma: ' . $nom . '</td></tr>';
-                    $html .= '<tr><td colspan="2" style="padding:10px;"><img class="firma" src="data:image/png;base64,' . $imgPdf . '" alt="Firma ' . $nom . '"/></td></tr>';
+                    $html .= '<table style="margin-top:6px;"><tr><td style="background:#eee;padding:6px 8px;font-weight:bold">Firma: ' . $nom . '</td></tr>';
+                    $html .= '<tr><td style="padding:10px;"><img class="firma" src="data:image/png;base64,' . $imgPdf . '" alt="Firma ' . $nom . '"/></td></tr></table>';
                 }
             }
         }
     }
-    $html .= '</table>';
-    $html .= '<p class="footer-note">Con la firma de esta solicitud, autorizo a PANAMA CAR RENTAL, S.A., MULTIBANK, INC., THE BANK OF NOVA SCOTIA (PANAMÁ), S.A., BANCO GENERAL, S.A., GLOBAL BANK CORPORATION, BAC International Bank, Inc., BANISTMO, S.A., BANCO DELTA, S.A., BANESCO (Panamá), S.A., BANISI, S.A., MULTIFINANCIAMIENTOS, S.A., FOSTRIAN Apoyo Financiera, CORPORACION DE CREDITO, S.A., CORPORACION DE FINANZAS DEL PAIS, S.A., FINANCIERA PACIFICO, DAVIVIENDA, ALIADO LEASING, CENTRO FINANCIERO EMPRESARIAL, SUMA FINANCIERA; a solicitar, consultar, recopilar, transmitir y revelar cualquier información, datos y documentos brindados en esta solicitud; se trate, comparta, transfiera, intercambie y utilice con terceros, ya sea que se concluya o no la adquisición del producto o servicio.</p>';
-    $html .= '<p class="footer-note">En cumplimiento de lo establecido en la Ley 81 de 2019 de Protección de Datos Personales, le comunicamos que los datos que usted nos facilite quedarán incorporados y serán tratados en nuestra base de datos con el fin de poderle prestar nuevos servicios, así como para mantenerle informado sobre temas relacionados con la empresa y sus servicios. Por este medio exonero expresamente a PANAMA CAR RENTAL, S.A. y/o a sus afiliadas, empleados, ejecutivos, dignatarios y apoderados, de cualquier consecuencia o responsabilidad resultante del ejercicio que ustedes hagan el derecho a solicitar o suministrar información o por razón de cualquier autorización de la presente.</p>';
     $firmaPath = $baseDir . '/img/firma.jpg';
     if (is_file($firmaPath)) {
         $firmaImgData = @file_get_contents($firmaPath);
         if ($firmaImgData !== false) {
             $firmaB64 = base64_encode($firmaImgData);
-            $html .= '<div style="margin-top:20px;text-align:right;"><img src="data:image/jpeg;base64,' . $firmaB64 . '" alt="Firma" style="max-height:90px;width:auto;" /></div>';
+            $html .= '<div style="margin-top:14px;text-align:right;"><img src="data:image/jpeg;base64,' . $firmaB64 . '" alt="Firma" style="max-height:90px;width:auto;" /></div>';
         }
     }
+    $html .= '</div>';
     $html .= '</div></body></html>';
     return $html;
 }
