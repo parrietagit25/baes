@@ -490,6 +490,7 @@ if ($isBanco && !$isAdmin) {
                 <form id="solicitudForm" method="POST" action="javascript:void(0);">
                     <div class="modal-body">
                         <input type="hidden" id="solicitud_id" name="id">
+                        <input type="hidden" id="financiamiento_registro_id" name="financiamiento_registro_id" value="">
                         
                         <!-- Cargar desde Sol Financiamiento -->
                         <div class="mb-3 p-3 rounded" style="background: #f0f4f8;">

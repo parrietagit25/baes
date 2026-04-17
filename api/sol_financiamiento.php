@@ -52,17 +52,33 @@ try {
         exit;
     }
 
-    $limite = isset($_GET['limite']) && ctype_digit($_GET['limite']) ? (int)$_GET['limite'] : 0;
+    $limite = isset($_GET['limite']) && ctype_digit((string) $_GET['limite']) ? (int) $_GET['limite'] : 0;
+    $solicitudExcluir = isset($_GET['solicitud_id']) && ctype_digit((string) $_GET['solicitud_id'])
+        ? (int) $_GET['solicitud_id'] : 0;
+
     $sql = "
-        SELECT id, fecha_creacion, cliente_nombre, cliente_id, cliente_correo, celular_cliente,
-               empresa_nombre, empresa_salario, marca_auto, modelo_auto, anio_auto, precio_venta
-        FROM financiamiento_registros
-        ORDER BY fecha_creacion DESC
+        SELECT fr.id, fr.fecha_creacion, fr.cliente_nombre, fr.cliente_id, fr.cliente_correo, fr.celular_cliente,
+               fr.empresa_nombre, fr.empresa_salario, fr.marca_auto, fr.modelo_auto, fr.anio_auto, fr.precio_venta
+        FROM financiamiento_registros fr
     ";
+    $params = [];
+    if ($limite > 0) {
+        $sql .= "
+        WHERE NOT EXISTS (
+            SELECT 1 FROM solicitudes_credito sc
+            WHERE sc.financiamiento_registro_id IS NOT NULL
+              AND sc.financiamiento_registro_id = fr.id
+              AND (? = 0 OR sc.id <> ?)
+        )";
+        $params[] = $solicitudExcluir;
+        $params[] = $solicitudExcluir;
+    }
+    $sql .= " ORDER BY fr.fecha_creacion DESC";
     if ($limite > 0) {
         $sql .= " LIMIT " . min($limite, 1000);
     }
-    $stmt = $pdo->query($sql);
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
     echo json_encode(['success' => true, 'data' => $rows]);
 } catch (PDOException $e) {

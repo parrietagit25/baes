@@ -189,15 +189,20 @@ function crearSolicitud() {
         }
         
         // Insertar solicitud
+        $finRegId = null;
+        if (!empty($_POST['financiamiento_registro_id']) && ctype_digit(trim((string) $_POST['financiamiento_registro_id']))) {
+            $finRegId = (int) $_POST['financiamiento_registro_id'];
+        }
+
         $stmt = $pdo->prepare("
             INSERT INTO solicitudes_credito (
-                gestor_id, banco_id, ejecutivo_ventas_id, tipo_persona, nombre_cliente, cedula, edad, genero,
+                gestor_id, banco_id, ejecutivo_ventas_id, financiamiento_registro_id, tipo_persona, nombre_cliente, cedula, edad, genero,
                 direccion, provincia, distrito, corregimiento, barriada, casa_edif,
                 numero_casa_apto, telefono, email, email_pipedrive, casado, hijos, perfil_financiero,
                 ingreso, tiempo_laborar, profesion, ocupacion, nombre_empresa_negocio, estabilidad_laboral,
                 fecha_constitucion, continuidad_laboral, marca_auto, modelo_auto, ao_auto, kilometraje,
                 precio_especial, abono_porcentaje, abono_monto, comentarios_gestor
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         
         // Función helper para convertir campos numéricos vacíos a null o 0
@@ -233,6 +238,7 @@ function crearSolicitud() {
             $_SESSION['user_id'],
             $convertirNumero($_POST['banco_id'] ?? null),
             $convertirNumero($_POST['ejecutivo_ventas_id'] ?? null),
+            $finRegId,
             $_POST['tipo_persona'],
             $_POST['nombre_cliente'],
             $_POST['cedula'],
@@ -359,7 +365,7 @@ function actualizarSolicitud() {
         $valores = [];
         
         $camposPermitidos = [
-            'banco_id', 'vendedor_id', 'ejecutivo_ventas_id', 'tipo_persona', 'nombre_cliente', 'cedula', 'edad', 'genero',
+            'banco_id', 'vendedor_id', 'ejecutivo_ventas_id', 'financiamiento_registro_id', 'tipo_persona', 'nombre_cliente', 'cedula', 'edad', 'genero',
             'direccion', 'provincia', 'distrito', 'corregimiento', 'barriada',
             'casa_edif', 'numero_casa_apto', 'telefono', 'email', 'email_pipedrive', 'casado',
             'hijos', 'perfil_financiero', 'ingreso', 'tiempo_laborar',
@@ -375,7 +381,7 @@ function actualizarSolicitud() {
         ];
         
         // Campos numéricos (enteros) que deben convertirse a NULL si están vacíos
-        $camposNumericos = ['edad', 'hijos', 'ao_auto', 'kilometraje', 'plazo', 'banco_id', 'vendedor_id', 'ejecutivo_ventas_id'];
+        $camposNumericos = ['edad', 'hijos', 'ao_auto', 'kilometraje', 'plazo', 'banco_id', 'vendedor_id', 'ejecutivo_ventas_id', 'financiamiento_registro_id'];
         // Columnas DECIMAL/DATE: vacío -> NULL (MySQL no acepta '' en estos tipos)
         $camposDecimalOFecha = ['ingreso', 'precio_especial', 'abono_porcentaje', 'abono_monto', 'abono_banco', 'estabilidad_laboral', 'fecha_constitucion'];
         

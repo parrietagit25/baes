@@ -158,7 +158,11 @@ $(document).ready(function() {
     });
     $('#cliente_financiamiento_select').on('change', function() {
         var id = $(this).val();
-        if (!id) return;
+        if (!id) {
+            $('#financiamiento_registro_id').val('');
+            return;
+        }
+        $('#financiamiento_registro_id').val(id);
         $.get('api/sol_financiamiento.php', { id: id }, function(res) {
             if (res.success && res.data) prefillFormularioDesdeFinanciamiento(res.data);
             else mostrarAlerta('No se pudo cargar el registro.', 'danger');
@@ -497,6 +501,7 @@ function limpiarFormularioSolicitud() {
     
     // Cargar desde Sol Financiamiento (select)
     $('#cliente_financiamiento_select').val('');
+    $('#financiamiento_registro_id').val('');
 
     // Ejecutivo de ventas: limpiar búsqueda y selección
     $('#buscar_ejecutivo').val('');
@@ -518,7 +523,12 @@ function limpiarFormularioSolicitud() {
 function cargarClientesFinanciamientoSelect() {
     var $sel = $('#cliente_financiamiento_select');
     $sel.find('option:not(:first)').remove();
-    $.get('api/sol_financiamiento.php', { limite: 500 }, function(res) {
+    var params = { limite: 500 };
+    var sid = $('#solicitud_id').val();
+    if (sid) {
+        params.solicitud_id = sid;
+    }
+    $.get('api/sol_financiamiento.php', params, function(res) {
         if (!res.success || !res.data) return;
         res.data.forEach(function(item) {
             var texto = [item.cliente_nombre, item.cliente_id, item.cliente_correo].filter(Boolean).join(' — ');
@@ -901,6 +911,10 @@ function llenarFormularioEdicion(solicitud) {
     
     // Llenar campos básicos
     $('#solicitud_id').val(solicitud.id);
+    var finId = solicitud.financiamiento_registro_id;
+    $('#financiamiento_registro_id').val(
+        finId !== undefined && finId !== null && String(finId).trim() !== '' ? String(finId).trim() : ''
+    );
     $('#tipo_persona').val(solicitud.tipo_persona);
     $('#nombre_cliente').val(solicitud.nombre_cliente);
     $('#cedula').val(solicitud.cedula);
