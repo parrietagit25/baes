@@ -534,6 +534,10 @@ function cargarClientesFinanciamientoSelect() {
             var texto = [item.cliente_nombre, item.cliente_id, item.cliente_correo].filter(Boolean).join(' — ');
             $sel.append($('<option></option>').val(item.id).text(texto));
         });
+        var vinc = String($('#financiamiento_registro_id').val() || '').trim();
+        if (vinc && /^\d+$/.test(vinc) && $sel.find('option[value="' + vinc + '"]').length) {
+            $sel.val(vinc);
+        }
     });
 }
 
