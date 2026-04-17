@@ -56,32 +56,52 @@ try {
     $solicitudExcluir = isset($_GET['solicitud_id']) && ctype_digit((string) $_GET['solicitud_id'])
         ? (int) $_GET['solicitud_id'] : 0;
 
-    $sql = "
-        SELECT fr.id, fr.fecha_creacion, fr.cliente_nombre, fr.cliente_id, fr.cliente_correo, fr.celular_cliente,
-               fr.empresa_nombre, fr.empresa_salario, fr.marca_auto, fr.modelo_auto, fr.anio_auto, fr.precio_venta
-        FROM financiamiento_registros fr
-    ";
-    $params = [];
+    $rows = [];
     if ($limite > 0) {
-        $sql .= "
-        WHERE NOT EXISTS (
-            SELECT 1 FROM solicitudes_credito sc
-            WHERE sc.financiamiento_registro_id IS NOT NULL
-              AND sc.financiamiento_registro_id = fr.id
-              AND (? = 0 OR sc.id <> ?)
-        )";
-        $params[] = $solicitudExcluir;
-        $params[] = $solicitudExcluir;
+        $limiteSql = min($limite, 1000);
+        $sqlFiltrado = "
+            SELECT fr.id, fr.fecha_creacion, fr.cliente_nombre, fr.cliente_id, fr.cliente_correo, fr.celular_cliente,
+                   fr.empresa_nombre, fr.empresa_salario, fr.marca_auto, fr.modelo_auto, fr.anio_auto, fr.precio_venta
+            FROM financiamiento_registros fr
+            WHERE NOT EXISTS (
+                SELECT 1 FROM solicitudes_credito sc
+                WHERE sc.financiamiento_registro_id IS NOT NULL
+                  AND sc.financiamiento_registro_id = fr.id
+                  AND (? = 0 OR sc.id <> ?)
+            )
+            ORDER BY fr.fecha_creacion DESC
+            LIMIT {$limiteSql}
+        ";
+        try {
+            $stmt = $pdo->prepare($sqlFiltrado);
+            $stmt->execute([$solicitudExcluir, $solicitudExcluir]);
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            // Columna no migrada, tablas en otras bases, etc.: devolver listado sin filtrar.
+            error_log('sol_financiamiento listado (fallback sin filtro vínculo solicitud): ' . $e->getMessage());
+            $sqlSimple = "
+                SELECT id, fecha_creacion, cliente_nombre, cliente_id, cliente_correo, celular_cliente,
+                       empresa_nombre, empresa_salario, marca_auto, modelo_auto, anio_auto, precio_venta
+                FROM financiamiento_registros
+                ORDER BY fecha_creacion DESC
+                LIMIT {$limiteSql}
+            ";
+            $stmt = $pdo->query($sqlSimple);
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+    } else {
+        $sql = "
+            SELECT id, fecha_creacion, cliente_nombre, cliente_id, cliente_correo, celular_cliente,
+                   empresa_nombre, empresa_salario, marca_auto, modelo_auto, anio_auto, precio_venta
+            FROM financiamiento_registros
+            ORDER BY fecha_creacion DESC
+        ";
+        $stmt = $pdo->query($sql);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
-    $sql .= " ORDER BY fr.fecha_creacion DESC";
-    if ($limite > 0) {
-        $sql .= " LIMIT " . min($limite, 1000);
-    }
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute($params);
-    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
     echo json_encode(['success' => true, 'data' => $rows]);
 } catch (PDOException $e) {
     http_response_code(500);
+    error_log('sol_financiamiento: ' . $e->getMessage());
     echo json_encode(['success' => false, 'message' => 'Error de base de datos', 'data' => []]);
 }
