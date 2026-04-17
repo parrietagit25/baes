@@ -9,8 +9,8 @@
 require_once __DIR__ . '/EmailService.php';
 
 /**
- * Correos en copia oculta (BCC) para el resumen al usuario banco: quien envía (sesión), email Pipedrive si existe,
- * y el ejecutivo de ventas asignado en Datos Generales (si tiene email válido). El banco solo ve su dirección en Para.
+ * Correos en copia (CC) para el resumen al usuario banco: quien envía (sesión), email Pipedrive si existe,
+ * y el ejecutivo de ventas asignado en Datos Generales (si tiene email válido). El destinatario principal sigue siendo el usuario banco (Para).
  *
  * @return list<string>
  */
@@ -418,7 +418,7 @@ function enviarResumenSolicitudBanco($solicitudId, $usuarioBancoId) {
             $mostrarEnlaceMotus
         );
 
-        $copias = obtenerCopiasResumenSolicitudBanco($pdo, $solicitud, (string) $banco['banco_email']);
+        $copiasCc = obtenerCopiasResumenSolicitudBanco($pdo, $solicitud, (string) $banco['banco_email']);
         $ccVisibles = [];
         $replyToGestor = '';
         $gestorId = isset($solicitud['gestor_id']) ? (int)$solicitud['gestor_id'] : 0;
@@ -432,8 +432,8 @@ function enviarResumenSolicitudBanco($solicitudId, $usuarioBancoId) {
                     if ($emailGestor !== '' && filter_var($emailGestor, FILTER_VALIDATE_EMAIL)) {
                         $replyToGestor = $emailGestor;
                         $ccVisibles[] = $emailGestor;
-                        // Si el gestor aparece en BCC, eliminarlo para que no vaya duplicado.
-                        $copias = array_values(array_filter($copias, function($e) use ($emailGestor) {
+                        // Evitar duplicar el gestor cuando también salga en la lista de copias.
+                        $copiasCc = array_values(array_filter($copiasCc, function($e) use ($emailGestor) {
                             return strtolower((string)$e) !== strtolower($emailGestor);
                         }));
                     }
@@ -441,6 +441,22 @@ function enviarResumenSolicitudBanco($solicitudId, $usuarioBancoId) {
             } catch (PDOException $e) {
                 error_log('enviarResumenSolicitudBanco gestor cc: ' . $e->getMessage());
             }
+        }
+        $ccLower = [];
+        foreach ($ccVisibles as $addr) {
+            $ccLower[strtolower(trim((string) $addr))] = true;
+        }
+        foreach ($copiasCc as $e) {
+            $e = trim((string) $e);
+            if ($e === '' || !filter_var($e, FILTER_VALIDATE_EMAIL)) {
+                continue;
+            }
+            $k = strtolower($e);
+            if (isset($ccLower[$k])) {
+                continue;
+            }
+            $ccLower[$k] = true;
+            $ccVisibles[] = $e;
         }
         $archivosAdjuntos = adjuntosArchivosParaCorreoResumen($adjuntos);
 
@@ -453,7 +469,7 @@ function enviarResumenSolicitudBanco($solicitudId, $usuarioBancoId) {
             strip_tags(preg_replace('/<br\s*\/?>/i', "\n", $html)),
             $archivosAdjuntos,
             $ccVisibles,
-            $copias,
+            [],
             $replyToGestor
         );
     } catch (Exception $e) {
