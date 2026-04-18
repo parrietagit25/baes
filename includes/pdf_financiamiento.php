@@ -164,25 +164,26 @@ function buildPdfHtmlFinanciamiento($input, $firmaBase64, $nombreCliente) {
         ]);
     }
 
+    // Nota: cada clave del array debe ser única; si se repite (p. ej. "CELULAR:"), PHP deja solo el último valor y se pierden datos en el PDF.
     $html .= $bloqueSec('E. REFERENCIAS — 2 REF PERSONALES (NO PARIENTES):', [
-        '1. NOMBRE COMPLETO:' => $h($input['refp1_nombre'] ?? ''),
-        '   DIR. RESIDENCIAL:' => $h($input['refp1_dir_res'] ?? ''),
-        '   LUGAR DONDE LABORA (EMPRESA/MINISTERIO):' => $h($input['refp1_dir_lab'] ?? ''),
-        '   CELULAR:' => $h($input['refp1_cel'] ?? ''),
-        '2. NOMBRE COMPLETO:' => $h($input['refp2_nombre'] ?? ''),
-        '   DIR. RESIDENCIAL:' => $h($input['refp2_dir_res'] ?? ''),
-        '   LUGAR DONDE LABORA (EMPRESA/MINISTERIO):' => $h($input['refp2_dir_lab'] ?? ''),
-        '   CELULAR:' => $h($input['refp2_cel'] ?? ''),
+        'REF. PERSONAL 1 — NOMBRE COMPLETO:' => $h($input['refp1_nombre'] ?? ''),
+        'REF. PERSONAL 1 — DIR. RESIDENCIAL:' => $h($input['refp1_dir_res'] ?? ''),
+        'REF. PERSONAL 1 — LUGAR DONDE LABORA (EMPRESA/MINISTERIO):' => $h($input['refp1_dir_lab'] ?? ''),
+        'REF. PERSONAL 1 — CELULAR:' => $h($input['refp1_cel'] ?? ''),
+        'REF. PERSONAL 2 — NOMBRE COMPLETO:' => $h($input['refp2_nombre'] ?? ''),
+        'REF. PERSONAL 2 — DIR. RESIDENCIAL:' => $h($input['refp2_dir_res'] ?? ''),
+        'REF. PERSONAL 2 — LUGAR DONDE LABORA (EMPRESA/MINISTERIO):' => $h($input['refp2_dir_lab'] ?? ''),
+        'REF. PERSONAL 2 — CELULAR:' => $h($input['refp2_cel'] ?? ''),
     ]);
     $html .= $bloqueSec('2 REF FAMILIARES (QUE NO VIVAN CON USTED):', [
-        '1. NOMBRE COMPLETO:' => $h($input['reff1_nombre'] ?? ''),
-        '   DIR. RESIDENCIAL:' => $h($input['reff1_dir_res'] ?? ''),
-        '   LUGAR DONDE LABORA (EMPRESA/MINISTERIO):' => $h($input['reff1_dir_lab'] ?? ''),
-        '   CELULAR:' => $h($input['reff1_cel'] ?? ''),
-        '2. NOMBRE COMPLETO:' => $h($input['reff2_nombre'] ?? ''),
-        '   DIR. RESIDENCIAL:' => $h($input['reff2_dir_res'] ?? ''),
-        '   LUGAR DONDE LABORA (EMPRESA/MINISTERIO):' => $h($input['reff2_dir_lab'] ?? ''),
-        '   CELULAR:' => $h($input['reff2_cel'] ?? ''),
+        'REF. FAMILIAR 1 — NOMBRE COMPLETO:' => $h($input['reff1_nombre'] ?? ''),
+        'REF. FAMILIAR 1 — DIR. RESIDENCIAL:' => $h($input['reff1_dir_res'] ?? ''),
+        'REF. FAMILIAR 1 — LUGAR DONDE LABORA (EMPRESA/MINISTERIO):' => $h($input['reff1_dir_lab'] ?? ''),
+        'REF. FAMILIAR 1 — CELULAR:' => $h($input['reff1_cel'] ?? ''),
+        'REF. FAMILIAR 2 — NOMBRE COMPLETO:' => $h($input['reff2_nombre'] ?? ''),
+        'REF. FAMILIAR 2 — DIR. RESIDENCIAL:' => $h($input['reff2_dir_res'] ?? ''),
+        'REF. FAMILIAR 2 — LUGAR DONDE LABORA (EMPRESA/MINISTERIO):' => $h($input['reff2_dir_lab'] ?? ''),
+        'REF. FAMILIAR 2 — CELULAR:' => $h($input['reff2_cel'] ?? ''),
     ]);
 
     $html .= '</table>';
