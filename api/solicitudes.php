@@ -19,6 +19,33 @@ require_once '../includes/historial_helper.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 
+function solicitudesTieneColumna(string $nombreColumna): bool {
+    global $pdo;
+    static $cache = [];
+
+    if (array_key_exists($nombreColumna, $cache)) {
+        return $cache[$nombreColumna];
+    }
+
+    try {
+        $sql = "
+            SELECT COUNT(*) 
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'solicitudes_credito'
+              AND COLUMN_NAME = ?
+        ";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([$nombreColumna]);
+        $cache[$nombreColumna] = ((int)$stmt->fetchColumn()) > 0;
+    } catch (Throwable $e) {
+        // Ante cualquier error de metadata, asumimos que no existe para evitar romper inserciones.
+        $cache[$nombreColumna] = false;
+    }
+
+    return $cache[$nombreColumna];
+}
+
 switch ($method) {
     case 'GET':
         if (isset($_GET['id'])) {
@@ -193,18 +220,18 @@ function crearSolicitud() {
         if (!empty($_POST['financiamiento_registro_id']) && ctype_digit(trim((string) $_POST['financiamiento_registro_id']))) {
             $finRegId = (int) $_POST['financiamiento_registro_id'];
         }
+        $tieneFinanciamientoRegistroId = solicitudesTieneColumna('financiamiento_registro_id');
 
-        $stmt = $pdo->prepare("
-            INSERT INTO solicitudes_credito (
-                gestor_id, banco_id, ejecutivo_ventas_id, financiamiento_registro_id, tipo_persona, nombre_cliente, cedula, edad, genero,
-                direccion, provincia, distrito, corregimiento, barriada, casa_edif,
-                numero_casa_apto, telefono, email, email_pipedrive, casado, hijos, perfil_financiero,
-                ingreso, tiempo_laborar, profesion, ocupacion, nombre_empresa_negocio, estabilidad_laboral,
-                fecha_constitucion, continuidad_laboral, marca_auto, modelo_auto, ao_auto, kilometraje,
-                precio_especial, abono_porcentaje, abono_monto, comentarios_gestor
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ");
-        
+        $columnas = [
+            'gestor_id', 'banco_id', 'ejecutivo_ventas_id',
+            'tipo_persona', 'nombre_cliente', 'cedula', 'edad', 'genero',
+            'direccion', 'provincia', 'distrito', 'corregimiento', 'barriada', 'casa_edif',
+            'numero_casa_apto', 'telefono', 'email', 'email_pipedrive', 'casado', 'hijos', 'perfil_financiero',
+            'ingreso', 'tiempo_laborar', 'profesion', 'ocupacion', 'nombre_empresa_negocio', 'estabilidad_laboral',
+            'fecha_constitucion', 'continuidad_laboral', 'marca_auto', 'modelo_auto', 'ao_auto', 'kilometraje',
+            'precio_especial', 'abono_porcentaje', 'abono_monto', 'comentarios_gestor'
+        ];
+
         // Función helper para convertir campos numéricos vacíos a null o 0
         $convertirNumero = function($valor, $default = null) {
             if ($valor === '' || $valor === null) {
@@ -233,12 +260,11 @@ function crearSolicitud() {
         $precioEspecial = $vacíoANull($_POST['precio_especial'] ?? null);
         $abonoPorcentaje = $vacíoANull($_POST['abono_porcentaje'] ?? null);
         $abonoMonto = $vacíoANull($_POST['abono_monto'] ?? null);
-        
-        $stmt->execute([
+
+        $valoresInsert = [
             $_SESSION['user_id'],
             $convertirNumero($_POST['banco_id'] ?? null),
             $convertirNumero($_POST['ejecutivo_ventas_id'] ?? null),
-            $finRegId,
             $_POST['tipo_persona'],
             $_POST['nombre_cliente'],
             $_POST['cedula'],
@@ -273,7 +299,20 @@ function crearSolicitud() {
             $abonoPorcentaje,
             $abonoMonto,
             $_POST['comentarios_gestor'] ?? null
-        ]);
+        ];
+
+        if ($tieneFinanciamientoRegistroId) {
+            array_splice($columnas, 3, 0, ['financiamiento_registro_id']);
+            array_splice($valoresInsert, 3, 0, [$finRegId]);
+        }
+
+        $placeholders = implode(', ', array_fill(0, count($columnas), '?'));
+        $stmt = $pdo->prepare("
+            INSERT INTO solicitudes_credito (" . implode(', ', $columnas) . ")
+            VALUES ($placeholders)
+        ");
+        
+        $stmt->execute($valoresInsert);
         
         $solicitudId = $pdo->lastInsertId();
         
@@ -365,7 +404,7 @@ function actualizarSolicitud() {
         $valores = [];
         
         $camposPermitidos = [
-            'banco_id', 'vendedor_id', 'ejecutivo_ventas_id', 'financiamiento_registro_id', 'tipo_persona', 'nombre_cliente', 'cedula', 'edad', 'genero',
+            'banco_id', 'vendedor_id', 'ejecutivo_ventas_id', 'tipo_persona', 'nombre_cliente', 'cedula', 'edad', 'genero',
             'direccion', 'provincia', 'distrito', 'corregimiento', 'barriada',
             'casa_edif', 'numero_casa_apto', 'telefono', 'email', 'email_pipedrive', 'casado',
             'hijos', 'perfil_financiero', 'ingreso', 'tiempo_laborar',
@@ -379,9 +418,16 @@ function actualizarSolicitud() {
             'fecha_firma_cliente', 'fecha_poliza', 'fecha_carta_promesa',
             'comentarios_fi', 'comentarios_ejecutivo_banco', 'estado'
         ];
+
+        if (solicitudesTieneColumna('financiamiento_registro_id')) {
+            array_splice($camposPermitidos, 3, 0, ['financiamiento_registro_id']);
+        }
         
         // Campos numéricos (enteros) que deben convertirse a NULL si están vacíos
-        $camposNumericos = ['edad', 'hijos', 'ao_auto', 'kilometraje', 'plazo', 'banco_id', 'vendedor_id', 'ejecutivo_ventas_id', 'financiamiento_registro_id'];
+        $camposNumericos = ['edad', 'hijos', 'ao_auto', 'kilometraje', 'plazo', 'banco_id', 'vendedor_id', 'ejecutivo_ventas_id'];
+        if (solicitudesTieneColumna('financiamiento_registro_id')) {
+            $camposNumericos[] = 'financiamiento_registro_id';
+        }
         // Columnas DECIMAL/DATE: vacío -> NULL (MySQL no acepta '' en estos tipos)
         $camposDecimalOFecha = ['ingreso', 'precio_especial', 'abono_porcentaje', 'abono_monto', 'abono_banco', 'estabilidad_laboral', 'fecha_constitucion'];
         
