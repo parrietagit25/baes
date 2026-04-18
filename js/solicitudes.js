@@ -1837,7 +1837,7 @@ function mostrarUsuariosAsignados(usuarios) {
                 <td>-</td>
                 <td>
                     <div class="btn-group btn-group-sm">
-                        <button class="btn btn-outline-primary btn-enviar-resumen-banco" title="Enviar resumen por correo"
+                        <button type="button" class="btn btn-outline-primary btn-enviar-resumen-banco" title="Enviar resumen por correo"
                                 data-usuario-banco-id="${usuario.usuario_banco_id}"
                                 data-usuario-email="${emailEsc}"
                                 data-usuario-nombre="${nombreEsc}">
@@ -1892,7 +1892,9 @@ function cambiarEstadoUsuario(id, nuevoEstado) {
 /**
  * Delegación: botón enviar resumen por correo a usuario banco
  */
-$(document).on('click', '.btn-enviar-resumen-banco', function() {
+$(document).on('click', '.btn-enviar-resumen-banco', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
     var btn = $(this);
     var usuarioBancoId = btn.data('usuario-banco-id');
     var email = btn.data('usuario-email') || '';
