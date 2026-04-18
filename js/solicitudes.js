@@ -1920,9 +1920,13 @@ function confirmarEnviarResumenBanco() {
         dataType: 'json',
         success: function(res) {
             if (res.success) {
-                mostrarAlerta(res.message || 'Resumen enviado por correo correctamente', 'success');
+                var okMsg = res.message || 'Resumen enviado por correo correctamente';
+                mostrarAlerta(okMsg, 'success');
+                alert('Confirmacion: ' + okMsg);
             } else {
-                mostrarAlerta(res.message || 'Error al enviar', 'danger');
+                var failMsg = res.message || 'Error al enviar';
+                mostrarAlerta(failMsg, 'danger');
+                alert('No se pudo enviar el resumen: ' + failMsg);
             }
         },
         error: function(xhr) {
@@ -1932,6 +1936,7 @@ function confirmarEnviarResumenBanco() {
                 if (d.message) msg = d.message;
             } catch (e) {}
             mostrarAlerta(msg, 'danger');
+            alert('No se pudo enviar el resumen: ' + msg);
         }
     });
 }
