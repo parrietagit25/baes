@@ -497,10 +497,11 @@ if ($isBanco && !$isAdmin) {
                             <label for="cliente_financiamiento_select" class="form-label">
                                 <i class="fas fa-file-invoice-dollar me-1"></i>Cargar desde Sol Financiamiento
                             </label>
+                            <input type="text" class="form-control mb-2" id="cliente_financiamiento_busqueda" placeholder="Escriba para filtrar por nombre, cédula o correo...">
                             <select class="form-select" id="cliente_financiamiento_select">
                                 <option value="">Seleccionar cliente...</option>
                             </select>
-                            <small class="text-muted">Seleccione un cliente que haya llenado el formulario de financiamiento para prellenar esta solicitud.</small>
+                            <small class="text-muted">Escriba para filtrar y luego seleccione un cliente que haya llenado el formulario de financiamiento para prellenar esta solicitud.</small>
                         </div>
                         
                         <!-- Pestañas -->

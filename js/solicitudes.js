@@ -170,6 +170,9 @@ $(document).ready(function() {
             mostrarAlerta('Error al cargar el registro.', 'danger');
         });
     });
+    $('#cliente_financiamiento_busqueda').on('input', function() {
+        renderClientesFinanciamientoSelect($(this).val());
+    });
 
     // Contador de caracteres para comentarios
     $('#comentarios_gestor').on('input', function() {
@@ -500,6 +503,7 @@ function limpiarFormularioSolicitud() {
     $('#contador_comentarios').text('1000');
     
     // Cargar desde Sol Financiamiento (select)
+    $('#cliente_financiamiento_busqueda').val('');
     $('#cliente_financiamiento_select').val('');
     $('#financiamiento_registro_id').val('');
 
@@ -520,9 +524,33 @@ function limpiarFormularioSolicitud() {
 
 // ==================== Cargar desde Sol Financiamiento (select) ====================
 
-function cargarClientesFinanciamientoSelect() {
+var clientesFinanciamientoOpciones = [];
+
+function renderClientesFinanciamientoSelect(filtro) {
     var $sel = $('#cliente_financiamiento_select');
-    $sel.find('option:not(:first)').remove();
+    var textoFiltro = String(filtro || '').trim().toLowerCase();
+    var valorActual = String($sel.val() || '').trim();
+
+    $sel.empty();
+    $sel.append($('<option></option>').val('').text('Seleccionar cliente...'));
+
+    clientesFinanciamientoOpciones.forEach(function(item) {
+        if (!textoFiltro || item.searchText.indexOf(textoFiltro) !== -1) {
+            $sel.append($('<option></option>').val(item.id).text(item.texto));
+        }
+    });
+
+    if (valorActual && $sel.find('option[value="' + valorActual + '"]').length) {
+        $sel.val(valorActual);
+    } else if (valorActual) {
+        $sel.val('');
+    }
+}
+
+function cargarClientesFinanciamientoSelect() {
+    clientesFinanciamientoOpciones = [];
+    var $sel = $('#cliente_financiamiento_select');
+    $sel.empty().append($('<option></option>').val('').text('Cargando clientes...'));
     var params = { limite: 500 };
     var sid = $('#solicitud_id').val();
     if (sid) {
@@ -530,14 +558,21 @@ function cargarClientesFinanciamientoSelect() {
     }
     $.get('api/sol_financiamiento.php', params, function(res) {
         if (!res.success || !res.data) return;
-        res.data.forEach(function(item) {
+        clientesFinanciamientoOpciones = res.data.map(function(item) {
             var texto = [item.cliente_nombre, item.cliente_id, item.cliente_correo].filter(Boolean).join(' — ');
-            $sel.append($('<option></option>').val(item.id).text(texto));
+            return {
+                id: String(item.id),
+                texto: texto,
+                searchText: texto.toLowerCase()
+            };
         });
+        renderClientesFinanciamientoSelect($('#cliente_financiamiento_busqueda').val());
         var vinc = String($('#financiamiento_registro_id').val() || '').trim();
         if (vinc && /^\d+$/.test(vinc) && $sel.find('option[value="' + vinc + '"]').length) {
             $sel.val(vinc);
         }
+    }).fail(function() {
+        $sel.empty().append($('<option></option>').val('').text('No se pudieron cargar clientes'));
     });
 }
 
@@ -2280,7 +2315,10 @@ function mostrarAlertaFinGuardado(solicitudIdAnterior, nuevaSolicitudId) {
     
     $('#solicitudModal').modal('hide');
     limpiarVehiculos();
-    cargarSolicitudes();
+    // El sistema no es reactivo: forzamos recarga para reflejar cambios.
+    setTimeout(function() {
+        window.location.reload();
+    }, 400);
 }
 
 // ========== FUNCIONES PARA GESTIÓN DE CITAS Y FIRMA ==========
