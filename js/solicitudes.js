@@ -156,22 +156,16 @@ $(document).ready(function() {
     $('#solicitudModal').on('show.bs.modal', function() {
         cargarClientesFinanciamientoSelect();
     });
+    $('#solicitudModal').on('hidden.bs.modal', function() {
+        destruirClienteFinanciamientoSelect2();
+    });
     $('#cliente_financiamiento_select').on('change', function() {
         var id = $(this).val();
         if (!id) {
             $('#financiamiento_registro_id').val('');
             return;
         }
-        $('#financiamiento_registro_id').val(id);
-        $.get('api/sol_financiamiento.php', { id: id }, function(res) {
-            if (res.success && res.data) prefillFormularioDesdeFinanciamiento(res.data);
-            else mostrarAlerta('No se pudo cargar el registro.', 'danger');
-        }).fail(function() {
-            mostrarAlerta('Error al cargar el registro.', 'danger');
-        });
-    });
-    $('#cliente_financiamiento_busqueda').on('input', function() {
-        renderClientesFinanciamientoSelect($(this).val());
+        cargarRegistroFinanciamientoYPrefill(id);
     });
 
     // Contador de caracteres para comentarios
@@ -502,9 +496,9 @@ function limpiarFormularioSolicitud() {
     $('#solicitudModalLabel').html('<i class="fas fa-file-alt me-2"></i>Nueva Solicitud de Crédito');
     $('#contador_comentarios').text('1000');
     
-    // Cargar desde Sol Financiamiento (select)
-    $('#cliente_financiamiento_busqueda').val('');
-    $('#cliente_financiamiento_select').val('');
+    // Cargar desde Sol Financiamiento (select + Select2)
+    destruirClienteFinanciamientoSelect2();
+    $('#cliente_financiamiento_select').empty().append($('<option></option>').val('').text('Seleccionar cliente...'));
     $('#financiamiento_registro_id').val('');
 
     // Ejecutivo de ventas: limpiar búsqueda y selección
@@ -524,31 +518,52 @@ function limpiarFormularioSolicitud() {
 
 // ==================== Cargar desde Sol Financiamiento (select) ====================
 
-var clientesFinanciamientoOpciones = [];
-
-function renderClientesFinanciamientoSelect(filtro) {
+function destruirClienteFinanciamientoSelect2() {
     var $sel = $('#cliente_financiamiento_select');
-    var textoFiltro = String(filtro || '').trim().toLowerCase();
-    var valorActual = String($sel.val() || '').trim();
-
-    $sel.empty();
-    $sel.append($('<option></option>').val('').text('Seleccionar cliente...'));
-
-    clientesFinanciamientoOpciones.forEach(function(item) {
-        if (!textoFiltro || item.searchText.indexOf(textoFiltro) !== -1) {
-            $sel.append($('<option></option>').val(item.id).text(item.texto));
-        }
-    });
-
-    if (valorActual && $sel.find('option[value="' + valorActual + '"]').length) {
-        $sel.val(valorActual);
-    } else if (valorActual) {
-        $sel.val('');
+    if (!$sel.length || typeof $.fn.select2 !== 'function') return;
+    if ($sel.hasClass('select2-hidden-accessible')) {
+        $sel.select2('destroy');
     }
 }
 
+function initClienteFinanciamientoSelect2() {
+    var $sel = $('#cliente_financiamiento_select');
+    if (!$sel.length || typeof $.fn.select2 !== 'function') return;
+    destruirClienteFinanciamientoSelect2();
+    $sel.select2({
+        theme: 'bootstrap-5',
+        width: '100%',
+        dropdownParent: $('#solicitudModal'),
+        placeholder: $sel.data('placeholder') || 'Seleccionar cliente...',
+        allowClear: true,
+        language: {
+            noResults: function() { return 'Sin coincidencias'; },
+            searching: function() { return 'Buscando…'; }
+        }
+    });
+}
+
+var ultimoFinanciamientoRegistroCargado = null;
+
+function cargarRegistroFinanciamientoYPrefill(id) {
+    var sid = String(id || '').trim();
+    if (!sid) return;
+    $('#financiamiento_registro_id').val(sid);
+    if (ultimoFinanciamientoRegistroCargado === sid) {
+        return;
+    }
+    ultimoFinanciamientoRegistroCargado = sid;
+    $.get('api/sol_financiamiento.php', { id: sid }, function(res) {
+        if (res.success && res.data) prefillFormularioDesdeFinanciamiento(res.data);
+        else mostrarAlerta('No se pudo cargar el registro.', 'danger');
+    }).fail(function() {
+        mostrarAlerta('Error al cargar el registro.', 'danger');
+    });
+}
+
 function cargarClientesFinanciamientoSelect() {
-    clientesFinanciamientoOpciones = [];
+    destruirClienteFinanciamientoSelect2();
+    ultimoFinanciamientoRegistroCargado = null;
     var $sel = $('#cliente_financiamiento_select');
     $sel.empty().append($('<option></option>').val('').text('Cargando clientes...'));
     var params = { limite: 500 };
@@ -558,21 +573,23 @@ function cargarClientesFinanciamientoSelect() {
     }
     $.get('api/sol_financiamiento.php', params, function(res) {
         if (!res.success || !res.data) return;
-        clientesFinanciamientoOpciones = res.data.map(function(item) {
+        $sel.empty();
+        $sel.append($('<option></option>').val('').text('Seleccionar cliente...'));
+        res.data.forEach(function(item) {
             var texto = [item.cliente_nombre, item.cliente_id, item.cliente_correo].filter(Boolean).join(' — ');
-            return {
-                id: String(item.id),
-                texto: texto,
-                searchText: texto.toLowerCase()
-            };
+            $sel.append($('<option></option>').val(String(item.id)).text(texto));
         });
-        renderClientesFinanciamientoSelect($('#cliente_financiamiento_busqueda').val());
         var vinc = String($('#financiamiento_registro_id').val() || '').trim();
         if (vinc && /^\d+$/.test(vinc) && $sel.find('option[value="' + vinc + '"]').length) {
             $sel.val(vinc);
+        } else {
+            $sel.val('');
         }
+        initClienteFinanciamientoSelect2();
+        $sel.trigger('change.select2');
     }).fail(function() {
         $sel.empty().append($('<option></option>').val('').text('No se pudieron cargar clientes'));
+        initClienteFinanciamientoSelect2();
     });
 }
 
@@ -645,7 +662,6 @@ function prefillFormularioDesdeFinanciamiento(d) {
         }];
         renderizarVehiculos();
     }
-    $('#cliente_financiamiento_select').val('');
     mostrarAlerta('Datos cargados desde Sol Financiamiento. Revise y complete los campos que falten.', 'success');
 }
 

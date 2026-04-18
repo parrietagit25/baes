@@ -91,6 +91,8 @@ if ($isBanco && !$isAdmin) {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/css/select2.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet">
     <style>
         .sidebar {
             min-height: 100vh;
@@ -497,11 +499,10 @@ if ($isBanco && !$isAdmin) {
                             <label for="cliente_financiamiento_select" class="form-label">
                                 <i class="fas fa-file-invoice-dollar me-1"></i>Cargar desde Sol Financiamiento
                             </label>
-                            <input type="text" class="form-control mb-2" id="cliente_financiamiento_busqueda" placeholder="Escriba para filtrar por nombre, cédula o correo...">
-                            <select class="form-select" id="cliente_financiamiento_select">
+                            <select class="form-select" id="cliente_financiamiento_select" data-placeholder="Seleccionar cliente...">
                                 <option value="">Seleccionar cliente...</option>
                             </select>
-                            <small class="text-muted">Escriba para filtrar y luego seleccione un cliente que haya llenado el formulario de financiamiento para prellenar esta solicitud.</small>
+                            <small class="text-muted">Abra el listado y escriba en el buscador para filtrar; luego seleccione un cliente que haya llenado el formulario de financiamiento para prellenar esta solicitud.</small>
                         </div>
                         
                         <!-- Pestañas -->
@@ -2544,6 +2545,7 @@ if ($isBanco && !$isAdmin) {
           </div>
       </div>
   
+      <script src="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/js/select2.full.min.js"></script>
       <script src="js/solicitudes.js?v=<?php echo file_exists(__DIR__ . '/js/solicitudes.js') ? filemtime(__DIR__ . '/js/solicitudes.js') : time(); ?>"></script>
       <script src="js/adjuntos.js?v=<?php echo file_exists(__DIR__ . '/js/adjuntos.js') ? filemtime(__DIR__ . '/js/adjuntos.js') : time(); ?>"></script>
       <?php include __DIR__ . '/includes/chatbot_widget.php'; ?>
