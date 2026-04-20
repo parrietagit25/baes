@@ -1814,9 +1814,14 @@ function mostrarUsuariosAsignados(usuarios) {
     
     if (usuarios.length === 0) {
         tbody.html('<tr><td colspan="7" class="text-center text-muted">No hay usuarios asignados</td></tr>');
+        window._listaUsuariosBancoTab = [];
+        $('#btnEnviarResumenTodos').prop('disabled', true);
         return;
     }
-    
+
+    window._listaUsuariosBancoTab = usuarios;
+    $('#btnEnviarResumenTodos').prop('disabled', false);
+
     usuarios.forEach(usuario => {
         const estadoClass = usuario.estado === 'activo' ? 'success' : 'secondary';
         const estadoText = usuario.estado === 'activo' ? 'Activo' : 'Inactivo';
@@ -1908,6 +1913,18 @@ $(document).on('click', '.btn-enviar-resumen-banco', function(e) {
 });
 
 /**
+ * Abrir modal enviar resumen a todos los usuarios banco asignados
+ */
+$(document).on('click', '#btnEnviarResumenTodos', function(e) {
+    e.preventDefault();
+    if (!solicitudActualId) return;
+    var lista = window._listaUsuariosBancoTab || [];
+    if (!lista.length) return;
+    $('#modalEnviarResumenBancoTodos .resumen-todos-cantidad').text(String(lista.length));
+    $('#modalEnviarResumenBancoTodos').data('solicitud-id', solicitudActualId).modal('show');
+});
+
+/**
  * Confirmar envío de resumen por correo
  */
 function confirmarEnviarResumenBanco() {
@@ -1943,6 +1960,49 @@ function confirmarEnviarResumenBanco() {
             } catch (e) {}
             mostrarAlerta(msg, 'danger');
             alert('No se pudo enviar el resumen: ' + msg);
+        }
+    });
+}
+
+/**
+ * Confirmar envío de resumen a todos los usuarios banco asignados
+ */
+function confirmarEnviarResumenBancoTodos() {
+    var modal = $('#modalEnviarResumenBancoTodos');
+    var solicitudId = modal.data('solicitud-id');
+    if (!solicitudId) return;
+    modal.modal('hide');
+    $.ajax({
+        url: 'api/enviar_resumen_banco_todos.php',
+        type: 'POST',
+        data: { solicitud_id: solicitudId },
+        dataType: 'json',
+        success: function(res) {
+            if (res.success) {
+                var okMsg = res.message || 'Resúmenes enviados correctamente';
+                if (res.partial) {
+                    mostrarAlerta(okMsg, 'warning');
+                } else {
+                    mostrarAlerta(okMsg, 'success');
+                }
+                alert('Confirmación: ' + okMsg);
+                if (typeof solicitudActualId !== 'undefined' && solicitudActualId) {
+                    cargarUsuariosAsignados(solicitudActualId);
+                }
+            } else {
+                var failMsg = res.message || 'Error al enviar';
+                mostrarAlerta(failMsg, 'danger');
+                alert('No se pudo completar el envío: ' + failMsg);
+            }
+        },
+        error: function(xhr) {
+            var msg = 'Error al enviar los resúmenes';
+            try {
+                var d = JSON.parse(xhr.responseText || '{}');
+                if (d.message) msg = d.message;
+            } catch (e) {}
+            mostrarAlerta(msg, 'danger');
+            alert('No se pudo completar el envío: ' + msg);
         }
     });
 }

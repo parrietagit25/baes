@@ -828,10 +828,14 @@ if ($isBanco && !$isAdmin) {
                                     <!-- Tabla de Usuarios Asignados -->
                                     <div class="mt-4">
                                         <div class="card">
-                                            <div class="card-header">
+                                            <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
                                                 <h6 class="mb-0">
                                                     <i class="fas fa-users me-2"></i>Usuarios Banco Asignados
                                                 </h6>
+                                                <button type="button" class="btn btn-primary btn-sm" id="btnEnviarResumenTodos" disabled
+                                                        title="Enviar resumen por correo a todos los usuarios asignados">
+                                                    <i class="fas fa-envelope me-1"></i>Enviar resumen a todos
+                                                </button>
                                             </div>
                                             <div class="card-body">
                                                 <div class="table-responsive">
@@ -1833,6 +1837,30 @@ if ($isBanco && !$isAdmin) {
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                     <button type="button" class="btn btn-primary" onclick="confirmarEnviarResumenBanco()">
                         <i class="fas fa-paper-plane me-1"></i>Enviar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal confirmar envío de resumen a todos los usuarios banco -->
+    <div class="modal fade" id="modalEnviarResumenBancoTodos" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">
+                        <i class="fas fa-envelope me-2"></i>Enviar resumen a todos
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2">¿Desea enviar por correo un resumen de la solicitud (datos generales, perfil financiero, datos del auto, análisis y adjuntos) a <strong><span class="resumen-todos-cantidad">0</span></strong> usuario(s) banco asignado(s)?</p>
+                    <p class="small text-muted mb-0">Se enviará un correo independiente a cada destinatario, con las mismas reglas de copia (CC) que en el envío individual.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="confirmarEnviarResumenBancoTodos()">
+                        <i class="fas fa-paper-plane me-1"></i>Enviar a todos
                     </button>
                 </div>
             </div>
