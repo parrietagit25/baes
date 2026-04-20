@@ -13,6 +13,18 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Solicitud de Financiamiento - Solicitud de Crédito</title>
+  <script>
+    (function(){
+      try{
+        var p = JSON.parse(localStorage.getItem("financiamiento_visual_prefs") || "{}");
+        var h = document.documentElement;
+        if (p.theme === "light") h.classList.add("theme-light");
+        var fs = p.fs === "lg" ? "1.12" : p.fs === "xl" ? "1.24" : "1";
+        h.style.setProperty("--fs-scale", fs);
+        if (p.bold) h.classList.add("a11y-bold");
+      }catch(e){}
+    })();
+  </script>
 
   <style>
     :root{
@@ -26,12 +38,15 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
       --ok:#34d399;
       --shadow: 0 10px 25px rgba(0,0,0,.25);
       --radius: 16px;
+      --fs-scale: 1;
+      --ink-signature: #eaf0ff;
     }
 
     *{ box-sizing:border-box; }
     body{
       margin:0;
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      font-size: calc(15px * var(--fs-scale));
       background: radial-gradient(1200px 600px at 30% 0%, rgba(78,161,255,.15), transparent 55%),
                   radial-gradient(900px 500px at 80% 10%, rgba(52,211,153,.12), transparent 55%),
                   var(--bg);
@@ -68,14 +83,14 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
 
     h1{
       margin:0;
-      font-size: 18px;
+      font-size: calc(18px * var(--fs-scale));
       letter-spacing:.2px;
     }
 
     .subtitle{
       margin:0;
       color: var(--muted);
-      font-size: 13px;
+      font-size: calc(13px * var(--fs-scale));
       line-height: 1.35;
     }
 
@@ -93,7 +108,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
       border-radius: 12px;
       cursor:pointer;
       font-weight: 600;
-      font-size: 14px;
+      font-size: calc(14px * var(--fs-scale));
       transition: transform .06s ease, background .15s ease, border-color .15s ease;
       user-select:none;
     }
@@ -139,7 +154,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
       border-radius: 999px;
       border: 1px solid var(--line);
       color: var(--muted);
-      font-size: 12px;
+      font-size: calc(12px * var(--fs-scale));
       background: rgba(255,255,255,.03);
       display:flex;
       gap: 6px;
@@ -206,11 +221,11 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
     }
     .sectionTitle h2{
       margin:0;
-      font-size: 16px;
+      font-size: calc(16px * var(--fs-scale));
     }
     .sectionTitle p{
       margin: 4px 0 0 0;
-      font-size: 13px;
+      font-size: calc(13px * var(--fs-scale));
       color: var(--muted);
       line-height: 1.35;
       max-width: 70ch;
@@ -235,7 +250,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
 
     label{
       display:block;
-      font-size: 12px;
+      font-size: calc(12px * var(--fs-scale));
       color: var(--muted);
       margin-bottom: 6px;
     }
@@ -247,6 +262,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
       border: 1px solid rgba(255,255,255,.14);
       background: rgba(15,27,51,.6);
       color: var(--text);
+      font-size: calc(15px * var(--fs-scale));
       outline: none;
     }
     input:focus, select:focus, textarea:focus{
@@ -258,13 +274,13 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
 
     .hint{
       margin-top: 6px;
-      font-size: 12px;
+      font-size: calc(12px * var(--fs-scale));
       color: var(--muted);
     }
 
     .error{
       margin-top: 6px;
-      font-size: 12px;
+      font-size: calc(12px * var(--fs-scale));
       color: var(--danger);
       display:none;
     }
@@ -295,13 +311,233 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
       padding: 10px 12px;
       border-radius: 999px;
       box-shadow: var(--shadow);
-      font-size: 13px;
+      font-size: calc(13px * var(--fs-scale));
       display:none;
       max-width: calc(100% - 24px);
     }
     .toast.show{ display:block; }
     .toast.ok{ border-color: rgba(52,211,153,.5); background: rgba(52,211,153,.15); }
     .toast.err{ border-color: rgba(255,93,93,.5); background: rgba(255,93,93,.15); }
+
+    /* Tema claro (alto contraste lectura) */
+    html.theme-light{
+      --bg:#f1f5f9;
+      --card:#ffffff;
+      --muted:#334155;
+      --text:#0f172a;
+      --line:rgba(15,23,42,.14);
+      --accent:#1d4ed8;
+      --danger:#b91c1c;
+      --ok:#047857;
+      --shadow: 0 10px 28px rgba(15,23,42,.1);
+      --ink-signature:#0f172a;
+    }
+    html.theme-light body{
+      background: radial-gradient(1000px 520px at 28% 0%, rgba(29,78,216,.1), transparent 55%),
+                  radial-gradient(780px 420px at 82% 8%, rgba(4,120,87,.08), transparent 55%),
+                  var(--bg);
+    }
+    html.theme-light header,
+    html.theme-light .progressCard,
+    html.theme-light form{
+      background: rgba(255,255,255,.92);
+    }
+    html.theme-light input,
+    html.theme-light select,
+    html.theme-light textarea{
+      background: #fff;
+      border-color: rgba(15,23,42,.2);
+      color: var(--text);
+    }
+    html.theme-light input:focus,
+    html.theme-light select:focus,
+    html.theme-light textarea:focus{
+      border-color: rgba(29,78,216,.55);
+      box-shadow: 0 0 0 3px rgba(29,78,216,.12);
+    }
+    html.theme-light .toast{
+      background: rgba(255,255,255,.96);
+      color: var(--text);
+    }
+    html.theme-light .toast.ok{
+      background: rgba(4,120,87,.12);
+    }
+    html.theme-light .toast.err{
+      background: rgba(185,28,28,.12);
+    }
+    html.theme-light .signature-wrap{
+      border-color: rgba(15,23,42,.22) !important;
+      background: #fff !important;
+    }
+    html.theme-light .consent-text{
+      background: rgba(15,23,42,.04) !important;
+      color: var(--text) !important;
+    }
+
+    html.a11y-bold body,
+    html.a11y-bold h1,
+    html.a11y-bold .subtitle,
+    html.a11y-bold label,
+    html.a11y-bold .hint,
+    html.a11y-bold .error,
+    html.a11y-bold .chip,
+    html.a11y-bold button,
+    html.a11y-bold input,
+    html.a11y-bold select,
+    html.a11y-bold textarea,
+    html.a11y-bold .sectionTitle h2,
+    html.a11y-bold .sectionTitle p,
+    html.a11y-bold .toast{
+      font-weight: 700;
+    }
+
+    /* Botón solapa: configuración visual */
+    .visual-dock{
+      position: fixed;
+      top: 10px;
+      right: 0;
+      z-index: 10000;
+      max-width: min(100vw - 8px, 360px);
+    }
+    .visual-dock-slide{
+      display: flex;
+      flex-direction: row;
+      align-items: stretch;
+      transition: transform 0.3s ease;
+      transform: translateX(calc(100% - 46px));
+      filter: drop-shadow(-6px 8px 22px rgba(0,0,0,.22));
+    }
+    @media (hover: hover){
+      .visual-dock:hover .visual-dock-slide,
+      .visual-dock:focus-within .visual-dock-slide{
+        transform: translateX(0);
+      }
+    }
+    @media (hover: none){
+      .visual-dock.is-open .visual-dock-slide{
+        transform: translateX(0);
+      }
+    }
+    .visual-panel{
+      flex: 1;
+      min-width: 0;
+      padding: 14px 16px;
+      border-radius: 14px 0 0 14px;
+      border: 1px solid var(--line);
+      border-right: 0;
+      background: var(--card);
+      color: var(--text);
+    }
+    .visual-panel-title{
+      margin: 0 0 6px 0;
+      font-size: calc(15px * var(--fs-scale));
+      font-weight: 800;
+    }
+    .visual-panel-hint{
+      margin: 0 0 12px 0;
+      font-size: calc(12px * var(--fs-scale));
+      color: var(--muted);
+      line-height: 1.4;
+    }
+    .visual-field{
+      margin-bottom: 12px;
+    }
+    .visual-field label.visual-label-inline{
+      display: block;
+      font-size: calc(12px * var(--fs-scale));
+      font-weight: 700;
+      margin-bottom: 6px;
+      color: var(--text);
+    }
+    .visual-options{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+    .visual-options label.pick{
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: calc(13px * var(--fs-scale));
+      cursor: pointer;
+      color: var(--text);
+    }
+    .visual-options select{
+      max-width: 100%;
+      flex: 1;
+      min-width: 140px;
+    }
+    .visual-tab{
+      flex: 0 0 46px;
+      width: 46px;
+      margin: 0;
+      padding: 10px 6px;
+      border: 1px solid var(--line);
+      border-right: 0;
+      border-radius: 14px 0 0 14px;
+      background: linear-gradient(165deg, rgba(78,161,255,.35), rgba(15,27,51,.92));
+      color: var(--text);
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-family: inherit;
+      transition: width 0.25s ease, padding 0.25s ease;
+    }
+    html.theme-light .visual-tab{
+      background: linear-gradient(165deg, rgba(59,130,246,.35), #f8fafc);
+      color: var(--text);
+    }
+    .visual-tab-short{
+      font-weight: 900;
+      font-size: calc(16px * var(--fs-scale));
+      line-height: 1;
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      letter-spacing: 0.06em;
+    }
+    .visual-tab-long{
+      display: none;
+      font-size: calc(11px * var(--fs-scale));
+      font-weight: 800;
+      text-align: center;
+      line-height: 1.2;
+      max-width: 11em;
+    }
+    @media (hover: hover){
+      .visual-dock:hover .visual-tab,
+      .visual-dock:focus-within .visual-tab{
+        width: auto;
+        min-width: 46px;
+        max-width: 150px;
+        padding: 10px 10px;
+      }
+      .visual-dock:hover .visual-tab-short,
+      .visual-dock:focus-within .visual-tab-short{
+        display: none;
+      }
+      .visual-dock:hover .visual-tab-long,
+      .visual-dock:focus-within .visual-tab-long{
+        display: block;
+      }
+    }
+    @media (hover: none){
+      .visual-dock.is-open .visual-tab{
+        width: auto;
+        min-width: 46px;
+        max-width: 150px;
+        padding: 10px 10px;
+      }
+      .visual-dock.is-open .visual-tab-short{
+        display: none;
+      }
+      .visual-dock.is-open .visual-tab-long{
+        display: block;
+      }
+    }
   </style>
 </head>
 
@@ -829,6 +1065,37 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
     </form>
   </div>
 
+  <div class="visual-dock" id="visualDock" aria-label="Configuración visual">
+    <div class="visual-dock-slide">
+      <div class="visual-panel" role="region" aria-labelledby="visualPanelTitle">
+        <h2 class="visual-panel-title" id="visualPanelTitle">Configuración visual</h2>
+        <p class="visual-panel-hint">Ajuste contraste y tamaño de texto para leer con más comodidad. Se recuerda en este dispositivo.</p>
+        <div class="visual-field">
+          <span class="visual-label-inline">Fondo</span>
+          <div class="visual-options">
+            <label class="pick"><input type="radio" name="visual_theme" id="visualThemeDark" value="dark" checked /> Oscuro</label>
+            <label class="pick"><input type="radio" name="visual_theme" id="visualThemeLight" value="light" /> Blanco (texto negro)</label>
+          </div>
+        </div>
+        <div class="visual-field">
+          <label class="visual-label-inline" for="visualFontSize">Tamaño de letra</label>
+          <select id="visualFontSize" aria-describedby="visualPanelTitle">
+            <option value="normal">Normal</option>
+            <option value="lg">Grande</option>
+            <option value="xl">Extra grande</option>
+          </select>
+        </div>
+        <div class="visual-field">
+          <label class="pick"><input type="checkbox" id="visualBold" /> Texto en negrita</label>
+        </div>
+      </div>
+      <button type="button" class="visual-tab" id="visualDockTab" aria-expanded="false" title="Configuración visual">
+        <span class="visual-tab-short" aria-hidden="true">Aa</span>
+        <span class="visual-tab-long">Configuración visual</span>
+      </button>
+    </div>
+  </div>
+
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script>
@@ -862,15 +1129,18 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
       var canvas = document.getElementById("firmaCanvas");
       var firmaDataInput = document.getElementById("firmaData");
       var btnLimpiarFirma = document.getElementById("btnLimpiarFirma");
+      function signatureInkColor(){
+        try{
+          var v = getComputedStyle(document.documentElement).getPropertyValue("--ink-signature").trim();
+          return v || "#eaf0ff";
+        }catch(e){ return "#eaf0ff"; }
+      }
       function setupSignatureCanvas(canvasEl, dataInput){
         if(!canvasEl || !canvasEl.getContext) return;
         var ctx = canvasEl.getContext("2d");
         var drawing = false, lastX = 0, lastY = 0;
-        // Trazo más oscuro y grueso para mejorar legibilidad en detalle/PDF.
-        ctx.strokeStyle = "#111827";
-        ctx.lineWidth = 3;
+        ctx.lineWidth = 2;
         ctx.lineCap = "round";
-        ctx.lineJoin = "round";
         function getPos(e){
           var r = canvasEl.getBoundingClientRect();
           var scaleX = canvasEl.width / r.width, scaleY = canvasEl.height / r.height;
@@ -878,7 +1148,14 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           var clientY = e.touches ? e.touches[0].clientY : e.clientY;
           return { x: (clientX - r.left) * scaleX, y: (clientY - r.top) * scaleY };
         }
-        function start(e){ if (!e.touches) e.preventDefault(); drawing = true; var p = getPos(e); lastX = p.x; lastY = p.y; }
+        function start(e){
+          if (!e.touches) e.preventDefault();
+          drawing = true;
+          ctx.strokeStyle = signatureInkColor();
+          var p = getPos(e);
+          lastX = p.x;
+          lastY = p.y;
+        }
         function move(e){ e.preventDefault(); if (!drawing) return; var p = getPos(e); ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(p.x, p.y); ctx.stroke(); lastX = p.x; lastY = p.y; }
         function end(e){ if (!e.changedTouches) e.preventDefault(); drawing = false; if (dataInput) dataInput.value = canvasEl.toDataURL("image/png").replace(/^data:image\/png;base64,/, ""); }
         canvasEl.addEventListener("mousedown", start);
@@ -1317,6 +1594,79 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
         });
       }
 
+      function initVisualPreferences(){
+        var KEY = "financiamiento_visual_prefs";
+        var dock = document.getElementById("visualDock");
+        var tab = document.getElementById("visualDockTab");
+        var rdDark = document.getElementById("visualThemeDark");
+        var rdLight = document.getElementById("visualThemeLight");
+        var selFs = document.getElementById("visualFontSize");
+        var chkBold = document.getElementById("visualBold");
+        if (!dock || !tab || !rdDark || !rdLight || !selFs || !chkBold) return;
+
+        function readPrefs(){
+          try { return JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) { return {}; }
+        }
+        function savePrefs(p){
+          try { localStorage.setItem(KEY, JSON.stringify(p)); } catch (e) {}
+        }
+        function applyPrefs(p){
+          var h = document.documentElement;
+          if (p.theme === "light") h.classList.add("theme-light");
+          else h.classList.remove("theme-light");
+          var fs = p.fs === "lg" ? "1.12" : p.fs === "xl" ? "1.24" : "1";
+          h.style.setProperty("--fs-scale", fs);
+          if (p.bold) h.classList.add("a11y-bold");
+          else h.classList.remove("a11y-bold");
+        }
+        function syncUIFromPrefs(p){
+          if (p.theme === "light") rdLight.checked = true;
+          else rdDark.checked = true;
+          selFs.value = p.fs === "lg" || p.fs === "xl" ? p.fs : "normal";
+          chkBold.checked = !!p.bold;
+        }
+
+        var prefs = readPrefs();
+        applyPrefs(prefs);
+        syncUIFromPrefs(prefs);
+
+        function persistFromUI(){
+          var p = {
+            theme: rdLight.checked ? "light" : "dark",
+            fs: selFs.value || "normal",
+            bold: chkBold.checked
+          };
+          savePrefs(p);
+          applyPrefs(p);
+        }
+        rdDark.addEventListener("change", persistFromUI);
+        rdLight.addEventListener("change", persistFromUI);
+        selFs.addEventListener("change", persistFromUI);
+        chkBold.addEventListener("change", persistFromUI);
+
+        if (window.matchMedia("(hover: none)").matches){
+          tab.addEventListener("click", function(e){
+            e.stopPropagation();
+            var open = dock.classList.toggle("is-open");
+            tab.setAttribute("aria-expanded", open ? "true" : "false");
+          });
+          document.addEventListener("click", function(e){
+            if (!dock.contains(e.target)){
+              dock.classList.remove("is-open");
+              tab.setAttribute("aria-expanded", "false");
+            }
+          });
+        }
+
+        dock.addEventListener("keydown", function(e){
+          if (e.key === "Escape"){
+            dock.classList.remove("is-open");
+            tab.setAttribute("aria-expanded", "false");
+          }
+        });
+      }
+
+      initVisualPreferences();
       init();
     })();
   </script>
