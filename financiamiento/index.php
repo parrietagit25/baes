@@ -398,28 +398,19 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
       right: 0;
       z-index: 10000;
       max-width: min(100vw - 8px, 360px);
+      width: fit-content;
+      pointer-events: none;
     }
     .visual-dock-slide{
       display: flex;
       flex-direction: row;
-      align-items: stretch;
-      transition: transform 0.3s ease;
-      transform: translateX(calc(100% - 46px));
+      align-items: flex-start;
+      justify-content: flex-end;
       filter: drop-shadow(-6px 8px 22px rgba(0,0,0,.22));
-    }
-    @media (hover: hover){
-      .visual-dock:hover .visual-dock-slide,
-      .visual-dock:focus-within .visual-dock-slide{
-        transform: translateX(0);
-      }
-    }
-    @media (hover: none){
-      .visual-dock.is-open .visual-dock-slide{
-        transform: translateX(0);
-      }
+      pointer-events: none;
     }
     .visual-panel{
-      flex: 1;
+      width: min(320px, calc(100vw - 52px));
       min-width: 0;
       padding: 14px 16px;
       border-radius: 14px 0 0 14px;
@@ -427,6 +418,11 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
       border-right: 0;
       background: var(--card);
       color: var(--text);
+      transform: translateX(100%);
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: transform .25s ease, opacity .2s ease, visibility .2s ease;
     }
     .visual-panel-title{
       margin: 0 0 6px 0;
@@ -469,74 +465,66 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
       min-width: 140px;
     }
     .visual-tab{
-      flex: 0 0 46px;
-      width: 46px;
+      flex: 0 0 34px;
+      width: 34px;
       margin: 0;
-      padding: 10px 6px;
+      padding: 8px 4px;
       border: 1px solid var(--line);
       border-right: 0;
-      border-radius: 14px 0 0 14px;
+      border-radius: 12px 0 0 12px;
       background: linear-gradient(165deg, rgba(78,161,255,.35), rgba(15,27,51,.92));
       color: var(--text);
       cursor: pointer;
       display: flex;
-      flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 8px;
       font-family: inherit;
-      transition: width 0.25s ease, padding 0.25s ease;
+      pointer-events: auto;
+      transition: width .2s ease;
     }
     html.theme-light .visual-tab{
       background: linear-gradient(165deg, rgba(59,130,246,.35), #f8fafc);
       color: var(--text);
     }
-    .visual-tab-short{
-      font-weight: 900;
+    .visual-gear{
       font-size: calc(16px * var(--fs-scale));
       line-height: 1;
-      writing-mode: vertical-rl;
-      text-orientation: mixed;
-      letter-spacing: 0.06em;
+      display: inline-block;
+      animation: spinGear 2.2s linear infinite;
+      transform-origin: 50% 50%;
     }
-    .visual-tab-long{
+    @keyframes spinGear{
+      from{ transform: rotate(0deg); }
+      to{ transform: rotate(360deg); }
+    }
+    .visual-tab-label{
       display: none;
       font-size: calc(11px * var(--fs-scale));
       font-weight: 800;
-      text-align: center;
       line-height: 1.2;
-      max-width: 11em;
+      text-align: center;
+      margin-left: 8px;
     }
-    @media (hover: hover){
-      .visual-dock:hover .visual-tab,
-      .visual-dock:focus-within .visual-tab{
-        width: auto;
-        min-width: 46px;
-        max-width: 150px;
-        padding: 10px 10px;
-      }
-      .visual-dock:hover .visual-tab-short,
-      .visual-dock:focus-within .visual-tab-short{
-        display: none;
-      }
-      .visual-dock:hover .visual-tab-long,
-      .visual-dock:focus-within .visual-tab-long{
-        display: block;
-      }
+    .visual-dock.is-open{
+      pointer-events: auto;
     }
-    @media (hover: none){
-      .visual-dock.is-open .visual-tab{
-        width: auto;
-        min-width: 46px;
-        max-width: 150px;
-        padding: 10px 10px;
-      }
-      .visual-dock.is-open .visual-tab-short{
-        display: none;
-      }
-      .visual-dock.is-open .visual-tab-long{
-        display: block;
-      }
+    .visual-dock.is-open .visual-dock-slide{
+      pointer-events: auto;
+    }
+    .visual-dock.is-open .visual-panel{
+      transform: translateX(0);
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+    .visual-dock.is-open .visual-tab{
+      width: auto;
+      min-width: 34px;
+      max-width: 160px;
+      padding: 8px 10px;
+    }
+    .visual-dock.is-open .visual-tab-label{
+      display: inline-block;
     }
   </style>
 </head>
@@ -1090,8 +1078,8 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
         </div>
       </div>
       <button type="button" class="visual-tab" id="visualDockTab" aria-expanded="false" title="Configuración visual">
-        <span class="visual-tab-short" aria-hidden="true">Aa</span>
-        <span class="visual-tab-long">Configuración visual</span>
+        <span class="visual-gear" aria-hidden="true">⚙</span>
+        <span class="visual-tab-label">Configuración visual</span>
       </button>
     </div>
   </div>
@@ -1644,19 +1632,17 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
         selFs.addEventListener("change", persistFromUI);
         chkBold.addEventListener("change", persistFromUI);
 
-        if (window.matchMedia("(hover: none)").matches){
-          tab.addEventListener("click", function(e){
-            e.stopPropagation();
-            var open = dock.classList.toggle("is-open");
-            tab.setAttribute("aria-expanded", open ? "true" : "false");
-          });
-          document.addEventListener("click", function(e){
-            if (!dock.contains(e.target)){
-              dock.classList.remove("is-open");
-              tab.setAttribute("aria-expanded", "false");
-            }
-          });
-        }
+        tab.addEventListener("click", function(e){
+          e.stopPropagation();
+          var open = dock.classList.toggle("is-open");
+          tab.setAttribute("aria-expanded", open ? "true" : "false");
+        });
+        document.addEventListener("click", function(e){
+          if (!dock.contains(e.target)){
+            dock.classList.remove("is-open");
+            tab.setAttribute("aria-expanded", "false");
+          }
+        });
 
         dock.addEventListener("keydown", function(e){
           if (e.key === "Escape"){
