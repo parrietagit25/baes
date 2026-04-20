@@ -16,22 +16,59 @@ $isAdmin = in_array('ROLE_ADMIN', $userRoles);
 $isBanco = in_array('ROLE_BANCO', $userRoles);
 $isGestor = in_array('ROLE_GESTOR', $userRoles);
 $isVendedor = in_array('ROLE_VENDEDOR', $userRoles);
-$usuarioId = $_SESSION['user_id'];
+$usuarioId = (int) $_SESSION['user_id'];
+
+// Filtro del dashboard: administrador ve todas las solicitudes; gestor solo las suyas (gestor_id);
+// banco y vendedor alineados con la lista en solicitudes.php.
+$dashboardFiltroParams = [];
+$dashboardFiltroSqlTabla = '';
+$dashboardFiltroSqlAliasS = '';
+$dashboardAlcanceEtiqueta = '';
+
+if ($isAdmin) {
+    $dashboardAlcanceEtiqueta = 'Vista global: todas las solicitudes del sistema.';
+} elseif ($isGestor) {
+    $dashboardFiltroSqlTabla = ' AND gestor_id = ? ';
+    $dashboardFiltroSqlAliasS = ' AND s.gestor_id = ? ';
+    $dashboardFiltroParams[] = $usuarioId;
+    $dashboardAlcanceEtiqueta = 'Vista personal: solo solicitudes donde usted es el gestor asignado.';
+} elseif ($isBanco) {
+    $dashboardFiltroSqlTabla = " AND EXISTS (
+        SELECT 1 FROM usuarios_banco_solicitudes ubs
+        WHERE ubs.solicitud_id = solicitudes_credito.id
+        AND ubs.usuario_banco_id = ?
+        AND ubs.estado = 'activo'
+    ) ";
+    $dashboardFiltroSqlAliasS = " AND EXISTS (
+        SELECT 1 FROM usuarios_banco_solicitudes ubs
+        WHERE ubs.solicitud_id = s.id
+        AND ubs.usuario_banco_id = ?
+        AND ubs.estado = 'activo'
+    ) ";
+    $dashboardFiltroParams[] = $usuarioId;
+    $dashboardAlcanceEtiqueta = 'Vista personal: solicitudes con su asignación activa como usuario banco.';
+} elseif ($isVendedor) {
+    $dashboardFiltroSqlTabla = ' AND vendedor_id = ? ';
+    $dashboardFiltroSqlAliasS = ' AND s.vendedor_id = ? ';
+    $dashboardFiltroParams[] = $usuarioId;
+    $dashboardAlcanceEtiqueta = 'Vista personal: solo solicitudes donde usted figura como vendedor.';
+}
 
 // ========================================
 // ESTADÍSTICAS DE SOLICITUDES POR ESTADO
 // ========================================
 
-// Total de solicitudes
-$stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito");
+$stmt = $pdo->prepare("SELECT COUNT(*) as total FROM solicitudes_credito WHERE 1=1 {$dashboardFiltroSqlTabla}");
+$stmt->execute($dashboardFiltroParams);
 $totalSolicitudes = $stmt->fetch()['total'];
 
-// Solicitudes por estado
-$stmt = $pdo->query("
-    SELECT estado, COUNT(*) as total 
-    FROM solicitudes_credito 
+$stmt = $pdo->prepare("
+    SELECT estado, COUNT(*) as total
+    FROM solicitudes_credito
+    WHERE 1=1 {$dashboardFiltroSqlTabla}
     GROUP BY estado
 ");
+$stmt->execute($dashboardFiltroParams);
 $solicitudesPorEstado = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
 
 $estadoNueva = $solicitudesPorEstado['Nueva'] ?? 0;
@@ -45,74 +82,82 @@ $estadoDesistimiento = $solicitudesPorEstado['Desistimiento'] ?? 0;
 // MÉTRICAS DE TIEMPO PROMEDIO POR ESTADO
 // ========================================
 
-// Tiempo promedio en estado "Nueva" (desde creación hasta primer cambio de estado)
-$stmt = $pdo->query("
+$stmt = $pdo->prepare("
     SELECT AVG(TIMESTAMPDIFF(HOUR, fecha_creacion, fecha_actualizacion)) as promedio_horas
     FROM solicitudes_credito
     WHERE estado != 'Nueva' AND fecha_actualizacion > fecha_creacion
+    {$dashboardFiltroSqlTabla}
 ");
+$stmt->execute($dashboardFiltroParams);
 $tiempoPromedioNueva = round($stmt->fetch()['promedio_horas'] ?? 0, 1);
 
-// Tiempo promedio en "En Revisión Banco"
-$stmt = $pdo->query("
+$stmt = $pdo->prepare("
     SELECT AVG(TIMESTAMPDIFF(HOUR, fecha_creacion, fecha_actualizacion)) as promedio_horas
     FROM solicitudes_credito
     WHERE estado = 'En Revisión Banco'
+    {$dashboardFiltroSqlTabla}
 ");
+$stmt->execute($dashboardFiltroParams);
 $tiempoPromedioRevision = round($stmt->fetch()['promedio_horas'] ?? 0, 1);
 
-// Tiempo promedio total desde creación hasta completada/aprobada
-$stmt = $pdo->query("
+$stmt = $pdo->prepare("
     SELECT AVG(TIMESTAMPDIFF(DAY, fecha_creacion, fecha_actualizacion)) as promedio_dias
     FROM solicitudes_credito
     WHERE estado IN ('Completada', 'Aprobada')
+    {$dashboardFiltroSqlTabla}
 ");
+$stmt->execute($dashboardFiltroParams);
 $tiempoPromedioTotal = round($stmt->fetch()['promedio_dias'] ?? 0, 1);
 
-// Tiempo promedio hasta aprobación
-$stmt = $pdo->query("
+$stmt = $pdo->prepare("
     SELECT AVG(TIMESTAMPDIFF(DAY, fecha_creacion, fecha_actualizacion)) as promedio_dias
     FROM solicitudes_credito
     WHERE estado = 'Aprobada'
+    {$dashboardFiltroSqlTabla}
 ");
+$stmt->execute($dashboardFiltroParams);
 $tiempoPromedioAprobacion = round($stmt->fetch()['promedio_dias'] ?? 0, 1);
 
 // ========================================
 // SOLICITUDES CRÍTICAS (Más de 7 días sin cambios)
 // ========================================
 
-$stmt = $pdo->query("
+$stmt = $pdo->prepare("
     SELECT COUNT(*) as total
     FROM solicitudes_credito
     WHERE estado NOT IN ('Completada', 'Rechazada', 'Desistimiento')
     AND TIMESTAMPDIFF(DAY, fecha_actualizacion, NOW()) > 7
+    {$dashboardFiltroSqlTabla}
 ");
+$stmt->execute($dashboardFiltroParams);
 $solicitudesCriticas = $stmt->fetch()['total'];
 
 // ========================================
 // SOLICITUDES RECIENTES CON TIEMPOS
 // ========================================
 
-$stmt = $pdo->query("
-    SELECT s.*, 
-           u.nombre as gestor_nombre, 
+$stmt = $pdo->prepare("
+    SELECT s.*,
+           u.nombre as gestor_nombre,
            u.apellido as gestor_apellido,
            TIMESTAMPDIFF(HOUR, s.fecha_creacion, NOW()) as horas_desde_creacion,
            TIMESTAMPDIFF(HOUR, s.fecha_actualizacion, NOW()) as horas_sin_cambios
     FROM solicitudes_credito s
     LEFT JOIN usuarios u ON s.gestor_id = u.id
     WHERE s.estado NOT IN ('Completada', 'Rechazada', 'Desistimiento')
+    {$dashboardFiltroSqlAliasS}
     ORDER BY s.fecha_actualizacion ASC
     LIMIT 10
 ");
+$stmt->execute($dashboardFiltroParams);
 $solicitudesRecientes = $stmt->fetchAll();
 
 // ========================================
 // DISTRIBUCIÓN DE TIEMPOS POR ESTADO
 // ========================================
 
-$stmt = $pdo->query("
-    SELECT 
+$stmt = $pdo->prepare("
+    SELECT
         estado,
         COUNT(*) as cantidad,
         AVG(TIMESTAMPDIFF(HOUR, fecha_creacion, fecha_actualizacion)) as promedio_horas,
@@ -120,8 +165,10 @@ $stmt = $pdo->query("
         MAX(TIMESTAMPDIFF(HOUR, fecha_creacion, fecha_actualizacion)) as max_horas
     FROM solicitudes_credito
     WHERE fecha_actualizacion > fecha_creacion
+    {$dashboardFiltroSqlTabla}
     GROUP BY estado
 ");
+$stmt->execute($dashboardFiltroParams);
 $tiemposPorEstado = $stmt->fetchAll();
 ?>
 
@@ -198,8 +245,13 @@ $tiemposPorEstado = $stmt->fetchAll();
                                 <i class="fas fa-chart-line me-2"></i>Dashboard de Solicitudes de Crédito
                             </h2>
                             <p class="text-muted mb-0">
-                                Métricas de rendimiento y tiempos - <?php echo htmlspecialchars($_SESSION['user_name']); ?>
+                                Métricas de rendimiento y tiempos — <?php echo htmlspecialchars($_SESSION['user_name'] ?? ''); ?>
                             </p>
+                            <?php if ($dashboardAlcanceEtiqueta !== ''): ?>
+                            <p class="small text-primary mb-0 mt-1">
+                                <i class="fas fa-user-shield me-1"></i><?php echo htmlspecialchars($dashboardAlcanceEtiqueta); ?>
+                            </p>
+                            <?php endif; ?>
                         </div>
                         <div class="d-flex gap-2">
                             <a href="solicitudes.php" class="btn btn-primary">
