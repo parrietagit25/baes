@@ -200,6 +200,7 @@ CREATE TABLE `usuarios_banco_solicitudes` (
   `fecha_asignacion` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `fecha_desactivacion` timestamp NULL DEFAULT NULL,
   `creado_por` int NOT NULL,
+  `correos_enviados` int unsigned NOT NULL DEFAULT '0',
   PRIMARY KEY (`id`),
   UNIQUE KEY `unique_asignacion` (`solicitud_id`,`usuario_banco_id`),
   KEY `creado_por` (`creado_por`),
@@ -208,7 +209,7 @@ CREATE TABLE `usuarios_banco_solicitudes` (
   KEY `idx_usuarios_banco_estado` (`estado`)
 ) ENGINE=InnoDB AUTO_INCREMENT=37 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
-INSERT INTO `usuarios_banco_solicitudes` VALUES (31,77,25,'activo','2026-02-27 16:58:36',NULL,1);
+INSERT INTO `usuarios_banco_solicitudes` VALUES (31,77,25,'activo','2026-02-27 16:58:36',NULL,1,0);
 
 -- -----------------------------------------------------------------------------
 -- 7. EVALUACIONES_BANCO (depende de solicitudes, usuarios_banco_solicitudes, vehiculos)

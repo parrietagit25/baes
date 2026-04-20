@@ -9,6 +9,40 @@
 require_once __DIR__ . '/EmailService.php';
 
 /**
+ * Incrementa correos_enviados en la fila de asignación (mismo usuario banco y solicitud).
+ */
+function incrementarCorreosEnviadosUsuarioBancoSolicitud(PDO $pdo, int $solicitudId, int $usuarioBancoUserId): void {
+    if ($solicitudId < 1 || $usuarioBancoUserId < 1) {
+        return;
+    }
+    try {
+        $stmt = $pdo->prepare(
+            'UPDATE usuarios_banco_solicitudes SET correos_enviados = correos_enviados + 1 WHERE solicitud_id = ? AND usuario_banco_id = ?'
+        );
+        $stmt->execute([$solicitudId, $usuarioBancoUserId]);
+    } catch (Throwable $e) {
+        error_log('incrementarCorreosEnviadosUsuarioBancoSolicitud: ' . $e->getMessage());
+    }
+}
+
+/**
+ * Incrementa correos_enviados por id de usuarios_banco_solicitudes (p. ej. reevaluación: FK en evaluaciones_banco).
+ */
+function incrementarCorreosEnviadosPorAsignacion(PDO $pdo, int $usuariosBancoSolicitudesId): void {
+    if ($usuariosBancoSolicitudesId < 1) {
+        return;
+    }
+    try {
+        $stmt = $pdo->prepare(
+            'UPDATE usuarios_banco_solicitudes SET correos_enviados = correos_enviados + 1 WHERE id = ?'
+        );
+        $stmt->execute([$usuariosBancoSolicitudesId]);
+    } catch (Throwable $e) {
+        error_log('incrementarCorreosEnviadosPorAsignacion: ' . $e->getMessage());
+    }
+}
+
+/**
  * Correos en copia (CC) para el resumen al usuario banco: quien envía (sesión), email Pipedrive si existe,
  * y el ejecutivo de ventas asignado en Datos Generales (si tiene email válido). El destinatario principal sigue siendo el usuario banco (Para).
  *
@@ -187,11 +221,15 @@ function enviarRecordatorioBanco($solicitudId, $usuarioBancoId) {
         $emailService = new EmailService();
         $bancoNombre = trim(($solicitud['banco_nombre'] ?? '') . ' ' . ($solicitud['banco_apellido'] ?? ''));
 
-        return $emailService->enviarRecordatorioBanco(
+        $resultado = $emailService->enviarRecordatorioBanco(
             $solicitud['banco_email'],
             $bancoNombre ?: 'Usuario Banco',
             $solicitud
         );
+        if (!empty($resultado['success'])) {
+            incrementarCorreosEnviadosUsuarioBancoSolicitud($pdo, (int) $solicitudId, (int) $usuarioBancoId);
+        }
+        return $resultado;
         
     } catch (Exception $e) {
         error_log("Error al enviar recordatorio al banco: " . $e->getMessage());
@@ -223,11 +261,15 @@ function notificarBancoNuevaSolicitud($solicitudId, $usuarioBancoId) {
         $emailService = new EmailService();
         $bancoNombre = trim(($solicitud['banco_nombre'] ?? '') . ' ' . ($solicitud['banco_apellido'] ?? ''));
 
-        return $emailService->notificarBancoNuevaSolicitud(
+        $resultado = $emailService->notificarBancoNuevaSolicitud(
             $solicitud['banco_email'],
             $bancoNombre ?: 'Usuario Banco',
             $solicitud
         );
+        if (!empty($resultado['success'])) {
+            incrementarCorreosEnviadosUsuarioBancoSolicitud($pdo, (int) $solicitudId, (int) $usuarioBancoId);
+        }
+        return $resultado;
         
     } catch (Exception $e) {
         error_log("Error al notificar banco de nueva solicitud: " . $e->getMessage());
@@ -334,12 +376,16 @@ function notificarReevaluacion($solicitudId, $evaluacionId, $comentario) {
         $emailService = new EmailService();
         $bancoNombre = trim(($row['banco_nombre'] ?? '') . ' ' . ($row['banco_apellido'] ?? ''));
 
-        return $emailService->notificarReevaluacion(
+        $resultado = $emailService->notificarReevaluacion(
             $row['banco_email'],
             $bancoNombre ?: 'Usuario Banco',
             $row,
             $comentario
         );
+        if (!empty($resultado['success']) && isset($row['usuario_banco_id'])) {
+            incrementarCorreosEnviadosPorAsignacion($pdo, (int) $row['usuario_banco_id']);
+        }
+        return $resultado;
         
     } catch (Exception $e) {
         error_log("Error al notificar reevaluación: " . $e->getMessage());
@@ -482,7 +528,7 @@ function enviarResumenSolicitudBanco($solicitudId, $usuarioBancoId) {
         $archivosAdjuntos = adjuntosArchivosParaCorreoResumen($adjuntos);
 
         $emailService = new EmailService();
-        return $emailService->enviarCorreo(
+        $resultado = $emailService->enviarCorreo(
             $banco['banco_email'],
             asuntoResumenSolicitudBancoMail($solicitud),
             $html,
@@ -493,6 +539,10 @@ function enviarResumenSolicitudBanco($solicitudId, $usuarioBancoId) {
             [],
             $replyToGestor
         );
+        if (!empty($resultado['success'])) {
+            incrementarCorreosEnviadosUsuarioBancoSolicitud($pdo, (int) $solicitudId, (int) $usuarioBancoId);
+        }
+        return $resultado;
     } catch (Exception $e) {
         error_log("Error enviarResumenSolicitudBanco: " . $e->getMessage());
         return ['success' => false, 'message' => 'Error al enviar el correo'];

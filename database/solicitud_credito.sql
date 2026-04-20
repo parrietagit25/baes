@@ -343,7 +343,8 @@ CREATE TABLE `usuarios_banco_solicitudes` (
   `estado` enum('activo','inactivo') DEFAULT 'activo',
   `fecha_asignacion` timestamp NOT NULL DEFAULT current_timestamp(),
   `fecha_desactivacion` timestamp NULL DEFAULT NULL,
-  `creado_por` int(11) NOT NULL
+  `creado_por` int(11) NOT NULL,
+  `correos_enviados` int(10) UNSIGNED NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------

@@ -1813,13 +1813,15 @@ function mostrarUsuariosAsignados(usuarios) {
     tbody.empty();
     
     if (usuarios.length === 0) {
-        tbody.html('<tr><td colspan="6" class="text-center text-muted">No hay usuarios asignados</td></tr>');
+        tbody.html('<tr><td colspan="7" class="text-center text-muted">No hay usuarios asignados</td></tr>');
         return;
     }
     
     usuarios.forEach(usuario => {
         const estadoClass = usuario.estado === 'activo' ? 'success' : 'secondary';
         const estadoText = usuario.estado === 'activo' ? 'Activo' : 'Inactivo';
+        const numCorreos = usuario.correos_enviados != null ? parseInt(usuario.correos_enviados, 10) : 0;
+        const correosMostrar = Number.isFinite(numCorreos) ? numCorreos : 0;
         
         const emailEsc = (usuario.usuario_email || '').replace(/"/g, '&quot;');
         const nombreEsc = ((usuario.usuario_nombre || '') + ' ' + (usuario.usuario_apellido || '')).trim().replace(/"/g, '&quot;');
@@ -1834,6 +1836,7 @@ function mostrarUsuariosAsignados(usuarios) {
                 <td>${usuario.banco_nombre || 'Sin banco'}</td>
                 <td><span class="badge bg-${estadoClass}">${estadoText}</span></td>
                 <td>${formatearFecha(usuario.fecha_asignacion)}</td>
+                <td><span class="badge bg-info text-dark" title="Correos enviados a este usuario banco para esta solicitud">${correosMostrar}</span></td>
                 <td>-</td>
                 <td>
                     <div class="btn-group btn-group-sm">
@@ -1923,6 +1926,9 @@ function confirmarEnviarResumenBanco() {
                 var okMsg = res.message || 'Resumen enviado por correo correctamente';
                 mostrarAlerta(okMsg, 'success');
                 alert('Confirmacion: ' + okMsg);
+                if (typeof solicitudActualId !== 'undefined' && solicitudActualId) {
+                    cargarUsuariosAsignados(solicitudActualId);
+                }
             } else {
                 var failMsg = res.message || 'Error al enviar';
                 mostrarAlerta(failMsg, 'danger');

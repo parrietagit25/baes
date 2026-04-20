@@ -842,6 +842,7 @@ if ($isBanco && !$isAdmin) {
                                                                 <th>Banco</th>
                                                                 <th>Estado</th>
                                                                 <th>Fecha Asignación</th>
+                                                                <th>Correos enviados</th>
                                                                 <th>Último Mensaje</th>
                                                                 <th>Acciones</th>
                                                             </tr>

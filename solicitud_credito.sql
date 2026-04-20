@@ -443,20 +443,21 @@ CREATE TABLE `usuarios_banco_solicitudes` (
   `estado` enum('activo','inactivo') DEFAULT 'activo',
   `fecha_asignacion` timestamp NOT NULL DEFAULT current_timestamp(),
   `fecha_desactivacion` timestamp NULL DEFAULT NULL,
-  `creado_por` int(11) NOT NULL
+  `creado_por` int(11) NOT NULL,
+  `correos_enviados` int(10) UNSIGNED NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Volcado de datos para la tabla `usuarios_banco_solicitudes`
 --
 
-INSERT INTO `usuarios_banco_solicitudes` (`id`, `solicitud_id`, `usuario_banco_id`, `estado`, `fecha_asignacion`, `fecha_desactivacion`, `creado_por`) VALUES
-(9, 60, 2, 'activo', '2025-10-01 03:49:18', NULL, 1),
-(10, 59, 2, 'activo', '2025-10-01 03:50:32', NULL, 1),
-(12, 58, 2, 'activo', '2025-10-03 03:34:59', NULL, 1),
-(13, 3, 2, 'activo', '2025-10-03 04:27:43', NULL, 3),
-(14, 57, 2, 'activo', '2025-10-08 16:56:03', NULL, 1),
-(15, 56, 2, 'activo', '2025-10-08 16:57:25', NULL, 1);
+INSERT INTO `usuarios_banco_solicitudes` (`id`, `solicitud_id`, `usuario_banco_id`, `estado`, `fecha_asignacion`, `fecha_desactivacion`, `creado_por`, `correos_enviados`) VALUES
+(9, 60, 2, 'activo', '2025-10-01 03:49:18', NULL, 1, 0),
+(10, 59, 2, 'activo', '2025-10-01 03:50:32', NULL, 1, 0),
+(12, 58, 2, 'activo', '2025-10-03 03:34:59', NULL, 1, 0),
+(13, 3, 2, 'activo', '2025-10-03 04:27:43', NULL, 3, 0),
+(14, 57, 2, 'activo', '2025-10-08 16:56:03', NULL, 1, 0),
+(15, 56, 2, 'activo', '2025-10-08 16:57:25', NULL, 1, 0);
 
 -- --------------------------------------------------------
 
