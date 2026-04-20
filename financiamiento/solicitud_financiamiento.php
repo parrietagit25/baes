@@ -269,8 +269,39 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
       border-color: rgba(78,161,255,.55);
       box-shadow: 0 0 0 3px rgba(78,161,255,.15);
     }
+    input.input-format-ok{
+      border-color: rgba(52,211,153,.65) !important;
+      box-shadow: 0 0 0 3px rgba(52,211,153,.14);
+    }
+    input.input-format-bad{
+      border-color: rgba(255,93,93,.8) !important;
+      box-shadow: 0 0 0 3px rgba(255,93,93,.14);
+    }
+    html.theme-light input.input-format-ok{
+      border-color: rgba(5,150,105,.55) !important;
+      box-shadow: 0 0 0 3px rgba(5,150,105,.12);
+    }
+    html.theme-light input.input-format-bad{
+      border-color: rgba(185,28,28,.65) !important;
+      box-shadow: 0 0 0 3px rgba(185,28,28,.12);
+    }
 
     textarea{ min-height: 92px; resize: vertical; }
+
+    .nacimiento-hint{
+      margin-top: 4px;
+      font-size: calc(11px * var(--fs-scale));
+      color: var(--muted);
+      line-height: 1.35;
+    }
+    .nacimiento-hint.err{
+      color: var(--danger);
+      font-weight: 700;
+    }
+    .nacimiento-hint.ok{
+      color: var(--ok);
+      font-weight: 700;
+    }
 
     .hint{
       margin-top: 6px;
@@ -599,12 +630,13 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           </div>
           <div class="col-3">
             <label for="cliente_nacimiento">Fecha de nacimiento *</label>
-            <input id="cliente_nacimiento" name="cliente_nacimiento" type="date" required />
+            <input id="cliente_nacimiento" name="cliente_nacimiento" type="text" inputmode="numeric" autocomplete="bday" maxlength="10" placeholder="MM/DD/YYYY" required />
+            <p id="clienteNacimientoHint" class="nacimiento-hint">Digite solo números; el formato debe ser MM/DD/YYYY (mes/día/año).</p>
             <div class="error" data-error-for="cliente_nacimiento"></div>
           </div>
           <div class="col-3">
             <label for="cliente_edad">Edad *</label>
-            <input id="cliente_edad" name="cliente_edad" inputmode="numeric" required pattern="^\d{1,3}$" placeholder="Ej: 35" />
+            <input id="cliente_edad" name="cliente_edad" inputmode="numeric" required readonly tabindex="-1" title="Se calcula automáticamente con la fecha de nacimiento" />
             <div class="error" data-error-for="cliente_edad"></div>
           </div>
           <div class="col-4">
@@ -1335,6 +1367,14 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
         if(data.__meta && typeof data.__meta.step === "number"){
           step = Math.max(0, Math.min(fieldsets.length - 1, data.__meta.step));
         }
+        var nacEl = form.elements["cliente_nacimiento"];
+        if (nacEl && data.cliente_nacimiento != null && data.cliente_nacimiento !== undefined){
+          var rawN = String(data.cliente_nacimiento).trim();
+          if (/^\d{4}-\d{2}-\d{2}$/.test(rawN)){
+            nacEl.value = rawN.slice(5, 7) + "/" + rawN.slice(8, 10) + "/" + rawN.slice(0, 4);
+          }
+        }
+        syncClienteNacimientoVisual();
       }
 
       function saveDraft(mode){
@@ -1390,6 +1430,182 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
         });
       }
 
+      var NACIMIENTO_HINT_DEFAULT = "Digite solo números; el formato debe ser MM/DD/YYYY (mes/día/año).";
+
+      function formatNacimientoDigits(digits){
+        digits = String(digits || "").replace(/\D/g, "").slice(0, 8);
+        if (digits.length <= 2) return digits;
+        if (digits.length <= 4) return digits.slice(0, 2) + "/" + digits.slice(2);
+        return digits.slice(0, 2) + "/" + digits.slice(2, 4) + "/" + digits.slice(4);
+      }
+
+      function parseUsDateFromString(str){
+        var m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(str || "").trim());
+        if (!m) return null;
+        var month = parseInt(m[1], 10);
+        var day = parseInt(m[2], 10);
+        var year = parseInt(m[3], 10);
+        if (month < 1 || month > 12) return null;
+        var d = new Date(year, month - 1, day);
+        if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return null;
+        return d;
+      }
+
+      function dateOnlyLocal(d){
+        return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      }
+
+      function yearsSinceBirth(birthDate){
+        var today = new Date();
+        var y = today.getFullYear() - birthDate.getFullYear();
+        var mo = today.getMonth() - birthDate.getMonth();
+        if (mo < 0 || (mo === 0 && today.getDate() < birthDate.getDate())) y--;
+        return y;
+      }
+
+      function analyzeClienteNacimiento(raw){
+        var s = String(raw || "").trim();
+        if (!s) return { status: "empty" };
+        var digits = s.replace(/\D/g, "");
+        if (s.length < 10 || digits.length < 8) return { status: "partial" };
+        var d = parseUsDateFromString(s);
+        if (!d) return { status: "bad" };
+        var todayD = dateOnlyLocal(new Date());
+        var birthD = dateOnlyLocal(d);
+        if (birthD.getTime() > todayD.getTime()) return { status: "future" };
+        var age = yearsSinceBirth(d);
+        if (age < 18) return { status: "minor", age: age };
+        return { status: "ok", age: age };
+      }
+
+      function syncClienteNacimientoVisual(){
+        var inp = form.elements["cliente_nacimiento"];
+        var edadEl = form.elements["cliente_edad"];
+        var hint = document.getElementById("clienteNacimientoHint");
+        if (!inp || !edadEl) return;
+        var st = analyzeClienteNacimiento(inp.value);
+        setError("cliente_nacimiento", "");
+        setError("cliente_edad", "");
+        inp.classList.remove("input-format-ok", "input-format-bad");
+        edadEl.classList.remove("input-format-ok", "input-format-bad");
+        if (hint){
+          hint.classList.remove("err", "ok");
+          hint.textContent = NACIMIENTO_HINT_DEFAULT;
+        }
+        if (st.status === "empty"){
+          edadEl.value = "";
+          return;
+        }
+        if (st.status === "partial"){
+          edadEl.value = "";
+          return;
+        }
+        if (st.status === "bad" || st.status === "future" || st.status === "minor"){
+          inp.classList.add("input-format-bad");
+          if (typeof st.age === "number") edadEl.value = String(st.age);
+          else edadEl.value = "";
+          if (hint){
+            hint.classList.add("err");
+            if (st.status === "bad") hint.textContent = "Use el formato MM/DD/YYYY (mes/día/año) y una fecha válida.";
+            if (st.status === "future") hint.textContent = "La fecha de nacimiento no puede ser futura.";
+            if (st.status === "minor") hint.textContent = "El cliente no posee la mayoría de edad (debe tener al menos 18 años).";
+          }
+          return;
+        }
+        if (st.status === "ok"){
+          edadEl.value = String(st.age);
+          inp.classList.add("input-format-ok");
+          edadEl.classList.add("input-format-ok");
+          if (hint){
+            hint.classList.add("ok");
+            hint.textContent = "Fecha correcta (MM/DD/YYYY).";
+          }
+        }
+      }
+
+      function validateClienteNacimientoStep0(){
+        var inp = form.elements["cliente_nacimiento"];
+        var edadEl = form.elements["cliente_edad"];
+        if (!inp || !edadEl) return true;
+        var st = analyzeClienteNacimiento(inp.value);
+        var hint = document.getElementById("clienteNacimientoHint");
+        inp.classList.remove("input-format-ok", "input-format-bad");
+        edadEl.classList.remove("input-format-ok", "input-format-bad");
+        if (hint){
+          hint.classList.remove("err", "ok");
+          hint.textContent = NACIMIENTO_HINT_DEFAULT;
+        }
+        if (st.status === "empty"){
+          setError("cliente_nacimiento", "Este campo es obligatorio.");
+          inp.classList.add("input-format-bad");
+          edadEl.value = "";
+          return false;
+        }
+        if (st.status === "partial"){
+          setError("cliente_nacimiento", "Complete la fecha en formato MM/DD/YYYY (mes/día/año).");
+          inp.classList.add("input-format-bad");
+          edadEl.value = "";
+          return false;
+        }
+        if (st.status === "bad"){
+          setError("cliente_nacimiento", "Formato o fecha inválida. Use MM/DD/YYYY (mes/día/año).");
+          inp.classList.add("input-format-bad");
+          edadEl.value = "";
+          if (hint){ hint.classList.add("err"); hint.textContent = "Use el formato MM/DD/YYYY (mes/día/año) y una fecha válida."; }
+          return false;
+        }
+        if (st.status === "future"){
+          setError("cliente_nacimiento", "La fecha de nacimiento no puede ser futura.");
+          inp.classList.add("input-format-bad");
+          edadEl.value = "";
+          if (hint){ hint.classList.add("err"); hint.textContent = "La fecha no puede ser futura."; }
+          return false;
+        }
+        if (st.status === "minor"){
+          var msg = "El cliente no posee la mayoría de edad (debe tener al menos 18 años).";
+          setError("cliente_nacimiento", msg);
+          setError("cliente_edad", msg);
+          inp.classList.add("input-format-bad");
+          edadEl.value = String(st.age);
+          if (hint){ hint.classList.add("err"); hint.textContent = msg; }
+          return false;
+        }
+        edadEl.value = String(st.age);
+        inp.classList.add("input-format-ok");
+        edadEl.classList.add("input-format-ok");
+        if (hint){
+          hint.classList.add("ok");
+          hint.textContent = "Fecha correcta (MM/DD/YYYY).";
+        }
+        return true;
+      }
+
+      function setupClienteNacimientoField(){
+        var inp = form.elements["cliente_nacimiento"];
+        if (!inp || inp.getAttribute("data-nac-bound") === "1") return;
+        inp.setAttribute("data-nac-bound", "1");
+        inp.addEventListener("keydown", function(e){
+          if (e.ctrlKey || e.metaKey || e.altKey) return;
+          var k = e.key;
+          if (k === "Backspace" || k === "Delete" || k === "Tab" || k === "Enter" || (k && k.indexOf("Arrow") === 0) || k === "Home" || k === "End") return;
+          if (k && k.length === 1 && !/\d/.test(k)) e.preventDefault();
+        });
+        inp.addEventListener("input", function(){
+          var digits = inp.value.replace(/\D/g, "").slice(0, 8);
+          var formatted = formatNacimientoDigits(digits);
+          if (formatted !== inp.value) inp.value = formatted;
+          syncClienteNacimientoVisual();
+        });
+        inp.addEventListener("paste", function(e){
+          var t = e.clipboardData && e.clipboardData.getData("text");
+          if (t == null) return;
+          e.preventDefault();
+          var digits = (inp.value + t).replace(/\D/g, "").slice(0, 8);
+          inp.value = formatNacimientoDigits(digits);
+          syncClienteNacimientoVisual();
+        });
+      }
+
       function validateMoneyField(name, required){
         var el = form.elements[name];
         if(!el) return true;
@@ -1410,6 +1626,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
         var tieneConyuge = !!form.elements["tiene_conyuge"] && form.elements["tiene_conyuge"].checked;
 
         inputs.forEach(function(el){
+          if(el.name === "cliente_nacimiento" || el.name === "cliente_edad") return;
           if(el.name.indexOf("con_") === 0 && !tieneConyuge) return;
           if(["precio_venta","abono","empresa_salario","con_salario","vivienda_monto"].indexOf(el.name) >= 0){
             el.value = formatMoneyLike(el.value);
@@ -1428,6 +1645,8 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
             setError(el.name, "");
           }
         });
+
+        if(stepIndex === 0) ok = validateClienteNacimientoStep0() && ok;
 
         if(stepIndex === 1){
           var vivienda = form.elements["vivienda"] && form.elements["vivienda"].value;
@@ -1477,9 +1696,13 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
         }
       });
       form.addEventListener("change", function(e){ if(e.target && e.target.name) saveDraft("auto"); });
+      form.addEventListener("reset", function(){
+        setTimeout(function(){ syncClienteNacimientoVisual(); }, 0);
+      });
       window.addEventListener("beforeunload", function(){ try{ saveDraft("auto"); }catch(e){} });
 
       function init(){
+        setupClienteNacimientoField();
         makeChips();
         attachNavButtons();
 
