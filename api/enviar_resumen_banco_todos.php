@@ -1,7 +1,6 @@
 <?php
 /**
- * Envía el resumen por correo a todos los usuarios banco asignados a la solicitud
- * (un envío por cada fila en usuarios_banco_solicitudes).
+ * Envía un único correo de resumen usando CCO para todos los usuarios banco asignados.
  */
 session_start();
 header('Content-Type: application/json');
@@ -21,57 +20,19 @@ require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../includes/email_helper.php';
 
 try {
-    $stmt = $pdo->prepare(
-        'SELECT usuario_banco_id FROM usuarios_banco_solicitudes WHERE solicitud_id = ? ORDER BY id'
-    );
-    $stmt->execute([$solicitud_id]);
-    $ids = $stmt->fetchAll(PDO::FETCH_COLUMN);
-
-    if ($ids === false || count($ids) === 0) {
-        echo json_encode(['success' => false, 'message' => 'No hay usuarios banco asignados a esta solicitud']);
-        exit;
-    }
-
-    $ok = 0;
-    $fallos = [];
-    foreach ($ids as $uid) {
-        $uid = (int) $uid;
-        $resultado = enviarResumenSolicitudBanco($solicitud_id, $uid);
-        if (!empty($resultado['success'])) {
-            $ok++;
-        } else {
-            $fallos[] = [
-                'usuario_banco_id' => $uid,
-                'message' => $resultado['message'] ?? 'Error al enviar',
-            ];
-        }
-    }
-
-    $total = count($ids);
-    if ($ok === $total) {
+    $resultado = enviarResumenSolicitudBancoTodosUnCorreo($solicitud_id);
+    if (!empty($resultado['success'])) {
+        $enviados = isset($resultado['enviados']) ? (int) $resultado['enviados'] : 0;
+        $msg = $resultado['message'] ?? "Resumen enviado correctamente en un solo correo (CCO) a {$enviados} usuario(s) banco.";
         echo json_encode([
             'success' => true,
-            'message' => "Resumen enviado correctamente a {$ok} usuario(s).",
-            'enviados' => $ok,
-            'total' => $total,
-            'fallos' => [],
-        ]);
-    } elseif ($ok > 0) {
-        echo json_encode([
-            'success' => true,
-            'message' => "Resumen enviado a {$ok} de {$total} usuario(s). Algunos envíos fallaron.",
-            'enviados' => $ok,
-            'total' => $total,
-            'fallos' => $fallos,
-            'partial' => true,
+            'message' => $msg,
+            'enviados' => $enviados,
         ]);
     } else {
         echo json_encode([
             'success' => false,
-            'message' => 'No se pudo enviar el resumen a ningún usuario.',
-            'enviados' => 0,
-            'total' => $total,
-            'fallos' => $fallos,
+            'message' => $resultado['message'] ?? 'No se pudo enviar el resumen.',
         ]);
     }
 } catch (Throwable $e) {
