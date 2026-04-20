@@ -887,12 +887,13 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           </div>
           <div class="col-3">
             <label for="con_nacimiento">Fecha de nacimiento</label>
-            <input id="con_nacimiento" name="con_nacimiento" type="date" />
+            <input id="con_nacimiento" name="con_nacimiento" type="text" inputmode="numeric" autocomplete="off" maxlength="10" placeholder="MM/DD/YYYY (opcional)" />
+            <p id="conNacimientoHint" class="nacimiento-hint">Opcional. Formato MM/DD/YYYY (mes/día/año). La edad se calcula sola; sin límite de edad.</p>
             <div class="error" data-error-for="con_nacimiento"></div>
           </div>
           <div class="col-3">
             <label for="con_edad">Edad</label>
-            <input id="con_edad" name="con_edad" inputmode="numeric" pattern="^\d{1,3}$" />
+            <input id="con_edad" name="con_edad" inputmode="numeric" readonly tabindex="-1" title="Se calcula con la fecha de nacimiento (opcional)" />
             <div class="error" data-error-for="con_edad"></div>
           </div>
           <div class="col-4">
@@ -1380,6 +1381,14 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           }
         }
         syncClienteNacimientoVisual();
+        var conNacEl = form.elements["con_nacimiento"];
+        if (conNacEl && data.con_nacimiento != null && data.con_nacimiento !== undefined){
+          var rawC = String(data.con_nacimiento).trim();
+          if (/^\d{4}-\d{2}-\d{2}$/.test(rawC)){
+            conNacEl.value = rawC.slice(5, 7) + "/" + rawC.slice(8, 10) + "/" + rawC.slice(0, 4);
+          }
+        }
+        syncConyugeNacimientoVisual();
       }
 
       function saveDraft(mode){
@@ -1436,6 +1445,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
       }
 
       var NACIMIENTO_HINT_DEFAULT = "Digite solo números; formato MM/DD/YYYY (mes/día/año). La edad debe estar entre 18 y 100 años.";
+      var CON_NACIMIENTO_HINT_DEFAULT = "Opcional. Formato MM/DD/YYYY (mes/día/año). La edad se calcula sola; sin límite de edad.";
 
       function formatNacimientoDigits(digits){
         digits = String(digits || "").replace(/\D/g, "").slice(0, 8);
@@ -1481,6 +1491,21 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
         var age = yearsSinceBirth(d);
         if (age < 18) return { status: "minor", age: age };
         if (age > 100) return { status: "senior", age: age };
+        return { status: "ok", age: age };
+      }
+
+      /** Fecha cónyuge: opcional; sin reglas de edad mínima/máxima. */
+      function analyzeConyugeNacimiento(raw){
+        var s = String(raw || "").trim();
+        if (!s) return { status: "empty" };
+        var digits = s.replace(/\D/g, "");
+        if (s.length < 10 || digits.length < 8) return { status: "partial" };
+        var d = parseUsDateFromString(s);
+        if (!d) return { status: "bad" };
+        var todayD = dateOnlyLocal(new Date());
+        var birthD = dateOnlyLocal(d);
+        if (birthD.getTime() > todayD.getTime()) return { status: "future" };
+        var age = yearsSinceBirth(d);
         return { status: "ok", age: age };
       }
 
@@ -1652,6 +1677,135 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
         });
       }
 
+      function syncConyugeNacimientoVisual(){
+        var inp = form.elements["con_nacimiento"];
+        var edadEl = form.elements["con_edad"];
+        var hint = document.getElementById("conNacimientoHint");
+        if (!inp || !edadEl) return;
+        var tiene = form.elements["tiene_conyuge"] && form.elements["tiene_conyuge"].checked;
+        setError("con_nacimiento", "");
+        setError("con_edad", "");
+        inp.classList.remove("input-format-ok", "input-format-bad");
+        edadEl.classList.remove("input-format-ok", "input-format-bad");
+        if (hint){
+          hint.classList.remove("err", "ok");
+          hint.textContent = CON_NACIMIENTO_HINT_DEFAULT;
+        }
+        if (!tiene){
+          edadEl.value = "";
+          return;
+        }
+        var st = analyzeConyugeNacimiento(inp.value);
+        if (st.status === "empty"){
+          edadEl.value = "";
+          return;
+        }
+        if (st.status === "partial"){
+          edadEl.value = "";
+          return;
+        }
+        if (st.status === "bad" || st.status === "future"){
+          inp.classList.add("input-format-bad");
+          edadEl.value = "";
+          if (hint){
+            hint.classList.add("err");
+            if (st.status === "bad") hint.textContent = "Use el formato MM/DD/YYYY (mes/día/año) y una fecha válida.";
+            if (st.status === "future") hint.textContent = "La fecha de nacimiento no puede ser futura.";
+          }
+          return;
+        }
+        if (st.status === "ok"){
+          edadEl.value = String(st.age);
+          inp.classList.add("input-format-ok");
+          edadEl.classList.add("input-format-ok");
+          if (hint){
+            hint.classList.add("ok");
+            hint.textContent = "Fecha correcta (MM/DD/YYYY). Edad: " + st.age + " años.";
+          }
+        }
+      }
+
+      function validateConyugeNacimientoStep3(){
+        var tiene = form.elements["tiene_conyuge"] && form.elements["tiene_conyuge"].checked;
+        if (!tiene) return true;
+        var inp = form.elements["con_nacimiento"];
+        var edadEl = form.elements["con_edad"];
+        var hint = document.getElementById("conNacimientoHint");
+        if (!inp || !edadEl) return true;
+        var st = analyzeConyugeNacimiento(inp.value);
+        inp.classList.remove("input-format-ok", "input-format-bad");
+        edadEl.classList.remove("input-format-ok", "input-format-bad");
+        if (hint){
+          hint.classList.remove("err", "ok");
+          hint.textContent = CON_NACIMIENTO_HINT_DEFAULT;
+        }
+        if (st.status === "empty"){
+          edadEl.value = "";
+          return true;
+        }
+        if (st.status === "partial"){
+          setError("con_nacimiento", "Complete la fecha en formato MM/DD/YYYY (mes/día/año), o deje el campo vacío.");
+          inp.classList.add("input-format-bad");
+          edadEl.value = "";
+          if (hint){ hint.classList.add("err"); hint.textContent = "Complete MM/DD/YYYY o vacíe el campo."; }
+          return false;
+        }
+        if (st.status === "bad"){
+          setError("con_nacimiento", "Formato o fecha inválida. Use MM/DD/YYYY (mes/día/año), o deje el campo vacío.");
+          inp.classList.add("input-format-bad");
+          edadEl.value = "";
+          if (hint){ hint.classList.add("err"); hint.textContent = "Fecha inválida. Use MM/DD/YYYY (mes/día/año)."; }
+          return false;
+        }
+        if (st.status === "future"){
+          setError("con_nacimiento", "La fecha de nacimiento no puede ser futura.");
+          inp.classList.add("input-format-bad");
+          edadEl.value = "";
+          if (hint){ hint.classList.add("err"); hint.textContent = "La fecha no puede ser futura."; }
+          return false;
+        }
+        edadEl.value = String(st.age);
+        inp.classList.add("input-format-ok");
+        edadEl.classList.add("input-format-ok");
+        if (hint){
+          hint.classList.add("ok");
+          hint.textContent = "Fecha correcta (MM/DD/YYYY). Edad: " + st.age + " años.";
+        }
+        return true;
+      }
+
+      function setupConyugeNacimientoField(){
+        var inp = form.elements["con_nacimiento"];
+        var chk = form.elements["tiene_conyuge"];
+        if (!inp || inp.getAttribute("data-con-nac-bound") === "1") return;
+        inp.setAttribute("data-con-nac-bound", "1");
+        inp.addEventListener("keydown", function(e){
+          if (e.ctrlKey || e.metaKey || e.altKey) return;
+          var k = e.key;
+          if (k === "Backspace" || k === "Delete" || k === "Tab" || k === "Enter" || (k && k.indexOf("Arrow") === 0) || k === "Home" || k === "End") return;
+          if (k && k.length === 1 && !/\d/.test(k)) e.preventDefault();
+        });
+        inp.addEventListener("input", function(){
+          var digits = inp.value.replace(/\D/g, "").slice(0, 8);
+          var formatted = formatNacimientoDigits(digits);
+          if (formatted !== inp.value) inp.value = formatted;
+          syncConyugeNacimientoVisual();
+        });
+        inp.addEventListener("paste", function(e){
+          var t = e.clipboardData && e.clipboardData.getData("text");
+          if (t == null) return;
+          e.preventDefault();
+          var digits = (inp.value + t).replace(/\D/g, "").slice(0, 8);
+          inp.value = formatNacimientoDigits(digits);
+          syncConyugeNacimientoVisual();
+        });
+        if (chk){
+          chk.addEventListener("change", function(){
+            syncConyugeNacimientoVisual();
+          });
+        }
+      }
+
       function validateMoneyField(name, required){
         var el = form.elements[name];
         if(!el) return true;
@@ -1673,6 +1827,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
 
         inputs.forEach(function(el){
           if(el.name === "cliente_nacimiento" || el.name === "cliente_edad") return;
+          if(el.name === "con_nacimiento" || el.name === "con_edad") return;
           if(el.name.indexOf("con_") === 0 && !tieneConyuge) return;
           if(["precio_venta","abono","empresa_salario","con_salario","vivienda_monto"].indexOf(el.name) >= 0){
             el.value = formatMoneyLike(el.value);
@@ -1705,7 +1860,10 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           }
         }
         if(stepIndex === 2) ok = validateMoneyField("empresa_salario", true) && ok;
-        if(stepIndex === 3 && tieneConyuge) ok = validateMoneyField("con_salario", false) && ok;
+        if(stepIndex === 3 && tieneConyuge){
+          ok = validateConyugeNacimientoStep3() && ok;
+          ok = validateMoneyField("con_salario", false) && ok;
+        }
         if(stepIndex === 4){
           if(TOKEN_LINK){
             var firmaVal = (firmaDataInput && firmaDataInput.value) ? firmaDataInput.value.trim() : "";
@@ -1741,14 +1899,21 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           saveDraft("auto");
         }
       });
-      form.addEventListener("change", function(e){ if(e.target && e.target.name) saveDraft("auto"); });
+      form.addEventListener("change", function(e){
+        if(e.target && e.target.name) saveDraft("auto");
+        if(e.target && e.target.name === "tiene_conyuge") syncConyugeNacimientoVisual();
+      });
       form.addEventListener("reset", function(){
-        setTimeout(function(){ syncClienteNacimientoVisual(); }, 0);
+        setTimeout(function(){
+          syncClienteNacimientoVisual();
+          syncConyugeNacimientoVisual();
+        }, 0);
       });
       window.addEventListener("beforeunload", function(){ try{ saveDraft("auto"); }catch(e){} });
 
       function init(){
         setupClienteNacimientoField();
+        setupConyugeNacimientoField();
         makeChips();
         attachNavButtons();
 
@@ -1766,6 +1931,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           calcProgress();
         }
         updateStep0NextButtonState();
+        syncConyugeNacimientoVisual();
 
         btnSaveExit.addEventListener("click", function(){
           saveDraft("manual");
