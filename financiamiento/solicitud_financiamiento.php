@@ -743,7 +743,11 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           </div>
           <div class="col-6">
             <label for="casa_edif">Casa / Edif</label>
-            <input id="casa_edif" name="casa_edif" maxlength="120" />
+            <select id="casa_edif" name="casa_edif">
+              <option value="">Seleccione…</option>
+              <option value="Casa">Casa</option>
+              <option value="Edificio">Edificio</option>
+            </select>
             <div class="error" data-error-for="casa_edif"></div>
           </div>
           <div class="col-6">
