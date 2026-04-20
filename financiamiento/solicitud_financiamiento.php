@@ -1065,7 +1065,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           </div>
           <div id="firmantesAdicionalesContainer" class="col-12" style="margin-top:16px"></div>
           <div class="col-12" style="margin-top:8px">
-            <button type="button" id="btnAgregarFirmante" class="btn btn-sm" style="background:var(--accent);color:#fff;border:0;">Agregar otro firmante</button>
+            <button type="button" id="btnAgregarFirmante" class="btn btn-sm" style="background:var(--accent);color:#fff;border:0;">Agregar firma de codeudor</button>
           </div>
           <div class="col-12" style="margin-top:14px">
             <div class="consent-text" style="font-size:11px;line-height:1.4;color:var(--muted);margin-bottom:12px;padding:12px;background:rgba(0,0,0,.2);border-radius:10px;border:1px solid var(--line);max-height:200px;overflow-y:auto;">
@@ -1202,19 +1202,20 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
       var firmantesContainer = document.getElementById("firmantesAdicionalesContainer");
       var btnAgregarFirmante = document.getElementById("btnAgregarFirmante");
       function addFirmanteBlock(){
-        var nombre = prompt("Nombre del firmante adicional:");
-        if (nombre == null || String(nombre).trim() === "") return;
-        nombre = String(nombre).trim();
+        if (!firmantesContainer) return;
+        if (firmantesContainer.querySelector(".firmante-adicional-block")){
+          showToast("Ya se agregó la firma de codeudor.", "err");
+          return;
+        }
+        var nombre = "Codeudor";
         var id = "fa_" + Date.now() + "_" + Math.random().toString(36).slice(2,6);
         var block = document.createElement("div");
         block.className = "firmante-adicional-block";
         block.style.cssText = "margin-top:14px;padding:14px;border:1px solid var(--line);border-radius:12px;background:rgba(0,0,0,.15);";
-        var lbl = document.createElement("label");
+        var lbl = document.createElement("div");
         lbl.className = "d-block";
-        lbl.style.marginBottom = "6px";
-        lbl.innerHTML = "<strong>Firmante: </strong>";
-        var strong = lbl.querySelector("strong");
-        strong.appendChild(document.createTextNode(nombre));
+        lbl.style.marginBottom = "8px";
+        lbl.innerHTML = "<strong>Firma de codeudor</strong>";
         block.appendChild(lbl);
         var nombreInput = document.createElement("input");
         nombreInput.type = "hidden";
@@ -1249,11 +1250,12 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
         btnQuitar.className = "btn btn-sm btn-quitar-fa";
         btnQuitar.setAttribute("data-fa-id", id);
         btnQuitar.style.cssText = "background:var(--danger);color:#fff;border:0;";
-        btnQuitar.textContent = "Quitar firmante";
+        btnQuitar.textContent = "Quitar firma de codeudor";
         btnWrap.appendChild(btnLimpiar);
         btnWrap.appendChild(btnQuitar);
         block.appendChild(btnWrap);
         firmantesContainer.appendChild(block);
+        if (btnAgregarFirmante) btnAgregarFirmante.disabled = true;
         setupSignatureCanvas(can, firmaInput);
         can.addEventListener("mouseup", function(){ firmaInput.value = can.toDataURL("image/png").replace(/^data:image\/png;base64,/, ""); });
         can.addEventListener("touchend", function(){ firmaInput.value = can.toDataURL("image/png").replace(/^data:image\/png;base64,/, ""); });
@@ -1264,6 +1266,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
         });
         block.querySelector(".btn-quitar-fa").addEventListener("click", function(){
           block.remove();
+          if (btnAgregarFirmante) btnAgregarFirmante.disabled = false;
         });
       }
       if (btnAgregarFirmante) btnAgregarFirmante.addEventListener("click", addFirmanteBlock);
