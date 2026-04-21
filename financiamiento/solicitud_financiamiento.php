@@ -25,6 +25,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
       }catch(e){}
     })();
   </script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
 
   <style>
     :root{
@@ -557,6 +558,119 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
     .visual-dock.is-open .visual-tab-label{
       display: inline-block;
     }
+
+    /* Solapa de identificación (captura cédula/firma) */
+    .id-dock{
+      position: fixed;
+      top: 56px;
+      right: 0;
+      z-index: 9999;
+      max-width: min(100vw - 8px, 380px);
+      width: fit-content;
+      pointer-events: none;
+    }
+    .id-dock-slide{
+      display: flex;
+      flex-direction: row;
+      align-items: flex-start;
+      justify-content: flex-end;
+      filter: drop-shadow(-6px 8px 22px rgba(0,0,0,.22));
+      pointer-events: none;
+    }
+    .id-panel{
+      width: min(340px, calc(100vw - 52px));
+      min-width: 0;
+      padding: 14px 16px;
+      border-radius: 14px 0 0 14px;
+      border: 1px solid var(--line);
+      border-right: 0;
+      background: var(--card);
+      color: var(--text);
+      transform: translateX(100%);
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: transform .25s ease, opacity .2s ease, visibility .2s ease;
+    }
+    .id-dock.is-open{ pointer-events: auto; }
+    .id-dock.is-open .id-dock-slide{ pointer-events: auto; }
+    .id-dock.is-open .id-panel{
+      transform: translateX(0);
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+    .id-tab{
+      flex: 0 0 34px;
+      width: 34px;
+      margin: 0;
+      padding: 8px 4px;
+      border: 1px solid var(--line);
+      border-right: 0;
+      border-radius: 12px 0 0 12px;
+      background: linear-gradient(165deg, rgba(16,185,129,.35), rgba(15,27,51,.92));
+      color: var(--text);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: inherit;
+      pointer-events: auto;
+      transition: width .2s ease;
+    }
+    .id-dock.is-open .id-tab{
+      width: auto;
+      min-width: 34px;
+      max-width: 160px;
+      padding: 8px 10px;
+    }
+    .id-tab-label{
+      display: none;
+      font-size: calc(11px * var(--fs-scale));
+      font-weight: 800;
+      line-height: 1.2;
+      text-align: center;
+      margin-left: 8px;
+    }
+    .id-dock.is-open .id-tab-label{ display: inline-block; }
+    .id-tab-icon{
+      font-size: calc(15px * var(--fs-scale));
+      line-height: 1;
+    }
+    .id-action-row{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .id-mini-preview{
+      margin-top: 10px;
+      border: 1px dashed var(--line);
+      border-radius: 10px;
+      min-height: 90px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      background: rgba(255,255,255,.03);
+    }
+    .id-mini-preview img{
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+    .signature-trace-bg{
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      max-width: 90%;
+      max-height: 90%;
+      opacity: .32;
+      pointer-events: none;
+      z-index: 0;
+    }
+    #firmaCanvas{ z-index: 1; }
   </style>
 </head>
 
@@ -1055,6 +1169,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
             <label class="d-block mb-2"><strong>Firma con el dedo (obligatorio)</strong></label>
             <p class="subtitle mb-2" style="font-size:12px;color:var(--muted)">Firme en todo el recuadro con el dedo o el mouse. Luego confirme abajo.</p>
             <div class="signature-wrap" style="border:2px solid rgba(255,255,255,.2);border-radius:12px;background:rgba(0,0,0,.2);touch-action:none;overflow:hidden;">
+              <img id="tracingBackgroundFin" class="signature-trace-bg d-none" src="" alt="Firma guía para calcar">
               <canvas id="firmaCanvas" width="500" height="180" style="display:block;width:100%;height:180px;cursor:crosshair;border-radius:10px;touch-action:none;"></canvas>
             </div>
             <div style="margin-top:8px;">
@@ -1121,8 +1236,66 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
     </div>
   </div>
 
+  <div class="id-dock" id="idDock" aria-label="Captura de identificación">
+    <div class="id-dock-slide">
+      <div class="id-panel" role="region" aria-labelledby="idPanelTitle">
+        <h2 class="visual-panel-title" id="idPanelTitle">Captura de identificación</h2>
+        <p class="visual-panel-hint">Toma una foto de cédula, recorta el documento y luego recorta la firma para calcarla al final.</p>
+        <input type="file" id="idCedulaInput" accept="image/*" capture="environment" class="d-none">
+        <div class="id-action-row">
+          <button type="button" class="btn btn-sm btn-primary" id="idBtnTomarFoto">
+            <i class="fas fa-camera me-1"></i>Tomar foto
+          </button>
+          <button type="button" class="btn btn-sm btn-outline-primary" id="idBtnRecortarDoc" disabled>
+            <i class="fas fa-crop-alt me-1"></i>Recortar cédula
+          </button>
+          <button type="button" class="btn btn-sm btn-outline-success" id="idBtnRecortarFirma" disabled>
+            <i class="fas fa-signature me-1"></i>Recortar firma
+          </button>
+        </div>
+        <div class="id-mini-preview" id="idMiniPreviewWrap">
+          <small class="text-muted">Aún no hay imagen de cédula</small>
+        </div>
+      </div>
+      <button type="button" class="id-tab" id="idDockTab" aria-expanded="false" title="Captura de identificación">
+        <span class="id-tab-icon" aria-hidden="true">🪪</span>
+        <span class="id-tab-label">Identificación</span>
+      </button>
+    </div>
+  </div>
+
+  <div id="idCropperModal" class="d-none" style="position:fixed;inset:0;z-index:11000;background:rgba(2,6,23,.82);">
+    <div style="max-width:960px;margin:4vh auto;background:#111827;border:1px solid rgba(255,255,255,.2);border-radius:14px;overflow:hidden;">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#1f2937;color:#fff;">
+        <h5 class="mb-0 fw-bold" id="idCropperTitle"><i class="fas fa-crop-alt me-2"></i>Recortar</h5>
+        <button type="button" class="btn btn-sm btn-outline-light" id="idCropCloseBtn">Cerrar</button>
+      </div>
+      <div style="padding:10px;background:#0b1220;max-height:60vh;overflow:auto;">
+        <img id="idImageToCrop" src="" alt="Imagen para recortar" style="max-width:100%;display:block;margin:0 auto;">
+      </div>
+      <div style="padding:12px;background:#f8fafc;">
+        <div class="d-flex justify-content-center gap-3 mb-2 d-none" id="idRotateActions">
+          <button type="button" class="btn btn-secondary rounded-circle" id="idRotateLeftBtn" title="Girar a la izquierda">
+            <i class="fas fa-undo"></i>
+          </button>
+          <button type="button" class="btn btn-secondary rounded-circle" id="idRotateRightBtn" title="Girar a la derecha">
+            <i class="fas fa-redo"></i>
+          </button>
+        </div>
+        <p class="text-muted small mb-3 text-center" id="idCropperHelp">Ajusta el recuadro.</p>
+        <div class="d-flex justify-content-between">
+          <button type="button" class="btn btn-outline-secondary rounded-pill px-4" id="idCropCancelBtn">Cancelar</button>
+          <button type="button" class="btn btn-primary rounded-pill px-4 fw-bold shadow" id="idCropApplyBtn">
+            <i class="fas fa-check me-2"></i>Aplicar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
   <script>
     (function(){
       var TOKEN_LINK = "<?php echo $tokenLink !== '' ? addslashes($tokenLink) : ''; ?>";
@@ -1154,6 +1327,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
       var canvas = document.getElementById("firmaCanvas");
       var firmaDataInput = document.getElementById("firmaData");
       var btnLimpiarFirma = document.getElementById("btnLimpiarFirma");
+      var tracingBackgroundFin = document.getElementById("tracingBackgroundFin");
       function signatureInkColor(){
         try{
           var v = getComputedStyle(document.documentElement).getPropertyValue("--ink-signature").trim();
@@ -1196,6 +1370,142 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
         if (canvas) { var ctx = canvas.getContext("2d"); ctx.clearRect(0, 0, canvas.width, canvas.height); }
         if (firmaDataInput) firmaDataInput.value = "";
       });
+
+      // Captura de identificación (cédula + firma para calcar)
+      var idDock = document.getElementById("idDock");
+      var idDockTab = document.getElementById("idDockTab");
+      var idCedulaInput = document.getElementById("idCedulaInput");
+      var idBtnTomarFoto = document.getElementById("idBtnTomarFoto");
+      var idBtnRecortarDoc = document.getElementById("idBtnRecortarDoc");
+      var idBtnRecortarFirma = document.getElementById("idBtnRecortarFirma");
+      var idMiniPreviewWrap = document.getElementById("idMiniPreviewWrap");
+      var idCropperModal = document.getElementById("idCropperModal");
+      var idImageToCrop = document.getElementById("idImageToCrop");
+      var idCropperTitle = document.getElementById("idCropperTitle");
+      var idCropperHelp = document.getElementById("idCropperHelp");
+      var idRotateActions = document.getElementById("idRotateActions");
+      var idRotateLeftBtn = document.getElementById("idRotateLeftBtn");
+      var idRotateRightBtn = document.getElementById("idRotateRightBtn");
+      var idCropApplyBtn = document.getElementById("idCropApplyBtn");
+      var idCropCancelBtn = document.getElementById("idCropCancelBtn");
+      var idCropCloseBtn = document.getElementById("idCropCloseBtn");
+
+      var idOriginalImageSrc = "";
+      var idDocCroppedData = "";
+      var idCropper = null;
+      var idCropMode = "document";
+
+      function setIdPreviewImage(src){
+        if (!idMiniPreviewWrap) return;
+        if (!src){
+          idMiniPreviewWrap.innerHTML = '<small class="text-muted">Aún no hay imagen de cédula</small>';
+          return;
+        }
+        idMiniPreviewWrap.innerHTML = '<img src="' + src + '" alt="Vista previa de cédula">';
+      }
+
+      function openIdCropper(mode){
+        if (!idCropperModal || !idImageToCrop || !window.Cropper) {
+          showToast("No se pudo abrir el recorte en este navegador.", "err");
+          return;
+        }
+        idCropMode = mode === "signature" ? "signature" : "document";
+        if (idCropMode === "document"){
+          if (!idOriginalImageSrc) {
+            showToast("Primero tome la foto de la cédula.", "err");
+            return;
+          }
+          idCropperTitle.innerHTML = '<i class="fas fa-crop-alt me-2"></i>Recortar cédula';
+          idCropperHelp.textContent = "Ajusta el marco para dejar solo el documento.";
+          idRotateActions.classList.remove("d-none");
+          idImageToCrop.src = idOriginalImageSrc;
+        } else {
+          var srcFirma = idDocCroppedData || idOriginalImageSrc;
+          if (!srcFirma) {
+            showToast("Primero capture y recorte la cédula.", "err");
+            return;
+          }
+          idCropperTitle.innerHTML = '<i class="fas fa-signature me-2"></i>Recortar firma';
+          idCropperHelp.textContent = "Ajusta el recorte para que quede solo la firma.";
+          idRotateActions.classList.add("d-none");
+          idImageToCrop.src = srcFirma;
+        }
+
+        idCropperModal.classList.remove("d-none");
+        setTimeout(function(){
+          if (idCropper) {
+            idCropper.destroy();
+            idCropper = null;
+          }
+          idCropper = new Cropper(idImageToCrop, {
+            viewMode: 1,
+            autoCropArea: idCropMode === "document" ? 0.9 : 0.2,
+            guides: true,
+            background: false,
+            responsive: true,
+            rotatable: true
+          });
+        }, 20);
+      }
+
+      function closeIdCropper(){
+        if (idCropper) {
+          idCropper.destroy();
+          idCropper = null;
+        }
+        if (idCropperModal) idCropperModal.classList.add("d-none");
+      }
+
+      if (idBtnTomarFoto && idCedulaInput) {
+        idBtnTomarFoto.addEventListener("click", function(){ idCedulaInput.click(); });
+      }
+      if (idCedulaInput) {
+        idCedulaInput.addEventListener("change", function(e){
+          var file = e.target.files && e.target.files[0];
+          if (!file) return;
+          if (!file.type || file.type.indexOf("image/") !== 0) {
+            showToast("Seleccione una imagen válida.", "err");
+            return;
+          }
+          var reader = new FileReader();
+          reader.onload = function(ev){
+            idOriginalImageSrc = String(ev.target && ev.target.result || "");
+            idDocCroppedData = "";
+            setIdPreviewImage(idOriginalImageSrc);
+            if (idBtnRecortarDoc) idBtnRecortarDoc.disabled = false;
+            if (idBtnRecortarFirma) idBtnRecortarFirma.disabled = false;
+            openIdCropper("document");
+          };
+          reader.readAsDataURL(file);
+        });
+      }
+      if (idBtnRecortarDoc) idBtnRecortarDoc.addEventListener("click", function(){ openIdCropper("document"); });
+      if (idBtnRecortarFirma) idBtnRecortarFirma.addEventListener("click", function(){ openIdCropper("signature"); });
+      if (idRotateLeftBtn) idRotateLeftBtn.addEventListener("click", function(){ if (idCropper) idCropper.rotate(-90); });
+      if (idRotateRightBtn) idRotateRightBtn.addEventListener("click", function(){ if (idCropper) idCropper.rotate(90); });
+      if (idCropCancelBtn) idCropCancelBtn.addEventListener("click", closeIdCropper);
+      if (idCropCloseBtn) idCropCloseBtn.addEventListener("click", closeIdCropper);
+
+      if (idCropApplyBtn) {
+        idCropApplyBtn.addEventListener("click", function(){
+          if (!idCropper) return;
+          var cropCanvas = idCropper.getCroppedCanvas({ maxWidth: 2000, maxHeight: 2000 });
+          if (!cropCanvas) return;
+          if (idCropMode === "document"){
+            idDocCroppedData = cropCanvas.toDataURL("image/jpeg", 0.85);
+            setIdPreviewImage(idDocCroppedData);
+            showToast("Documento recortado correctamente.", "ok");
+          } else {
+            var firmaRecortada = cropCanvas.toDataURL("image/png");
+            if (tracingBackgroundFin) {
+              tracingBackgroundFin.src = firmaRecortada;
+              tracingBackgroundFin.classList.remove("d-none");
+            }
+            showToast("Firma recortada lista para calcar.", "ok");
+          }
+          closeIdCropper();
+        });
+      }
 
       // Firmantes adicionales
       var firmantesAdicionales = [];
@@ -1910,6 +2220,16 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
         setTimeout(function(){
           syncClienteNacimientoVisual();
           syncConyugeNacimientoVisual();
+          if (tracingBackgroundFin) {
+            tracingBackgroundFin.src = "";
+            tracingBackgroundFin.classList.add("d-none");
+          }
+          idOriginalImageSrc = "";
+          idDocCroppedData = "";
+          if (idCedulaInput) idCedulaInput.value = "";
+          setIdPreviewImage("");
+          if (idBtnRecortarDoc) idBtnRecortarDoc.disabled = true;
+          if (idBtnRecortarFirma) idBtnRecortarFirma.disabled = true;
         }, 0);
       });
       window.addEventListener("beforeunload", function(){ try{ saveDraft("auto"); }catch(e){} });
@@ -2091,7 +2411,30 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
         });
       }
 
+      function initIdDock(){
+        if (!idDock || !idDockTab) return;
+        idDockTab.addEventListener("click", function(e){
+          e.stopPropagation();
+          var open = idDock.classList.toggle("is-open");
+          idDockTab.setAttribute("aria-expanded", open ? "true" : "false");
+        });
+        document.addEventListener("click", function(e){
+          if (!idDock.contains(e.target)){
+            idDock.classList.remove("is-open");
+            idDockTab.setAttribute("aria-expanded", "false");
+          }
+        });
+        idDock.addEventListener("keydown", function(e){
+          if (e.key === "Escape"){
+            idDock.classList.remove("is-open");
+            idDockTab.setAttribute("aria-expanded", "false");
+            closeIdCropper();
+          }
+        });
+      }
+
       initVisualPreferences();
+      initIdDock();
       init();
     })();
   </script>

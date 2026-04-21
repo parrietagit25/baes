@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Captura de Cédula y Firma</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/style.css">
+    <!-- Cropper.js CSS -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet">
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4 shadow-sm">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="index.html">
+                <i class="fas fa-id-card me-2"></i>Validación de Identidad
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active fw-semibold" aria-current="page" href="index.html">
+                            <i class="fas fa-camera-retro me-1"></i> Capturar
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="registros.php">
+                            <i class="fas fa-list-alt me-1"></i> Ver Registros
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container pb-5">
+        <div class="row justify-content-center">
+            <div class="col-md-8 col-lg-6">
+                
+                <form id="idForm" enctype="multipart/form-data">
+                    
+                    <!-- Section: ID Capture -->
+                    <div class="card shadow-sm mb-4 border-0 rounded-4">
+                        <div class="card-body p-4 text-center">
+                            <h5 class="card-title mb-3 fw-bold text-dark">Foto de la Cédula</h5>
+                            <p class="text-muted small">Toma una foto clara y enfocada de tu documento oficial.</p>
+                            
+                            <div class="upload-container mb-3 position-relative">
+                                <input type="file" id="cedulaInput" accept="image/*" capture="environment" class="d-none" required>
+                                <label for="cedulaInput" class="upload-area rounded-3 p-4 d-flex flex-column align-items-center justify-content-center bg-light" style="border: 2px dashed #0d6efd; cursor: pointer; min-height: 220px; transition: all 0.3s ease;">
+                                    <i class="fas fa-camera fa-3x text-primary mb-3" id="uploadIcon"></i>
+                                    <span id="uploadText" class="fw-semibold text-primary">Tocar para abrir cámara</span>
+                                    <img id="imagePreview" src="" alt="Vista previa" class="img-fluid rounded-3 d-none shadow-sm" style="max-height: 300px;">
+                                </label>
+                            </div>
+                            
+                            <!-- Hidden inputs to store base64 data -->
+                            <input type="hidden" id="cedulaEditadaInput" name="cedula_editada" required>
+                            <input type="hidden" id="firmaExtraidaInput" name="firma_extraida">
+                            
+                            <!-- Action Buttons for the Photo -->
+                            <div id="photoActionsContainer" class="d-none mt-3">
+                                <div class="d-flex justify-content-center gap-2 mb-3">
+                                    <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3" id="editDocBtn">
+                                        <i class="fas fa-crop me-1"></i>Editar Foto
+                                    </button>
+                                    <button type="button" class="btn btn-outline-success btn-sm rounded-pill px-3" id="extractSignatureBtn">
+                                        <i class="fas fa-signature me-1"></i>Extraer Firma
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div id="croppedResultContainer" class="d-none mt-2">
+                                <p class="text-success small fw-bold mb-1"><i class="fas fa-check-circle me-1"></i>Firma lista para calcar</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section: Signature Capture -->
+                    <div class="card shadow-sm mb-4 border-0 rounded-4">
+                        <div class="card-body p-4 text-center">
+                            <h5 class="card-title mb-3 fw-bold text-dark">Firma Digital</h5>
+                            <p class="text-muted small">Dibuja tu firma en el recuadro de abajo. Debe ser lo más parecida posible a la de tu documento.</p>
+                            
+                            <div class="signature-container border border-2 rounded-3 bg-white position-relative shadow-inner overflow-hidden" style="height: 220px; touch-action: none;">
+                                <img id="tracingBackground" class="tracing-bg d-none" src="" alt="Firma de fondo">
+                                <canvas id="signaturePad" class="position-absolute top-0 start-0 w-100 h-100"></canvas>
+                            </div>
+                            <div class="d-flex justify-content-end mt-3">
+                                <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3" id="clearSignature">
+                                    <i class="fas fa-eraser me-1"></i>Limpiar Firma
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div class="d-grid gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary btn-lg rounded-pill fw-bold shadow-lg text-uppercase" id="submitBtn">
+                            <i class="fas fa-cloud-upload-alt me-2"></i>Procesar Datos
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Loading State & Results -->
+                <div id="loadingOverlay" class="d-none text-center mt-5 p-4 rounded-4 bg-white shadow-sm border">
+                    <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <h5 class="fw-bold text-dark">Analizando Documento...</h5>
+                    <p class="text-muted small mb-0">La inteligencia artificial está extrayendo tus datos. Esto puede tomar unos segundos.</p>
+                </div>
+
+                <div id="resultsCard" class="card shadow-lg mt-5 border-0 rounded-4 d-none">
+                    <div class="card-header bg-success text-white rounded-top-4 p-3 d-flex align-items-center">
+                        <i class="fas fa-check-circle fa-2x me-3"></i>
+                        <h5 class="mb-0 fw-bold">Verificación Exitosa</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div id="extractedData"></div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Universal Cropper Modal -->
+    <div class="modal fade" id="cropperModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content rounded-4 border-0 shadow-lg">
+                <div class="modal-header bg-primary text-white border-0 rounded-top-4">
+                    <h5 class="modal-title fw-bold" id="cropperModalLabel"><i class="fas fa-crop-alt me-2"></i>Recortar</h5>
+                </div>
+                <div class="modal-body p-0 bg-dark position-relative">
+                    <div class="img-container p-3" style="max-height: 60vh;">
+                        <img id="imageToCrop" src="" alt="Picture" class="img-fluid w-100">
+                    </div>
+                </div>
+                <div class="modal-footer bg-light border-0 rounded-bottom-4 flex-column p-3">
+                    <div class="d-flex w-100 justify-content-center gap-3 mb-3 d-none" id="rotateActions">
+                        <button type="button" class="btn btn-secondary rounded-circle" id="rotateLeftBtn" title="Girar a la izquierda">
+                            <i class="fas fa-undo"></i>
+                        </button>
+                        <button type="button" class="btn btn-secondary rounded-circle" id="rotateRightBtn" title="Girar a la derecha">
+                            <i class="fas fa-redo"></i>
+                        </button>
+                    </div>
+                    <p class="text-muted small mb-3 w-100 text-center" id="cropperHelperText">Ajusta el recuadro.</p>
+                    <div class="d-flex w-100 justify-content-between">
+                        <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn btn-primary rounded-pill px-4 fw-bold shadow" id="cropBtn">
+                            <i class="fas fa-check me-2"></i>Aplicar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Signature Pad -->
+    <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.5/dist/signature_pad.umd.min.js"></script>
+    <!-- Cropper.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+    <!-- SweetAlert2 for nice alerts -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- Custom JS -->
+    <script src="js/app.js"></script>
+</body>
+</html>

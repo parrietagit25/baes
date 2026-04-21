@@ -1,0 +1,92 @@
+body {
+    background-color: #f8f9fa;
+    font-family: 'Inter', sans-serif;
+    color: #333;
+}
+
+.upload-area:hover {
+    background-color: #e9ecef !important;
+    border-color: #0a58ca !important;
+}
+
+.upload-area img {
+    object-fit: contain;
+    width: 100%;
+    border-radius: 8px;
+}
+
+.shadow-inner {
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.06);
+}
+
+canvas#signaturePad {
+    width: 100%;
+    height: 100%;
+    cursor: crosshair;
+    border-radius: 0.3rem;
+}
+
+.card {
+    transition: transform 0.2s ease-in-out;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+    border: none;
+}
+
+.btn-primary:hover {
+    background: linear-gradient(135deg, #0b5ed7 0%, #084298 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
+    transition: all 0.3s;
+}
+
+/* Custom list styling for results */
+.list-group-item {
+    border-left: 0;
+    border-right: 0;
+    padding: 1rem 1.5rem;
+}
+
+.list-group-item:first-child {
+    border-top: 0;
+}
+
+/* Thumbnail styles for the records table */
+.thumb-img {
+    width: 60px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: 8px;
+    cursor: pointer;
+    border: 1px solid #dee2e6;
+    transition: transform 0.2s;
+}
+
+.thumb-img:hover {
+    transform: scale(1.1);
+    box-shadow: 0 .125rem .25rem rgba(0,0,0,.075);
+}
+
+.table-responsive {
+    border-radius: 12px;
+    box-shadow: 0 .125rem .25rem rgba(0,0,0,.075);
+}
+
+/* Background image for signature tracing */
+.tracing-bg {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    max-width: 90%;
+    max-height: 90%;
+    opacity: 0.35; /* Opaque enough to trace, light enough to see drawing */
+    pointer-events: none; /* Let clicks pass through to canvas */
+    z-index: 0;
+}
+
+#signaturePad {
+    z-index: 1; /* Above the background */
+}
