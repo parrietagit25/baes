@@ -637,6 +637,113 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
       font-size: calc(15px * var(--fs-scale));
       line-height: 1;
     }
+
+    /* Solapa de adjuntos (clip) — mismo patrón que identificación */
+    .attach-dock{
+      position: fixed;
+      top: 102px;
+      right: 0;
+      z-index: 9998;
+      max-width: min(100vw - 8px, 380px);
+      width: fit-content;
+      pointer-events: none;
+    }
+    .attach-dock-slide{
+      display: flex;
+      flex-direction: row;
+      align-items: flex-start;
+      justify-content: flex-end;
+      filter: drop-shadow(-6px 8px 22px rgba(0,0,0,.22));
+      pointer-events: none;
+    }
+    .attach-panel{
+      width: min(340px, calc(100vw - 52px));
+      min-width: 0;
+      padding: 14px 16px;
+      border-radius: 14px 0 0 14px;
+      border: 1px solid var(--line);
+      border-right: 0;
+      background: var(--card);
+      color: var(--text);
+      transform: translateX(100%);
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: transform .25s ease, opacity .2s ease, visibility .2s ease;
+    }
+    .attach-dock.is-open{ pointer-events: auto; }
+    .attach-dock.is-open .attach-dock-slide{ pointer-events: auto; }
+    .attach-dock.is-open .attach-panel{
+      transform: translateX(0);
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+    .attach-tab{
+      flex: 0 0 34px;
+      width: 34px;
+      margin: 0;
+      padding: 8px 4px;
+      border: 1px solid var(--line);
+      border-right: 0;
+      border-radius: 12px 0 0 12px;
+      background: linear-gradient(165deg, rgba(245,158,11,.42), rgba(15,27,51,.92));
+      color: var(--text);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: inherit;
+      pointer-events: auto;
+      transition: width .2s ease;
+      position: relative;
+    }
+    html.theme-light .attach-tab{
+      background: linear-gradient(165deg, rgba(245,158,11,.45), #f8fafc);
+      color: var(--text);
+    }
+    .attach-dock.is-open .attach-tab{
+      width: auto;
+      min-width: 34px;
+      max-width: 160px;
+      padding: 8px 10px;
+    }
+    .attach-tab-label{
+      display: none;
+      font-size: calc(11px * var(--fs-scale));
+      font-weight: 800;
+      line-height: 1.2;
+      text-align: center;
+      margin-left: 6px;
+    }
+    .attach-dock.is-open .attach-tab-label{ display: inline-block; }
+    .attach-tab-icon{
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .attach-tab-icon svg{
+      display: block;
+    }
+    .attach-tab-badge{
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      min-width: 16px;
+      height: 16px;
+      padding: 0 4px;
+      border-radius: 999px;
+      background: #dc2626;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 800;
+      line-height: 16px;
+      text-align: center;
+      display: none;
+      pointer-events: none;
+    }
+    .attach-tab-badge.is-on{ display: block; }
     .id-action-row{
       display: flex;
       flex-wrap: wrap;
@@ -1292,15 +1399,12 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
         <div class="sectionTitle">
           <div>
             <h2>F. Adjuntos</h2>
-            <p>Puede adjuntar uno o varios documentos (opcional). Se guardan con su solicitud en el sistema y se envían por correo junto al PDF. Si usó la solapa <strong>Identificación</strong> y recortó la cédula, esa imagen también se incluye al enviar.</p>
+            <p>Los documentos se agregan desde la solapa <strong>Adjuntos</strong> en el borde derecho (icono de clip). Se guardan en este dispositivo y se envían con la solicitud (correo y sistema). La imagen de cédula de la solapa <strong>Identificación</strong> también se incluye si la capturó.</p>
           </div>
         </div>
         <div class="grid">
           <div class="col-12">
-            <label for="adjuntosExtraInput">Seleccionar archivos (máx. 15, hasta 10 MB c/u)</label>
-            <input type="file" id="adjuntosExtraInput" name="adjuntos_extra_input" multiple accept=".pdf,.jpg,.jpeg,.png,.gif,.doc,.docx,.xls,.xlsx,.txt,application/pdf,image/*" class="adjuntos-file-input" />
-            <p class="hint" style="margin-top:6px">Formatos: PDF, imágenes (JPG, PNG, GIF), Word, Excel, texto.</p>
-            <ul id="adjuntosExtraList" class="adjuntos-extra-list" aria-live="polite"></ul>
+            <p class="hint" id="adjuntosResumenPaso" style="margin-top:4px;font-size:calc(14px * var(--fs-scale))">Abra la solapa del clip a la derecha para elegir archivos.</p>
           </div>
         </div>
         <div class="rowActions">
@@ -1369,6 +1473,26 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
       <button type="button" class="id-tab" id="idDockTab" aria-expanded="false" title="Captura de identificación">
         <span class="id-tab-icon" aria-hidden="true">🪪</span>
         <span class="id-tab-label">Identificación</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="attach-dock" id="attachDock" aria-label="Adjuntos">
+    <div class="attach-dock-slide">
+      <div class="attach-panel" role="region" aria-labelledby="attachPanelTitle">
+        <h2 class="visual-panel-title" id="attachPanelTitle">Adjuntos</h2>
+        <p class="visual-panel-hint">Adjunte comprobantes, PDF u otros documentos (opcional). Máximo 15 archivos, 10 MB cada uno.</p>
+        <label for="adjuntosExtraInput" class="visual-label-inline" style="margin-bottom:6px">Seleccionar archivos</label>
+        <input type="file" id="adjuntosExtraInput" name="adjuntos_extra_input" multiple accept=".pdf,.jpg,.jpeg,.png,.gif,.doc,.docx,.xls,.xlsx,.txt,application/pdf,image/*" class="adjuntos-file-input" />
+        <p class="hint" style="margin-top:6px">PDF, imágenes, Word, Excel o texto.</p>
+        <ul id="adjuntosExtraList" class="adjuntos-extra-list" aria-live="polite"></ul>
+      </div>
+      <button type="button" class="attach-tab" id="attachDockTab" aria-expanded="false" title="Adjuntar documentos">
+        <span class="attach-tab-badge" id="attachDockBadge" aria-hidden="true"></span>
+        <span class="attach-tab-icon" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.2-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+        </span>
+        <span class="attach-tab-label">Adjuntos</span>
       </button>
     </div>
   </div>
@@ -1534,6 +1658,28 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           li.appendChild(btn);
           adjuntosExtraListEl.appendChild(li);
         });
+        var badge = document.getElementById("attachDockBadge");
+        if (badge){
+          if (extraAdjuntosList.length > 0){
+            badge.textContent = String(extraAdjuntosList.length);
+            badge.classList.add("is-on");
+          } else {
+            badge.textContent = "";
+            badge.classList.remove("is-on");
+          }
+        }
+        var summaryPaso = document.getElementById("adjuntosResumenPaso");
+        if (summaryPaso){
+          summaryPaso.textContent = extraAdjuntosList.length
+            ? "En lista: " + extraAdjuntosList.length + " archivo(s). Se enviarán al pulsar Enviar en el último paso."
+            : "Aún no hay archivos. Abra la solapa del clip a la derecha para elegir documentos.";
+        }
+        var attachTab = document.getElementById("attachDockTab");
+        if (attachTab){
+          attachTab.title = extraAdjuntosList.length
+            ? "Adjuntos: " + extraAdjuntosList.length + " archivo(s) en lista"
+            : "Adjuntar documentos";
+        }
       }
 
       function handleAdjuntosExtraInputChange(){
@@ -2663,6 +2809,16 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           e.stopPropagation();
           var open = dock.classList.toggle("is-open");
           tab.setAttribute("aria-expanded", open ? "true" : "false");
+          if (open){
+            var idd = document.getElementById("idDock");
+            var ad = document.getElementById("attachDock");
+            var it = document.getElementById("idDockTab");
+            var at = document.getElementById("attachDockTab");
+            if (idd) idd.classList.remove("is-open");
+            if (ad) ad.classList.remove("is-open");
+            if (it) it.setAttribute("aria-expanded", "false");
+            if (at) at.setAttribute("aria-expanded", "false");
+          }
         });
         document.addEventListener("click", function(e){
           if (!dock.contains(e.target)){
@@ -2686,6 +2842,12 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           e.stopPropagation();
           var open = idDock.classList.toggle("is-open");
           idDockTab.setAttribute("aria-expanded", open ? "true" : "false");
+          if (open){
+            var ad = document.getElementById("attachDock");
+            var at = document.getElementById("attachDockTab");
+            if (ad) ad.classList.remove("is-open");
+            if (at) at.setAttribute("aria-expanded", "false");
+          }
         });
         document.addEventListener("click", function(e){
           if (!idDock.contains(e.target)){
@@ -2702,8 +2864,42 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
         });
       }
 
+      function initAttachDock(){
+        var dock = document.getElementById("attachDock");
+        var tab = document.getElementById("attachDockTab");
+        if (!dock || !tab) return;
+        tab.addEventListener("click", function(e){
+          e.stopPropagation();
+          var open = dock.classList.toggle("is-open");
+          tab.setAttribute("aria-expanded", open ? "true" : "false");
+          if (open){
+            var vd = document.getElementById("visualDock");
+            var idd = document.getElementById("idDock");
+            var vt = document.getElementById("visualDockTab");
+            var it = document.getElementById("idDockTab");
+            if (vd) vd.classList.remove("is-open");
+            if (idd) idd.classList.remove("is-open");
+            if (vt) vt.setAttribute("aria-expanded", "false");
+            if (it) it.setAttribute("aria-expanded", "false");
+          }
+        });
+        document.addEventListener("click", function(e){
+          if (!dock.contains(e.target)){
+            dock.classList.remove("is-open");
+            tab.setAttribute("aria-expanded", "false");
+          }
+        });
+        dock.addEventListener("keydown", function(e){
+          if (e.key === "Escape"){
+            dock.classList.remove("is-open");
+            tab.setAttribute("aria-expanded", "false");
+          }
+        });
+      }
+
       initVisualPreferences();
       initIdDock();
+      initAttachDock();
       init();
     })();
   </script>
