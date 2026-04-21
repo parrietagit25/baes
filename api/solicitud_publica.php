@@ -143,6 +143,33 @@ function toInt($v, $default = null) {
     return is_numeric($v) ? (int)$v : $default;
 }
 
+/**
+ * Normaliza fechas de entrada a Y-m-d.
+ * Acepta:
+ * - Y-m-d
+ * - m/d/Y (formulario público actual)
+ * - d/m/Y (fallback)
+ */
+function normalizeDateToSql($v) {
+    $x = trim((string)$v);
+    if ($x === '') return null;
+
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $x)) {
+        $dt = DateTime::createFromFormat('Y-m-d', $x);
+        return ($dt && $dt->format('Y-m-d') === $x) ? $x : null;
+    }
+
+    if (preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $x)) {
+        $m = DateTime::createFromFormat('m/d/Y', $x);
+        if ($m && $m->format('m/d/Y') === $x) return $m->format('Y-m-d');
+
+        $d = DateTime::createFromFormat('d/m/Y', $x);
+        if ($d && $d->format('d/m/Y') === $x) return $d->format('Y-m-d');
+    }
+
+    return null;
+}
+
 require_once __DIR__ . '/../includes/pdf_financiamiento.php';
 
 $solicitudId = 0;
@@ -237,7 +264,7 @@ if ($pdoReg) {
         $vDate = function($key) use ($input) {
             $x = trim((string)($input[$key] ?? ''));
             if ($x === '') return null;
-            return $x;
+            return normalizeDateToSql($x);
         };
         $stmtReg = $pdoReg->prepare("
             INSERT INTO financiamiento_registros (
