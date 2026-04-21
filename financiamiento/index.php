@@ -659,6 +659,38 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
       height: auto;
       display: block;
     }
+    .adjuntos-file-input{
+      padding: 10px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: rgba(15,27,51,.5);
+      color: var(--text);
+      width: 100%;
+      font-size: calc(13px * var(--fs-scale));
+    }
+    html.theme-light .adjuntos-file-input{
+      background: #fff;
+      color: var(--text);
+    }
+    .adjuntos-extra-list{
+      list-style: none;
+      margin: 10px 0 0;
+      padding: 0;
+      display: grid;
+      gap: 8px;
+    }
+    .adjuntos-extra-item{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.04);
+      font-size: calc(13px * var(--fs-scale));
+    }
     .signature-trace-bg{
       position: absolute;
       top: 50%;
@@ -833,7 +865,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           </div>
         </div>
         <div class="rowActions">
-          <div class="chip"><strong>Paso:</strong> 1 / 5</div>
+          <div class="chip"><strong>Paso:</strong> 1 / 6</div>
           <div class="navBtns">
             <button type="button" data-prev>Atrás</button>
             <button type="button" class="primary" data-next>Siguiente</button>
@@ -934,7 +966,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           </div>
         </div>
         <div class="rowActions">
-          <div class="chip"><strong>Paso:</strong> 2 / 5</div>
+          <div class="chip"><strong>Paso:</strong> 2 / 6</div>
           <div class="navBtns">
             <button type="button" data-prev>Atrás</button>
             <button type="button" class="primary" data-next>Siguiente</button>
@@ -997,7 +1029,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           </div>
         </div>
         <div class="rowActions">
-          <div class="chip"><strong>Paso:</strong> 3 / 5</div>
+          <div class="chip"><strong>Paso:</strong> 3 / 6</div>
           <div class="navBtns">
             <button type="button" data-prev>Atrás</button>
             <button type="button" class="primary" data-next>Siguiente</button>
@@ -1120,7 +1152,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           </div>
         </div>
         <div class="rowActions">
-          <div class="chip"><strong>Paso:</strong> 4 / 5</div>
+          <div class="chip"><strong>Paso:</strong> 4 / 6</div>
           <div class="navBtns">
             <button type="button" data-prev>Atrás</button>
             <button type="button" class="primary" data-next>Siguiente</button>
@@ -1248,7 +1280,31 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           </div>
         </div>
         <div class="rowActions">
-          <div class="chip"><strong>Paso:</strong> 5 / 5</div>
+          <div class="chip"><strong>Paso:</strong> 5 / 6</div>
+          <div class="navBtns">
+            <button type="button" data-prev>Atrás</button>
+            <button type="button" class="primary" data-next>Siguiente</button>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset data-step="5">
+        <div class="sectionTitle">
+          <div>
+            <h2>F. Adjuntos</h2>
+            <p>Puede adjuntar uno o varios documentos (opcional). Se guardan con su solicitud en el sistema y se envían por correo junto al PDF. Si usó la solapa <strong>Identificación</strong> y recortó la cédula, esa imagen también se incluye al enviar.</p>
+          </div>
+        </div>
+        <div class="grid">
+          <div class="col-12">
+            <label for="adjuntosExtraInput">Seleccionar archivos (máx. 15, hasta 10 MB c/u)</label>
+            <input type="file" id="adjuntosExtraInput" name="adjuntos_extra_input" multiple accept=".pdf,.jpg,.jpeg,.png,.gif,.doc,.docx,.xls,.xlsx,.txt,application/pdf,image/*" class="adjuntos-file-input" />
+            <p class="hint" style="margin-top:6px">Formatos: PDF, imágenes (JPG, PNG, GIF), Word, Excel, texto.</p>
+            <ul id="adjuntosExtraList" class="adjuntos-extra-list" aria-live="polite"></ul>
+          </div>
+        </div>
+        <div class="rowActions">
+          <div class="chip"><strong>Paso:</strong> 6 / 6</div>
           <div class="navBtns">
             <button type="button" data-prev>Atrás</button>
             <button type="submit" class="primary" id="btnSubmit">Enviar</button>
@@ -1374,7 +1430,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
       const btnClear = document.getElementById("btnClear");
       const btnSubmit = document.getElementById("btnSubmit");
 
-      const stepLabels = ["A. Cliente", "B. Dirección", "C. Laboral", "D. Cónyuge", "E. Referencias"];
+      const stepLabels = ["A. Cliente", "B. Dirección", "C. Laboral", "D. Cónyuge", "E. Referencias", "F. Adjuntos"];
       let step = 0;
       let toastTimer = null;
 
@@ -1447,6 +1503,73 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
 
       var idOriginalImageSrc = "";
       var idDocCroppedData = "";
+      var extraAdjuntosList = [];
+      var adjuntosExtraInput = document.getElementById("adjuntosExtraInput");
+      var adjuntosExtraListEl = document.getElementById("adjuntosExtraList");
+
+      function base64ToFile(b64, name, mime){
+        var bin = atob(b64);
+        var arr = new Uint8Array(bin.length);
+        for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+        return new File([arr], name, { type: mime || "application/octet-stream" });
+      }
+
+      function renderExtraAdjuntosList(){
+        if (!adjuntosExtraListEl) return;
+        adjuntosExtraListEl.innerHTML = "";
+        extraAdjuntosList.forEach(function(item){
+          var li = document.createElement("li");
+          li.className = "adjuntos-extra-item";
+          var span = document.createElement("span");
+          span.textContent = item.name + (item.size ? " (" + Math.round(item.size / 1024) + " KB)" : "");
+          var btn = document.createElement("button");
+          btn.type = "button";
+          btn.textContent = "Quitar";
+          btn.addEventListener("click", function(){
+            extraAdjuntosList = extraAdjuntosList.filter(function(x){ return x.id !== item.id; });
+            renderExtraAdjuntosList();
+            saveDraft("auto");
+          });
+          li.appendChild(span);
+          li.appendChild(btn);
+          adjuntosExtraListEl.appendChild(li);
+        });
+      }
+
+      function handleAdjuntosExtraInputChange(){
+        if (!adjuntosExtraInput || !adjuntosExtraInput.files) return;
+        var files = Array.prototype.slice.call(adjuntosExtraInput.files, 0);
+        var maxN = 15;
+        var maxBytes = 10 * 1024 * 1024;
+        files.forEach(function(file){
+          if (extraAdjuntosList.length >= maxN){
+            showToast("Máximo " + maxN + " archivos.", "err");
+            return;
+          }
+          if (file.size > maxBytes){
+            showToast("Archivo demasiado grande (máx. 10 MB): " + file.name, "err");
+            return;
+          }
+          var reader = new FileReader();
+          reader.onload = function(){
+            var comma = reader.result.indexOf(",");
+            var b64 = comma >= 0 ? reader.result.slice(comma + 1) : reader.result;
+            extraAdjuntosList.push({
+              id: "f_" + Date.now() + "_" + Math.random().toString(36).slice(2, 9),
+              name: file.name,
+              mime: file.type || "application/octet-stream",
+              size: file.size,
+              dataBase64: b64,
+              file: file
+            });
+            renderExtraAdjuntosList();
+            saveDraft("auto");
+          };
+          reader.onerror = function(){ showToast("No se pudo leer el archivo: " + file.name, "err"); };
+          reader.readAsDataURL(file);
+        });
+        adjuntosExtraInput.value = "";
+      }
       var idOriginalObjectUrl = "";
       var idCropper = null;
       var idCropMode = "document";
@@ -1741,6 +1864,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
         var data = {};
         form.querySelectorAll("input, select, textarea").forEach(function(el){
           if(!el.name) return;
+          if(el.type === "file") return;
           if(el.type === "checkbox"){
             data[el.name] = el.checked;
             return;
@@ -1790,14 +1914,52 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           }
         }
         syncConyugeNacimientoVisual();
+        if (data.__meta){
+          if (data.__meta.imagen_cedula){
+            idDocCroppedData = data.__meta.imagen_cedula;
+            setIdPreviewImage(idDocCroppedData);
+            if (idBtnRecortarDoc) idBtnRecortarDoc.disabled = false;
+            if (idBtnRecortarFirma) idBtnRecortarFirma.disabled = false;
+          } else {
+            idDocCroppedData = "";
+            setIdPreviewImage("");
+            if (idBtnRecortarDoc) idBtnRecortarDoc.disabled = true;
+            if (idBtnRecortarFirma) idBtnRecortarFirma.disabled = true;
+          }
+          if (Array.isArray(data.__meta.adjuntos_extra)){
+            extraAdjuntosList = data.__meta.adjuntos_extra.map(function(row, idx){
+              return {
+                id: "r_" + idx + "_" + Date.now(),
+                name: row.name || "archivo",
+                mime: row.mime || "",
+                size: 0,
+                dataBase64: row.data || "",
+                file: null
+              };
+            });
+            renderExtraAdjuntosList();
+          } else {
+            extraAdjuntosList = [];
+            renderExtraAdjuntosList();
+          }
+        }
       }
 
       function saveDraft(mode){
         var payload = readFormToObject();
+        var meta = Object.assign({}, payload.__meta || {}, { step: step, savedAt: new Date().toISOString() });
+        if (idDocCroppedData) meta.imagen_cedula = idDocCroppedData;
+        else delete meta.imagen_cedula;
+        meta.adjuntos_extra = extraAdjuntosList.map(function(it){
+          return { name: it.name, mime: it.mime, data: it.dataBase64 };
+        });
+        payload.__meta = meta;
         try {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
           saveState.textContent = mode === "manual" ? "Guardado" : "Auto-guardado";
-        } catch(e) {}
+        } catch(e) {
+          showToast("No se pudo guardar todo en este dispositivo (demasiado volumen de adjuntos). Quite algunos archivos o una imagen muy grande.", "err");
+        }
       }
 
       function aplicarCompatibilidadDireccion(payload){
@@ -2227,6 +2389,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
         var tieneConyuge = !!form.elements["tiene_conyuge"] && form.elements["tiene_conyuge"].checked;
 
         inputs.forEach(function(el){
+          if(el.type === "file") return;
           if(el.name === "cliente_nacimiento" || el.name === "cliente_edad") return;
           if(el.name === "con_nacimiento" || el.name === "con_edad") return;
           if(el.name.indexOf("con_") === 0 && !tieneConyuge) return;
@@ -2322,6 +2485,8 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           setIdPreviewImage("");
           if (idBtnRecortarDoc) idBtnRecortarDoc.disabled = true;
           if (idBtnRecortarFirma) idBtnRecortarFirma.disabled = true;
+          extraAdjuntosList = [];
+          renderExtraAdjuntosList();
         }, 0);
       });
       window.addEventListener("beforeunload", function(){ try{ saveDraft("auto"); }catch(e){} });
@@ -2331,6 +2496,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
         setupConyugeNacimientoField();
         makeChips();
         attachNavButtons();
+        if (adjuntosExtraInput) adjuntosExtraInput.addEventListener("change", handleAdjuntosExtraInputChange);
 
         var draft = loadDraft();
         if(draft){
@@ -2393,14 +2559,24 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           });
           if (faList.length) payload.firmantes_adicionales = JSON.stringify(faList);
           Object.keys(payload).forEach(function(k){ if (k.indexOf("fa_nombre_") === 0 || k.indexOf("fa_firma_") === 0) delete payload[k]; });
+          if (idDocCroppedData) payload.imagen_cedula = idDocCroppedData;
 
           btnSubmit.disabled = true;
           btnSubmit.textContent = "Enviando…";
 
+          var fd = new FormData();
+          fd.append("payload", JSON.stringify(payload));
+          extraAdjuntosList.forEach(function(it){
+            var f = it.file;
+            if (!f && it.dataBase64){
+              try { f = base64ToFile(it.dataBase64, it.name, it.mime); } catch (err) { f = null; }
+            }
+            if (f) fd.append("adjuntos_extra[]", f, it.name);
+          });
+
           fetch(API_URL, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
+            body: fd
           })
           .then(function(r){ return r.json().then(function(data){ return { ok: r.ok, data: data }; }); })
           .then(function(result){

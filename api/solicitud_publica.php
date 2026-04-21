@@ -64,9 +64,13 @@ set_error_handler(function ($severity, $message, $file, $line) {
 
 logSolPub('start');
 
-// Obtener body JSON si viene por fetch
+// JSON en body, o multipart con campo "payload" (JSON) + archivos adjuntos_extra[]
 $input = $_POST;
-if (empty($input) || !is_array($input)) {
+$ct = $_SERVER['CONTENT_TYPE'] ?? '';
+if (stripos($ct, 'multipart/form-data') !== false && isset($_POST['payload']) && is_string($_POST['payload'])) {
+    $decoded = json_decode($_POST['payload'], true);
+    $input = is_array($decoded) ? $decoded : [];
+} elseif (empty($input) || !is_array($input)) {
     $raw = file_get_contents('php://input');
     $decoded = $raw ? json_decode($raw, true) : null;
     $input = is_array($decoded) ? $decoded : [];
@@ -74,6 +78,11 @@ if (empty($input) || !is_array($input)) {
 
 // Quitar __meta del payload si existe
 unset($input['__meta']);
+$cedulaImagenDataUrl = isset($input['imagen_cedula']) ? trim((string)$input['imagen_cedula']) : '';
+if ($cedulaImagenDataUrl === '') {
+    $cedulaImagenDataUrl = null;
+}
+unset($input['imagen_cedula']);
 $token = isset($input['token']) ? trim($input['token']) : '';
 $token = $token !== '' ? urldecode($token) : '';
 $firmaBase64 = isset($input['firma']) ? $input['firma'] : '';
@@ -170,60 +179,202 @@ function normalizeDateToSql($v) {
     return null;
 }
 
+/** Columna de tamaño en adjuntos_solicitud (nombre puede variar por instalación). */
+function solPub_adjuntos_tamano_column(PDO $pdo): ?string {
+    static $col = '__unset__';
+    if ($col !== '__unset__') {
+        return $col ?: null;
+    }
+    $col = null;
+    try {
+        $dbName = $pdo->query('SELECT DATABASE()')->fetchColumn();
+        if (!$dbName) {
+            return null;
+        }
+        $stmt = $pdo->prepare("
+            SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'adjuntos_solicitud'
+              AND COLUMN_NAME IN ('tamaño_archivo','tamano_archivo','tamao_archivo')
+            LIMIT 1
+        ");
+        $stmt->execute([$dbName]);
+        $found = $stmt->fetchColumn();
+        $col = $found ?: null;
+    } catch (Throwable $e) {
+        $col = null;
+    }
+    return $col;
+}
+
+function solPub_finfo_mime(string $path): string {
+    if (function_exists('mime_content_type')) {
+        $m = @mime_content_type($path);
+        if (is_string($m) && $m !== '') {
+            return $m;
+        }
+    }
+    if (class_exists('finfo')) {
+        $fi = new finfo(FILEINFO_MIME_TYPE);
+        $m = $fi->file($path);
+        if (is_string($m) && $m !== '') {
+            return $m;
+        }
+    }
+    return 'application/octet-stream';
+}
+
+/** @return list<array{name:string,type:string,tmp_name:string,error:int,size:int}> */
+function solPub_normalize_uploaded_files(string $field): array {
+    if (!isset($_FILES[$field]) || !is_array($_FILES[$field]['name'])) {
+        return [];
+    }
+    $f = $_FILES[$field];
+    $out = [];
+    $n = count($f['name']);
+    for ($i = 0; $i < $n; $i++) {
+        $out[] = [
+            'name' => (string)$f['name'][$i],
+            'type' => (string)$f['type'][$i],
+            'tmp_name' => (string)$f['tmp_name'][$i],
+            'error' => (int)$f['error'][$i],
+            'size' => (int)$f['size'][$i],
+        ];
+    }
+    return $out;
+}
+
+/**
+ * Guarda adjuntos del formulario público en adjuntos/solicitudes/ y en adjuntos_solicitud.
+ *
+ * @return string[] rutas absolutas de archivos para adjuntar al correo
+ */
+function solPub_guardar_adjuntos_formulario_publico(PDO $pdo, int $solicitudId, int $gestorId, ?string $cedulaDataUrl): array {
+    $allowed = [
+        'image/jpeg', 'image/png', 'image/gif',
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'text/plain',
+    ];
+    $pathsOut = [];
+    $dirRel = 'adjuntos/solicitudes/';
+    $dirAbs = __DIR__ . '/../' . $dirRel;
+    if (!is_dir($dirAbs)) {
+        @mkdir($dirAbs, 0755, true);
+    }
+    $dirAbs = realpath($dirAbs) ?: $dirAbs;
+    $tamCol = solPub_adjuntos_tamano_column($pdo);
+
+    $insertRow = static function (
+        PDO $pdo,
+        int $solicitudId,
+        int $gestorId,
+        ?string $tamCol,
+        string $nombreArchivo,
+        string $nombreOriginal,
+        string $rutaDb,
+        string $mime,
+        int $size,
+        string $descripcion
+    ): void {
+        if ($tamCol) {
+            $stmt = $pdo->prepare("INSERT INTO adjuntos_solicitud (solicitud_id, usuario_id, nombre_archivo, nombre_original, ruta_archivo, tipo_archivo, `$tamCol`, descripcion) VALUES (?,?,?,?,?,?,?,?)");
+            $stmt->execute([$solicitudId, $gestorId, $nombreArchivo, $nombreOriginal, $rutaDb, $mime, $size, $descripcion !== '' ? $descripcion : null]);
+        } else {
+            $stmt = $pdo->prepare('INSERT INTO adjuntos_solicitud (solicitud_id, usuario_id, nombre_archivo, nombre_original, ruta_archivo, tipo_archivo, descripcion) VALUES (?,?,?,?,?,?,?)');
+            $stmt->execute([$solicitudId, $gestorId, $nombreArchivo, $nombreOriginal, $rutaDb, $mime, $descripcion !== '' ? $descripcion : null]);
+        }
+    };
+
+    if (is_string($cedulaDataUrl) && $cedulaDataUrl !== '' && preg_match('/^data:image\\/(jpeg|jpg|png);base64,(.+)$/is', $cedulaDataUrl, $mm)) {
+        $raw = base64_decode($mm[2], true);
+        if ($raw !== false && strlen($raw) > 200 && strlen($raw) < 15 * 1024 * 1024) {
+            $ext = (stripos($mm[1], 'png') !== false) ? 'png' : 'jpg';
+            $nombreArchivo = 'finpub_' . $solicitudId . '_cedula_' . uniqid('', true) . '.' . $ext;
+            $abs = rtrim($dirAbs, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $nombreArchivo;
+            if (file_put_contents($abs, $raw) !== false) {
+                $mime = $ext === 'png' ? 'image/png' : 'image/jpeg';
+                $size = strlen($raw);
+                $rutaDb = $dirRel . $nombreArchivo;
+                try {
+                    $insertRow($pdo, $solicitudId, $gestorId, $tamCol, $nombreArchivo, 'Identificacion-cedula.' . $ext, $rutaDb, $mime, $size, 'Identificación (formulario público)');
+                    $pathsOut[] = $abs;
+                } catch (Throwable $e) {
+                    @unlink($abs);
+                    logSolPub('adj cedula insert: ' . $e->getMessage());
+                }
+            }
+        }
+    }
+
+    $maxFiles = 15;
+    $c = 0;
+    foreach (solPub_normalize_uploaded_files('adjuntos_extra') as $row) {
+        if ($c >= $maxFiles) {
+            break;
+        }
+        if ($row['error'] !== UPLOAD_ERR_OK) {
+            continue;
+        }
+        $size = (int)$row['size'];
+        if ($size <= 0 || $size > 10 * 1024 * 1024) {
+            continue;
+        }
+        $tmp = $row['tmp_name'];
+        if ($tmp === '' || !is_uploaded_file($tmp)) {
+            continue;
+        }
+        $mime = solPub_finfo_mime($tmp);
+        if (!in_array($mime, $allowed, true)) {
+            continue;
+        }
+        $orig = $row['name'] !== '' ? basename($row['name']) : 'adjunto.bin';
+        $orig = preg_replace('/[^A-Za-z0-9._\\- ]/', '_', $orig);
+        if ($orig === '' || strlen($orig) > 200) {
+            $orig = 'adjunto.bin';
+        }
+        $ext = pathinfo($orig, PATHINFO_EXTENSION);
+        $ext = $ext !== '' ? ('.' . preg_replace('/[^a-zA-Z0-9]/', '', $ext)) : '';
+        $nombreArchivo = 'finpub_' . $solicitudId . '_' . uniqid('', true) . $ext;
+        $abs = rtrim($dirAbs, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $nombreArchivo;
+        if (!move_uploaded_file($tmp, $abs)) {
+            continue;
+        }
+        $rutaDb = $dirRel . $nombreArchivo;
+        try {
+            $insertRow($pdo, $solicitudId, $gestorId, $tamCol, $nombreArchivo, $orig, $rutaDb, $mime, $size, 'Adjunto formulario público');
+            $pathsOut[] = $abs;
+            $c++;
+        } catch (Throwable $e) {
+            @unlink($abs);
+            logSolPub('adj upload insert: ' . $e->getMessage());
+        }
+    }
+
+    return $pathsOut;
+}
+
 require_once __DIR__ . '/../includes/pdf_financiamiento.php';
 
 $solicitudId = 0;
 $emailEnviado = false;
+$pdoMain = null;
+$gestorId = null;
+$adjuntosParaCorreo = [];
 
-// 1) Envío de correos financiamiento: PDF al vendedor (token) y copia al cliente (cliente_correo)
 $emailDestinoVendedor = null;
 if ($token !== '') {
     $decoded = @base64_decode(str_replace(['-', '_'], ['+', '/'], $token), true);
-    if ($decoded === false) $decoded = @base64_decode($token, true);
+    if ($decoded === false) {
+        $decoded = @base64_decode($token, true);
+    }
     if (is_string($decoded) && filter_var($decoded, FILTER_VALIDATE_EMAIL)) {
         $emailDestinoVendedor = $decoded;
     }
 }
 $emailCliente = isset($input['cliente_correo']) && filter_var(trim($input['cliente_correo']), FILTER_VALIDATE_EMAIL) ? trim($input['cliente_correo']) : null;
-
-if ($emailDestinoVendedor !== null || $emailCliente !== null) {
-    try {
-        $pdfPath = null;
-        if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
-            require_once __DIR__ . '/../vendor/autoload.php';
-            if (class_exists('Dompdf\Dompdf')) {
-                $html = buildPdfHtmlFinanciamiento($input, $firmaBase64, $nombre);
-                $dompdf = new \Dompdf\Dompdf(['isRemoteEnabled' => true]);
-                $dompdf->loadHtml($html, 'UTF-8');
-                $dompdf->setPaper('A4', 'portrait');
-                $dompdf->render();
-                $pdfPath = sys_get_temp_dir() . '/sol_fin_' . uniqid('', true) . '.pdf';
-                file_put_contents($pdfPath, $dompdf->output());
-            }
-        }
-        if ($pdfPath && file_exists($pdfPath)) {
-            require_once __DIR__ . '/../includes/EmailService.php';
-            $emailService = new EmailService();
-            $asuntoVendedor = 'Solicitud de Financiamiento completada - ' . $nombre;
-            $cuerpoVendedor = '<p>Se ha recibido una solicitud de financiamiento completada.</p><p><strong>Cliente:</strong> ' . htmlspecialchars($nombre) . '</p><p>Ver adjunto PDF con todos los datos y la firma.</p>';
-            $asuntoCliente = 'Recibimos su Solicitud de Financiamiento - AutoMarket';
-            $cuerpoCliente = '<p>Estimado/a ' . htmlspecialchars($nombre) . ',</p><p>Hemos recibido correctamente su solicitud de financiamiento. Adjunto encontrará una copia en PDF.</p><p>Nos pondremos en contacto a la brevedad.</p><p>— AutoMarket</p>';
-
-            if ($emailDestinoVendedor !== null) {
-                $result = $emailService->enviarCorreo($emailDestinoVendedor, $asuntoVendedor, $cuerpoVendedor, '', strip_tags($cuerpoVendedor), [$pdfPath]);
-                $emailEnviado = !empty($result['success']);
-            }
-            if ($emailCliente !== null && $emailCliente !== $emailDestinoVendedor) {
-                $resultCliente = $emailService->enviarCorreo($emailCliente, $asuntoCliente, $cuerpoCliente, '', strip_tags($cuerpoCliente), [$pdfPath]);
-                if (!empty($resultCliente['success'])) $emailEnviado = true;
-            }
-            @unlink($pdfPath);
-        }
-    } catch (Exception $e) {
-        error_log('solicitud_publica email: ' . $e->getMessage());
-        logSolPub('email error: ' . $e->getMessage());
-    }
-}
 
 // 2a) Guardar en financiamiento_registros. Usa financiamiento/config_db.php o, si no existe, config/database.php (misma base motus_baes).
 $pdoReg = null;
@@ -334,6 +485,7 @@ if (is_file($configPath) && is_file($historialPath)) {
         require_once $configPath;
         require_once $historialPath;
         if (isset($pdo) && $pdo instanceof PDO) {
+            $pdoMain = $pdo;
             $gestorId = getDefaultGestorId($pdo);
             if ($gestorId) {
                 // Construir comentarios_gestor con datos extra del wizard
@@ -396,6 +548,61 @@ if (is_file($configPath) && is_file($historialPath)) {
     } catch (Throwable $e) {
         logSolPub('DB optional fail: ' . $e->getMessage());
         error_log('solicitud_publica DB: ' . $e->getMessage());
+    }
+}
+
+if ($solicitudId > 0 && $pdoMain instanceof PDO && $gestorId) {
+    try {
+        $adjuntosParaCorreo = solPub_guardar_adjuntos_formulario_publico($pdoMain, $solicitudId, (int)$gestorId, $cedulaImagenDataUrl);
+    } catch (Throwable $e) {
+        logSolPub('adjuntos form pub: ' . $e->getMessage());
+    }
+}
+
+// Correo después de crear solicitud y guardar adjuntos (PDF + identificación + archivos extra)
+if ($emailDestinoVendedor !== null || $emailCliente !== null) {
+    try {
+        $pdfPath = null;
+        if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
+            require_once __DIR__ . '/../vendor/autoload.php';
+            if (class_exists('Dompdf\Dompdf')) {
+                $html = buildPdfHtmlFinanciamiento($input, $firmaBase64, $nombre);
+                $dompdf = new \Dompdf\Dompdf(['isRemoteEnabled' => true]);
+                $dompdf->loadHtml($html, 'UTF-8');
+                $dompdf->setPaper('A4', 'portrait');
+                $dompdf->render();
+                $pdfPath = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'sol_fin_' . uniqid('', true) . '.pdf';
+                file_put_contents($pdfPath, $dompdf->output());
+            }
+        }
+        if ($pdfPath && file_exists($pdfPath)) {
+            require_once __DIR__ . '/../includes/EmailService.php';
+            $emailService = new EmailService();
+            $asuntoVendedor = 'Solicitud de Financiamiento completada - ' . $nombre;
+            $txtAdj = count($adjuntosParaCorreo) > 0
+                ? 'Adjuntos: PDF de la solicitud, identificación y/o otros documentos enviados por el cliente.'
+                : 'Adjunto: PDF con todos los datos y la firma.';
+            $cuerpoVendedor = '<p>Se ha recibido una solicitud de financiamiento completada.</p><p><strong>Cliente:</strong> ' . htmlspecialchars($nombre) . '</p><p>' . htmlspecialchars($txtAdj) . '</p>';
+            $asuntoCliente = 'Recibimos su Solicitud de Financiamiento - AutoMarket';
+            $cuerpoCliente = '<p>Estimado/a ' . htmlspecialchars($nombre) . ',</p><p>Hemos recibido correctamente su solicitud de financiamiento. Adjunto encontrará el PDF y los documentos que envió.</p><p>Nos pondremos en contacto a la brevedad.</p><p>— AutoMarket</p>';
+
+            $attachments = array_merge([$pdfPath], $adjuntosParaCorreo);
+
+            if ($emailDestinoVendedor !== null) {
+                $result = $emailService->enviarCorreo($emailDestinoVendedor, $asuntoVendedor, $cuerpoVendedor, '', strip_tags($cuerpoVendedor), $attachments);
+                $emailEnviado = !empty($result['success']);
+            }
+            if ($emailCliente !== null && $emailCliente !== $emailDestinoVendedor) {
+                $resultCliente = $emailService->enviarCorreo($emailCliente, $asuntoCliente, $cuerpoCliente, '', strip_tags($cuerpoCliente), $attachments);
+                if (!empty($resultCliente['success'])) {
+                    $emailEnviado = true;
+                }
+            }
+            @unlink($pdfPath);
+        }
+    } catch (Exception $e) {
+        error_log('solicitud_publica email: ' . $e->getMessage());
+        logSolPub('email error: ' . $e->getMessage());
     }
 }
 
