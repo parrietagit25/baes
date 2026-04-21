@@ -573,7 +573,7 @@ function enviarResumenSolicitudBancoTodosUnCorreo($solicitudId) {
             FROM usuarios_banco_solicitudes ubs
             INNER JOIN usuarios u ON ubs.usuario_banco_id = u.id
             WHERE ubs.solicitud_id = ?
-            ORDER BY ubs.id
+            ORDER BY u.id
         ");
         $stmt->execute([(int) $solicitudId]);
         $bancos = $stmt->fetchAll(PDO::FETCH_ASSOC);
