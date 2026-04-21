@@ -9,6 +9,83 @@
 require_once __DIR__ . '/EmailService.php';
 
 /**
+ * Asegura la tabla de log de envíos de resumen banco.
+ */
+function asegurarTablaLogResumenBanco(PDO $pdo): void {
+    static $ready = false;
+    if ($ready) {
+        return;
+    }
+    try {
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS email_resumen_banco_log (
+                id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                solicitud_id INT NOT NULL,
+                usuario_banco_id INT NULL,
+                destinatario_email VARCHAR(255) NOT NULL,
+                tipo_envio ENUM('individual','todos') NOT NULL DEFAULT 'individual',
+                estado ENUM('enviado','fallido') NOT NULL,
+                provider VARCHAR(50) NULL,
+                provider_message_id VARCHAR(191) NULL,
+                mensaje VARCHAR(500) NULL,
+                fecha_envio DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                INDEX idx_email_resumen_solicitud (solicitud_id),
+                INDEX idx_email_resumen_estado (estado),
+                INDEX idx_email_resumen_fecha (fecha_envio)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        ");
+        $ready = true;
+    } catch (Throwable $e) {
+        error_log('asegurarTablaLogResumenBanco: ' . $e->getMessage());
+    }
+}
+
+/**
+ * Guarda un evento de envío/fallo de correo de resumen banco.
+ */
+function registrarLogResumenBancoEmail(
+    PDO $pdo,
+    int $solicitudId,
+    ?int $usuarioBancoId,
+    string $destinatarioEmail,
+    string $tipoEnvio,
+    bool $success,
+    string $mensaje = '',
+    string $provider = '',
+    string $providerMessageId = ''
+): void {
+    if ($solicitudId < 1) {
+        return;
+    }
+    $email = trim($destinatarioEmail);
+    if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        return;
+    }
+    asegurarTablaLogResumenBanco($pdo);
+    try {
+        $stmt = $pdo->prepare("
+            INSERT INTO email_resumen_banco_log
+                (solicitud_id, usuario_banco_id, destinatario_email, tipo_envio, estado, provider, provider_message_id, mensaje)
+            VALUES
+                (?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        $stmt->execute([
+            (int) $solicitudId,
+            $usuarioBancoId !== null ? (int) $usuarioBancoId : null,
+            $email,
+            $tipoEnvio === 'todos' ? 'todos' : 'individual',
+            $success ? 'enviado' : 'fallido',
+            trim($provider),
+            trim($providerMessageId),
+            mb_substr(trim($mensaje), 0, 500),
+        ]);
+    } catch (Throwable $e) {
+        error_log('registrarLogResumenBancoEmail: ' . $e->getMessage());
+    }
+}
+
+/**
  * Incrementa correos_enviados en la fila de asignación (mismo usuario banco y solicitud).
  */
 function incrementarCorreosEnviadosUsuarioBancoSolicitud(PDO $pdo, int $solicitudId, int $usuarioBancoUserId): void {
@@ -539,6 +616,17 @@ function enviarResumenSolicitudBanco($solicitudId, $usuarioBancoId) {
             [],
             $replyToGestor
         );
+        registrarLogResumenBancoEmail(
+            $pdo,
+            (int) $solicitudId,
+            (int) $usuarioBancoId,
+            (string) $banco['banco_email'],
+            'individual',
+            !empty($resultado['success']),
+            (string) ($resultado['message'] ?? ''),
+            (string) ($resultado['provider'] ?? ''),
+            (string) ($resultado['id'] ?? '')
+        );
         if (!empty($resultado['success'])) {
             incrementarCorreosEnviadosUsuarioBancoSolicitud($pdo, (int) $solicitudId, (int) $usuarioBancoId);
         }
@@ -593,6 +681,8 @@ function enviarResumenSolicitudBancoTodosUnCorreo($solicitudId) {
             return ['success' => false, 'message' => 'No hay usuarios banco asignados con email válido'];
         }
 
+        $emailVendedor = '';
+        $emailPipe = '';
         $vendedorId = isset($solicitud['vendedor_id']) ? (int) $solicitud['vendedor_id'] : 0;
         if ($vendedorId > 0) {
             $stmtVend = $pdo->prepare('SELECT email FROM usuarios WHERE id = ? LIMIT 1');
@@ -686,6 +776,26 @@ function enviarResumenSolicitudBancoTodosUnCorreo($solicitudId) {
 
         $archivosAdjuntos = adjuntosArchivosParaCorreoResumen($adjuntos);
         $emailService = new EmailService();
+
+        $logsPendientes = [];
+        foreach (array_unique($idsUsuariosBanco) as $uid) {
+            foreach ($bancos as $row) {
+                if ((int)($row['usuario_banco_id'] ?? 0) === (int)$uid) {
+                    $em = trim((string)($row['email'] ?? ''));
+                    if ($em !== '' && filter_var($em, FILTER_VALIDATE_EMAIL)) {
+                        $logsPendientes[] = ['uid' => (int)$uid, 'email' => $em];
+                    }
+                    break;
+                }
+            }
+        }
+        if ($vendedorId > 0 && !empty($emailVendedor) && filter_var($emailVendedor, FILTER_VALIDATE_EMAIL)) {
+            $logsPendientes[] = ['uid' => null, 'email' => $emailVendedor];
+        }
+        if (!empty($emailPipe) && filter_var($emailPipe, FILTER_VALIDATE_EMAIL)) {
+            $logsPendientes[] = ['uid' => null, 'email' => $emailPipe];
+        }
+
         $resultado = $emailService->enviarCorreo(
             $toPrincipal,
             asuntoResumenSolicitudBancoMail($solicitud),
@@ -698,7 +808,22 @@ function enviarResumenSolicitudBancoTodosUnCorreo($solicitudId) {
             $replyToGestor
         );
 
-        if (!empty($resultado['success'])) {
+        $ok = !empty($resultado['success']);
+        foreach ($logsPendientes as $lg) {
+            registrarLogResumenBancoEmail(
+                $pdo,
+                (int) $solicitudId,
+                $lg['uid'] !== null ? (int)$lg['uid'] : null,
+                (string) $lg['email'],
+                'todos',
+                $ok,
+                (string) ($resultado['message'] ?? ''),
+                (string) ($resultado['provider'] ?? ''),
+                (string) ($resultado['id'] ?? '')
+            );
+        }
+
+        if ($ok) {
             foreach (array_unique($idsUsuariosBanco) as $uid) {
                 incrementarCorreosEnviadosUsuarioBancoSolicitud($pdo, (int) $solicitudId, (int) $uid);
             }

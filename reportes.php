@@ -15,11 +15,11 @@ if (!in_array('ROLE_ADMIN', $_SESSION['user_roles'])) {
 }
 
 $submenu = $_GET['submenu'] ?? 'usuarios';
-if (!in_array($submenu, ['usuarios', 'tiempo', 'banco'], true)) {
+if (!in_array($submenu, ['usuarios', 'tiempo', 'banco', 'emails'], true)) {
     $submenu = 'usuarios';
 }
 $estadosCol = ['Nueva', 'En Revisión Banco', 'Aprobada', 'Rechazada', 'Completada', 'Desistimiento'];
-$titulosReporte = ['usuarios' => 'Rep. Usuarios', 'tiempo' => 'Rep. Tiempo', 'banco' => 'Rep. Banco'];
+$titulosReporte = ['usuarios' => 'Rep. Usuarios', 'tiempo' => 'Rep. Tiempo', 'banco' => 'Rep. Banco', 'emails' => 'Rep. Correos'];
 ?>
 
 <!DOCTYPE html>
@@ -58,7 +58,8 @@ $titulosReporte = ['usuarios' => 'Rep. Usuarios', 'tiempo' => 'Rep. Tiempo', 'ba
                         <p class="mb-0 opacity-90"><?php
                             if ($submenu === 'usuarios') echo 'Total de solicitudes por usuario y estado';
                             elseif ($submenu === 'tiempo') echo 'Tiempo entre cambios de estado por solicitud';
-                            else echo 'Tiempo que tardan los bancos en dar respuesta a las solicitudes asignadas';
+                            elseif ($submenu === 'banco') echo 'Tiempo que tardan los bancos en dar respuesta a las solicitudes asignadas';
+                            else echo 'Cantidad de correos enviados/fallidos y detalle de destinatarios';
                         ?></p>
                     </div>
 
@@ -133,6 +134,71 @@ $titulosReporte = ['usuarios' => 'Rep. Usuarios', 'tiempo' => 'Rep. Tiempo', 'ba
                             </div>
                         </div>
                     </div>
+
+                    <!-- Rep. Correos -->
+                    <div id="panel-emails" class="report-panel" style="display: <?php echo $submenu === 'emails' ? 'block' : 'none'; ?>">
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-3">
+                                <div class="card"><div class="card-body text-center">
+                                    <div class="text-muted small">Enviados</div>
+                                    <div class="h4 mb-0 text-success" id="emailsTotalEnviados">0</div>
+                                </div></div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card"><div class="card-body text-center">
+                                    <div class="text-muted small">No enviados</div>
+                                    <div class="h4 mb-0 text-danger" id="emailsTotalFallidos">0</div>
+                                </div></div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card"><div class="card-body text-center">
+                                    <div class="text-muted small">Total</div>
+                                    <div class="h4 mb-0" id="emailsTotalGeneral">0</div>
+                                </div></div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="d-flex flex-wrap align-items-end gap-2 mb-3">
+                                    <div>
+                                        <label class="form-label mb-1">Estado</label>
+                                        <select id="filtroEstadoEmail" class="form-select form-select-sm">
+                                            <option value="">Todos</option>
+                                            <option value="enviado">Enviado</option>
+                                            <option value="fallido">No enviado</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="form-label mb-1">Desde</label>
+                                        <input type="date" id="filtroDesdeEmail" class="form-control form-control-sm">
+                                    </div>
+                                    <div>
+                                        <label class="form-label mb-1">Hasta</label>
+                                        <input type="date" id="filtroHastaEmail" class="form-control form-control-sm">
+                                    </div>
+                                    <button type="button" class="btn btn-primary btn-sm" id="btnFiltrarEmails">
+                                        <i class="fas fa-filter me-1"></i>Filtrar
+                                    </button>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-bordered table-reportes" id="tabla-emails">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Fecha</th>
+                                                <th>Estado</th>
+                                                <th>Correo</th>
+                                                <th>Tipo</th>
+                                                <th>Solicitud</th>
+                                                <th>Cliente</th>
+                                                <th>Mensaje</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -191,6 +257,8 @@ $titulosReporte = ['usuarios' => 'Rep. Usuarios', 'tiempo' => 'Rep. Tiempo', 'ba
         loadReporteTiempo();
     } else if (submenu === 'banco') {
         loadReporteBanco();
+    } else if (submenu === 'emails') {
+        loadReporteEmails();
     }
 
     function loadReporteUsuarios() {
@@ -292,6 +360,50 @@ $titulosReporte = ['usuarios' => 'Rep. Usuarios', 'tiempo' => 'Rep. Tiempo', 'ba
             .catch(() => { document.querySelector('#tabla-banco tbody').innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error al cargar</td></tr>'; });
     }
 
+    function loadReporteEmails() {
+        const estado = (document.getElementById('filtroEstadoEmail') || {}).value || '';
+        const desde = (document.getElementById('filtroDesdeEmail') || {}).value || '';
+        const hasta = (document.getElementById('filtroHastaEmail') || {}).value || '';
+        const q = new URLSearchParams({ action: 'reporte_emails_resumen' });
+        if (estado) q.set('estado', estado);
+        if (desde) q.set('desde', desde);
+        if (hasta) q.set('hasta', hasta);
+
+        fetch('api/reportes.php?' + q.toString())
+            .then(r => r.json())
+            .then(data => {
+                const tbody = document.querySelector('#tabla-emails tbody');
+                if (!data.success) {
+                    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-danger">Error al cargar</td></tr>';
+                    return;
+                }
+                document.getElementById('emailsTotalEnviados').textContent = String(data.resumen?.enviados ?? 0);
+                document.getElementById('emailsTotalFallidos').textContent = String(data.resumen?.fallidos ?? 0);
+                document.getElementById('emailsTotalGeneral').textContent = String(data.resumen?.total ?? 0);
+
+                let html = '';
+                (data.data || []).forEach(row => {
+                    const badge = row.estado === 'enviado'
+                        ? '<span class="badge bg-success">Enviado</span>'
+                        : '<span class="badge bg-danger">No enviado</span>';
+                    html += '<tr>'
+                        + '<td>' + escapeHtml(row.fecha_envio || '-') + '</td>'
+                        + '<td>' + badge + '</td>'
+                        + '<td>' + escapeHtml(row.destinatario_email || '-') + '</td>'
+                        + '<td>' + escapeHtml(row.tipo_envio || '-') + '</td>'
+                        + '<td>#' + escapeHtml(String(row.solicitud_id || '')) + '</td>'
+                        + '<td>' + escapeHtml(row.nombre_cliente || '-') + '</td>'
+                        + '<td>' + escapeHtml(row.mensaje || '-') + '</td>'
+                        + '</tr>';
+                });
+                if (!html) html = '<tr><td colspan="7" class="text-center text-muted">Sin datos</td></tr>';
+                tbody.innerHTML = html;
+            })
+            .catch(() => {
+                document.querySelector('#tabla-emails tbody').innerHTML = '<tr><td colspan="7" class="text-center text-danger">Error al cargar</td></tr>';
+            });
+    }
+
     function abrirModalHistorial(solicitudId, cliente) {
         document.getElementById('modalHistorialTitulo').textContent = 'Solicitud #' + solicitudId + ' — ' + cliente;
         document.getElementById('modalHistorialBody').innerHTML = '<tr><td colspan="6" class="text-center">Cargando…</td></tr>';
@@ -317,6 +429,11 @@ $titulosReporte = ['usuarios' => 'Rep. Usuarios', 'tiempo' => 'Rep. Tiempo', 'ba
         const div = document.createElement('div');
         div.textContent = s;
         return div.innerHTML;
+    }
+
+    const btnFiltrarEmails = document.getElementById('btnFiltrarEmails');
+    if (btnFiltrarEmails) {
+        btnFiltrarEmails.addEventListener('click', loadReporteEmails);
     }
 })();
     </script>

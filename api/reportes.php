@@ -32,6 +32,9 @@ switch ($action) {
     case 'reporte_banco':
         reporteBanco();
         break;
+    case 'reporte_emails_resumen':
+        reporteEmailsResumen();
+        break;
     default:
         echo json_encode(['success' => false, 'message' => 'Acción no válida']);
 }
@@ -248,6 +251,85 @@ function reporteBanco() {
         
         echo json_encode(['success' => true, 'data' => $rows]);
     } catch (PDOException $e) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Error de base de datos']);
+    }
+}
+
+/**
+ * Reporte de envíos de correos de resumen a banco.
+ * Devuelve resumen (enviados/fallidos) y listado detallado.
+ */
+function reporteEmailsResumen() {
+    global $pdo;
+    try {
+        $desde = trim((string)($_GET['desde'] ?? ''));
+        $hasta = trim((string)($_GET['hasta'] ?? ''));
+        $estado = trim((string)($_GET['estado'] ?? ''));
+
+        $where = [];
+        $params = [];
+
+        if ($estado === 'enviado' || $estado === 'fallido') {
+            $where[] = 'l.estado = ?';
+            $params[] = $estado;
+        }
+        if ($desde !== '') {
+            $where[] = 'DATE(l.fecha_envio) >= ?';
+            $params[] = $desde;
+        }
+        if ($hasta !== '') {
+            $where[] = 'DATE(l.fecha_envio) <= ?';
+            $params[] = $hasta;
+        }
+
+        $whereSql = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
+
+        $sqlResumen = "
+            SELECT
+                SUM(CASE WHEN l.estado = 'enviado' THEN 1 ELSE 0 END) AS enviados,
+                SUM(CASE WHEN l.estado = 'fallido' THEN 1 ELSE 0 END) AS fallidos,
+                COUNT(*) AS total
+            FROM email_resumen_banco_log l
+            {$whereSql}
+        ";
+        $stmtR = $pdo->prepare($sqlResumen);
+        $stmtR->execute($params);
+        $resumen = $stmtR->fetch(PDO::FETCH_ASSOC) ?: ['enviados' => 0, 'fallidos' => 0, 'total' => 0];
+
+        $sqlDetalle = "
+            SELECT
+                l.id, l.solicitud_id, l.usuario_banco_id, l.destinatario_email, l.tipo_envio, l.estado,
+                l.provider, l.provider_message_id, l.mensaje, l.fecha_envio,
+                s.nombre_cliente
+            FROM email_resumen_banco_log l
+            LEFT JOIN solicitudes_credito s ON s.id = l.solicitud_id
+            {$whereSql}
+            ORDER BY l.fecha_envio DESC
+            LIMIT 1000
+        ";
+        $stmtD = $pdo->prepare($sqlDetalle);
+        $stmtD->execute($params);
+        $detalle = $stmtD->fetchAll(PDO::FETCH_ASSOC);
+
+        echo json_encode([
+            'success' => true,
+            'resumen' => [
+                'enviados' => (int)($resumen['enviados'] ?? 0),
+                'fallidos' => (int)($resumen['fallidos'] ?? 0),
+                'total' => (int)($resumen['total'] ?? 0),
+            ],
+            'data' => $detalle
+        ]);
+    } catch (PDOException $e) {
+        if (($e->errorInfo[1] ?? null) === 1146) {
+            echo json_encode([
+                'success' => true,
+                'resumen' => ['enviados' => 0, 'fallidos' => 0, 'total' => 0],
+                'data' => []
+            ]);
+            return;
+        }
         http_response_code(500);
         echo json_encode(['success' => false, 'message' => 'Error de base de datos']);
     }

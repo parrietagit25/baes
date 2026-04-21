@@ -99,6 +99,9 @@ $isVendedor = in_array('ROLE_VENDEDOR', $_SESSION['user_roles']);
         <a class="nav-link ps-4 py-1 small <?php echo ($report_submenu === 'banco') ? 'active' : ''; ?>" href="reportes.php?submenu=banco">
             <i class="fas fa-university me-1"></i> Rep. Banco
         </a>
+        <a class="nav-link ps-4 py-1 small <?php echo ($report_submenu === 'emails') ? 'active' : ''; ?>" href="reportes.php?submenu=emails">
+            <i class="fas fa-envelope me-1"></i> Rep. Correos
+        </a>
         <?php endif; ?>
         
         <!-- Cerrar Sesión - Visible para todos -->
