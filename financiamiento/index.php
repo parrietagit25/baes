@@ -1264,7 +1264,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
     </div>
   </div>
 
-  <div id="idCropperModal" class="d-none" style="position:fixed;inset:0;z-index:11000;background:rgba(2,6,23,.82);">
+  <div id="idCropperModal" class="d-none" hidden style="display:none;position:fixed;inset:0;z-index:11000;background:rgba(2,6,23,.82);">
     <div style="max-width:960px;margin:4vh auto;background:#111827;border:1px solid rgba(255,255,255,.2);border-radius:14px;overflow:hidden;">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#1f2937;color:#fff;">
         <h5 class="mb-0 fw-bold" id="idCropperTitle"><i class="fas fa-crop-alt me-2"></i>Recortar</h5>
@@ -1432,6 +1432,8 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           idImageToCrop.src = srcFirma;
         }
 
+        idCropperModal.hidden = false;
+        idCropperModal.style.display = "block";
         idCropperModal.classList.remove("d-none");
         idImageToCrop.onload = function(){
           if (idCropper) {
@@ -1458,7 +1460,11 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           idCropper.destroy();
           idCropper = null;
         }
-        if (idCropperModal) idCropperModal.classList.add("d-none");
+        if (idCropperModal){
+          idCropperModal.classList.add("d-none");
+          idCropperModal.hidden = true;
+          idCropperModal.style.display = "none";
+        }
       }
 
       if (idBtnTomarFoto && idCedulaInput) {
@@ -1504,6 +1510,14 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
       if (idRotateRightBtn) idRotateRightBtn.addEventListener("click", function(){ if (idCropper) idCropper.rotate(90); });
       if (idCropCancelBtn) idCropCancelBtn.addEventListener("click", closeIdCropper);
       if (idCropCloseBtn) idCropCloseBtn.addEventListener("click", closeIdCropper);
+      if (idCropperModal) {
+        idCropperModal.addEventListener("click", function(e){
+          if (e.target === idCropperModal) closeIdCropper();
+        });
+      }
+      document.addEventListener("keydown", function(e){
+        if (e.key === "Escape") closeIdCropper();
+      });
 
       if (idCropApplyBtn) {
         idCropApplyBtn.addEventListener("click", function(){
@@ -2436,6 +2450,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
 
       function initIdDock(){
         if (!idDock || !idDockTab) return;
+        closeIdCropper();
         idDockTab.addEventListener("click", function(e){
           e.stopPropagation();
           var open = idDock.classList.toggle("is-open");
