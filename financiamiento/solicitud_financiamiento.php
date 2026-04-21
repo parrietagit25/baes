@@ -1392,6 +1392,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
 
       var idOriginalImageSrc = "";
       var idDocCroppedData = "";
+      var idOriginalObjectUrl = "";
       var idCropper = null;
       var idCropMode = "document";
 
@@ -1432,7 +1433,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
         }
 
         idCropperModal.classList.remove("d-none");
-        setTimeout(function(){
+        idImageToCrop.onload = function(){
           if (idCropper) {
             idCropper.destroy();
             idCropper = null;
@@ -1445,7 +1446,11 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
             responsive: true,
             rotatable: true
           });
-        }, 20);
+        };
+        idImageToCrop.onerror = function(){
+          showToast("No se pudo cargar la imagen para recortar.", "err");
+          closeIdCropper();
+        };
       }
 
       function closeIdCropper(){
@@ -1467,16 +1472,30 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
             showToast("Seleccione una imagen válida.", "err");
             return;
           }
-          var reader = new FileReader();
-          reader.onload = function(ev){
-            idOriginalImageSrc = String(ev.target && ev.target.result || "");
+          if (idOriginalObjectUrl) {
+            try { URL.revokeObjectURL(idOriginalObjectUrl); } catch (err) {}
+            idOriginalObjectUrl = "";
+          }
+          try {
+            idOriginalObjectUrl = URL.createObjectURL(file);
+            idOriginalImageSrc = idOriginalObjectUrl;
             idDocCroppedData = "";
             setIdPreviewImage(idOriginalImageSrc);
             if (idBtnRecortarDoc) idBtnRecortarDoc.disabled = false;
             if (idBtnRecortarFirma) idBtnRecortarFirma.disabled = false;
             openIdCropper("document");
-          };
-          reader.readAsDataURL(file);
+          } catch (err) {
+            var reader = new FileReader();
+            reader.onload = function(ev){
+              idOriginalImageSrc = String(ev.target && ev.target.result || "");
+              idDocCroppedData = "";
+              setIdPreviewImage(idOriginalImageSrc);
+              if (idBtnRecortarDoc) idBtnRecortarDoc.disabled = false;
+              if (idBtnRecortarFirma) idBtnRecortarFirma.disabled = false;
+              openIdCropper("document");
+            };
+            reader.readAsDataURL(file);
+          }
         });
       }
       if (idBtnRecortarDoc) idBtnRecortarDoc.addEventListener("click", function(){ openIdCropper("document"); });
@@ -2223,6 +2242,10 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           if (tracingBackgroundFin) {
             tracingBackgroundFin.src = "";
             tracingBackgroundFin.classList.add("d-none");
+          }
+          if (idOriginalObjectUrl) {
+            try { URL.revokeObjectURL(idOriginalObjectUrl); } catch (err) {}
+            idOriginalObjectUrl = "";
           }
           idOriginalImageSrc = "";
           idDocCroppedData = "";
