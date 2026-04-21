@@ -702,6 +702,27 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
       background: #e2e8f0;
       border: 1px solid #94a3b8;
       color: #0f172a;
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      width: 56px;
+      height: 56px;
+      padding: 6px 4px;
+      border-radius: 50%;
+      line-height: 1;
+    }
+    #idCropperModal .id-crop-footer #idRotateLeftBtn svg,
+    #idCropperModal .id-crop-footer #idRotateRightBtn svg{
+      display: block;
+      flex-shrink: 0;
+    }
+    #idCropperModal .id-crop-footer .id-rotate-cap{
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      color: #0f172a;
     }
   </style>
 </head>
@@ -1307,11 +1328,13 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
       </div>
       <div class="id-crop-footer" style="padding:12px;background:#f8fafc;">
         <div class="d-flex justify-content-center gap-3 mb-2 d-none" id="idRotateActions">
-          <button type="button" class="btn btn-secondary rounded-circle" id="idRotateLeftBtn" title="Girar a la izquierda">
-            <i class="fas fa-undo"></i>
+          <button type="button" class="btn" id="idRotateLeftBtn" title="Girar 90° a la izquierda">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+            <span class="id-rotate-cap">Izq.</span>
           </button>
-          <button type="button" class="btn btn-secondary rounded-circle" id="idRotateRightBtn" title="Girar a la derecha">
-            <i class="fas fa-redo"></i>
+          <button type="button" class="btn" id="idRotateRightBtn" title="Girar 90° a la derecha">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+            <span class="id-rotate-cap">Der.</span>
           </button>
         </div>
         <p class="small mb-3 text-center" id="idCropperHelp">Ajusta el recuadro.</p>
