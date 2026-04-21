@@ -671,6 +671,38 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
       z-index: 0;
     }
     #firmaCanvas{ z-index: 1; }
+
+    /* Modal recorte: pie con fondo claro — forzar tinta oscura (el formulario fuerza color claro en .btn global) */
+    #idCropperModal .id-crop-footer{
+      color: #0f172a;
+    }
+    #idCropperModal .id-crop-footer #idCropperHelp{
+      color: #334155 !important;
+    }
+    #idCropperModal .id-crop-footer #idCropCancelBtn{
+      background: #fff;
+      border: 1px solid #64748b;
+      color: #0f172a;
+    }
+    #idCropperModal .id-crop-footer #idCropCancelBtn:hover{
+      background: #f1f5f9;
+      border-color: #475569;
+    }
+    #idCropperModal .id-crop-footer #idCropApplyBtn{
+      background: #2563eb;
+      border: 1px solid #1d4ed8;
+      color: #fff;
+    }
+    #idCropperModal .id-crop-footer #idCropApplyBtn:hover{
+      background: #1d4ed8;
+      border-color: #1e40af;
+    }
+    #idCropperModal .id-crop-footer #idRotateLeftBtn,
+    #idCropperModal .id-crop-footer #idRotateRightBtn{
+      background: #e2e8f0;
+      border: 1px solid #94a3b8;
+      color: #0f172a;
+    }
   </style>
 </head>
 
@@ -1273,7 +1305,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
       <div style="padding:10px;background:#0b1220;max-height:60vh;overflow:auto;">
         <img id="idImageToCrop" src="" alt="Imagen para recortar" style="max-width:100%;display:block;margin:0 auto;">
       </div>
-      <div style="padding:12px;background:#f8fafc;">
+      <div class="id-crop-footer" style="padding:12px;background:#f8fafc;">
         <div class="d-flex justify-content-center gap-3 mb-2 d-none" id="idRotateActions">
           <button type="button" class="btn btn-secondary rounded-circle" id="idRotateLeftBtn" title="Girar a la izquierda">
             <i class="fas fa-undo"></i>
@@ -1282,7 +1314,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
             <i class="fas fa-redo"></i>
           </button>
         </div>
-        <p class="text-muted small mb-3 text-center" id="idCropperHelp">Ajusta el recuadro.</p>
+        <p class="small mb-3 text-center" id="idCropperHelp">Ajusta el recuadro.</p>
         <div class="d-flex justify-content-between">
           <button type="button" class="btn btn-outline-secondary rounded-pill px-4" id="idCropCancelBtn">Cancelar</button>
           <button type="button" class="btn btn-primary rounded-pill px-4 fw-bold shadow" id="idCropApplyBtn">
