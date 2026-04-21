@@ -253,14 +253,30 @@ function solPub_normalize_uploaded_files(string $field): array {
     return $out;
 }
 
-/**
- * Guarda adjuntos del formulario público en adjuntos/solicitudes/ y en adjuntos_solicitud.
- *
- * @return string[] rutas absolutas de archivos para adjuntar al correo
- */
-function solPub_guardar_adjuntos_formulario_publico(PDO $pdo, int $solicitudId, int $gestorId, ?string $cedulaDataUrl): array {
-    $allowed = [
-        'image/jpeg', 'image/png', 'image/gif',
+/** Filas de subida: prueba adjuntos_extra y cualquier clave FILES que empiece por adjuntos_extra. */
+function solPub_upload_rows_from_request(): array {
+    foreach (['adjuntos_extra', 'adjuntos_extra[]'] as $field) {
+        $rows = solPub_normalize_uploaded_files($field);
+        if ($rows !== []) {
+            return $rows;
+        }
+    }
+    foreach (array_keys($_FILES) as $k) {
+        if (preg_match('/^adjuntos_extra/', $k)) {
+            $rows = solPub_normalize_uploaded_files($k);
+            if ($rows !== []) {
+                logSolPub('adjuntos FILES campo: ' . $k);
+                return $rows;
+            }
+        }
+    }
+    return [];
+}
+
+/** @return list<string> */
+function solPub_allowed_mime_list(): array {
+    return [
+        'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/pjpeg',
         'application/pdf',
         'application/msword',
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -268,6 +284,136 @@ function solPub_guardar_adjuntos_formulario_publico(PDO $pdo, int $solicitudId, 
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'text/plain',
     ];
+}
+
+function solPub_mime_effective_for_upload(string $detectedMime, string $clientType, string $origName, array $allowed): ?string {
+    $detectedMime = strtolower(trim($detectedMime));
+    $clientType = strtolower(trim($clientType));
+    foreach ([$detectedMime, $clientType] as $mime) {
+        if ($mime !== '' && in_array($mime, $allowed, true)) {
+            return $mime;
+        }
+    }
+    $ext = strtolower((string)pathinfo($origName, PATHINFO_EXTENSION));
+    $fromExt = [
+        'pdf' => 'application/pdf',
+        'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'jpe' => 'image/jpeg',
+        'png' => 'image/png', 'gif' => 'image/gif', 'webp' => 'image/webp',
+        'doc' => 'application/msword',
+        'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'xls' => 'application/vnd.ms-excel',
+        'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'txt' => 'text/plain',
+    ];
+    if ($ext !== '' && isset($fromExt[$ext]) && in_array($fromExt[$ext], $allowed, true)) {
+        if (in_array($detectedMime, ['application/octet-stream', 'binary/octet-stream', ''], true)
+            || in_array($clientType, ['application/octet-stream', 'binary/octet-stream'], true)) {
+            return $fromExt[$ext];
+        }
+    }
+    return null;
+}
+
+/**
+ * Guarda imagen de cédula (data URL) en disco; ruta sin extensión → se añade .jpg/.png/.webp.
+ *
+ * @return string|null ruta absoluta del archivo creado
+ */
+function solPub_save_cedula_from_data_url(?string $dataUrl, string $absPathNoExt): ?string {
+    if (!is_string($dataUrl) || trim($dataUrl) === '') {
+        return null;
+    }
+    $dataUrl = trim($dataUrl);
+    if (!preg_match('#^data:image/([^;]+);base64,(.+)$#is', $dataUrl, $m)) {
+        return null;
+    }
+    $subtype = strtolower(trim($m[1]));
+    $b64 = preg_replace('/\s+/', '', $m[2]);
+    $raw = base64_decode($b64, true);
+    if ($raw === false || strlen($raw) < 200 || strlen($raw) > 15 * 1024 * 1024) {
+        return null;
+    }
+    $ext = 'jpg';
+    if (strpos($subtype, 'png') !== false) {
+        $ext = 'png';
+    } elseif (strpos($subtype, 'webp') !== false) {
+        $ext = 'webp';
+    } elseif (strpos($subtype, 'jpeg') !== false || $subtype === 'jpg') {
+        $ext = 'jpg';
+    }
+    $abs = $absPathNoExt . '.' . $ext;
+    if (file_put_contents($abs, $raw) === false) {
+        return null;
+    }
+    return $abs;
+}
+
+/**
+ * Cuando no hay solicitud en BD: materializa cédula + subidas en /tmp para adjuntar al correo (luego se borran).
+ *
+ * @return string[] rutas absolutas
+ */
+function solPub_materialize_adjuntos_temporales_para_correo(?string $cedulaDataUrl): array {
+    $allowed = solPub_allowed_mime_list();
+    $paths = [];
+    $tmpBase = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+
+    $cedAbs = solPub_save_cedula_from_data_url($cedulaDataUrl, $tmpBase . 'solpub_ced_' . uniqid('', true));
+    if ($cedAbs !== null && is_file($cedAbs)) {
+        $paths[] = $cedAbs;
+    }
+
+    $maxFiles = 15;
+    $c = 0;
+    foreach (solPub_upload_rows_from_request() as $row) {
+        if ($c >= $maxFiles) {
+            break;
+        }
+        if ($row['error'] !== UPLOAD_ERR_OK) {
+            continue;
+        }
+        $size = (int)$row['size'];
+        if ($size <= 0 || $size > 10 * 1024 * 1024) {
+            continue;
+        }
+        $tmp = $row['tmp_name'];
+        if ($tmp === '') {
+            continue;
+        }
+        if (!is_uploaded_file($tmp) && !is_readable($tmp)) {
+            continue;
+        }
+        $orig = $row['name'] !== '' ? basename($row['name']) : 'adjunto.bin';
+        $orig = preg_replace('/[^A-Za-z0-9._\\- ]/', '_', $orig);
+        if ($orig === '' || strlen($orig) > 200) {
+            $orig = 'adjunto.bin';
+        }
+        $ext = pathinfo($orig, PATHINFO_EXTENSION);
+        $ext = $ext !== '' ? ('.' . preg_replace('/[^a-zA-Z0-9]/', '', $ext)) : '';
+        $dest = $tmpBase . 'solpub_up_' . uniqid('', true) . $ext;
+        $moved = is_uploaded_file($tmp) ? @move_uploaded_file($tmp, $dest) : @copy($tmp, $dest);
+        if (!$moved || !is_file($dest)) {
+            continue;
+        }
+        $mime = solPub_mime_effective_for_upload(solPub_finfo_mime($dest), $row['type'], $orig, $allowed);
+        if ($mime === null) {
+            @unlink($dest);
+            continue;
+        }
+        $paths[] = $dest;
+        $c++;
+    }
+
+    return $paths;
+}
+
+/**
+ * Guarda adjuntos del formulario público en adjuntos/solicitudes/ y en adjuntos_solicitud.
+ *
+ * @return string[] rutas absolutas de archivos para adjuntar al correo
+ */
+function solPub_guardar_adjuntos_formulario_publico(PDO $pdo, int $solicitudId, int $gestorId, ?string $cedulaDataUrl): array {
+    $allowed = solPub_allowed_mime_list();
     $pathsOut = [];
     $dirRel = 'adjuntos/solicitudes/';
     $dirAbs = __DIR__ . '/../' . $dirRel;
@@ -298,31 +444,28 @@ function solPub_guardar_adjuntos_formulario_publico(PDO $pdo, int $solicitudId, 
         }
     };
 
-    if (is_string($cedulaDataUrl) && $cedulaDataUrl !== '' && preg_match('/^data:image\\/(jpeg|jpg|png);base64,(.+)$/is', $cedulaDataUrl, $mm)) {
-        $raw = base64_decode($mm[2], true);
-        if ($raw !== false && strlen($raw) > 200 && strlen($raw) < 15 * 1024 * 1024) {
-            $ext = (stripos($mm[1], 'png') !== false) ? 'png' : 'jpg';
-            $nombreArchivo = 'finpub_' . $solicitudId . '_cedula_' . uniqid('', true) . '.' . $ext;
-            $abs = rtrim($dirAbs, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $nombreArchivo;
-            if (file_put_contents($abs, $raw) !== false) {
-                $mime = $ext === 'png' ? 'image/png' : 'image/jpeg';
-                $size = strlen($raw);
-                $rutaDb = $dirRel . $nombreArchivo;
-                try {
-                    $insertRow($pdo, $solicitudId, $gestorId, $tamCol, $nombreArchivo, 'Identificacion-cedula.' . $ext, $rutaDb, $mime, $size, 'Identificación (formulario público)');
-                    $pathsOut[] = $abs;
-                } catch (Throwable $e) {
-                    @unlink($abs);
-                    logSolPub('adj cedula insert: ' . $e->getMessage());
-                }
-            }
+    $cedBase = rtrim($dirAbs, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'finpub_' . $solicitudId . '_cedula_' . uniqid('', true);
+    $cedAbs = solPub_save_cedula_from_data_url($cedulaDataUrl, $cedBase);
+    if ($cedAbs !== null && is_file($cedAbs)) {
+        $ext = strtolower(pathinfo($cedAbs, PATHINFO_EXTENSION));
+        $mimeMap = ['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp'];
+        $cedMime = $mimeMap[$ext] ?? 'image/jpeg';
+        $nombreArchivo = basename($cedAbs);
+        $size = (int)filesize($cedAbs);
+        $rutaDb = $dirRel . $nombreArchivo;
+        try {
+            $insertRow($pdo, $solicitudId, $gestorId, $tamCol, $nombreArchivo, 'Identificacion-cedula.' . $ext, $rutaDb, $cedMime, $size, 'Identificación (formulario público)');
+            $pathsOut[] = $cedAbs;
+        } catch (Throwable $e) {
+            @unlink($cedAbs);
+            logSolPub('adj cedula insert: ' . $e->getMessage());
         }
     }
 
     $maxFiles = 15;
-    $c = 0;
-    foreach (solPub_normalize_uploaded_files('adjuntos_extra') as $row) {
-        if ($c >= $maxFiles) {
+    $n = 0;
+    foreach (solPub_upload_rows_from_request() as $row) {
+        if ($n >= $maxFiles) {
             break;
         }
         if ($row['error'] !== UPLOAD_ERR_OK) {
@@ -333,17 +476,21 @@ function solPub_guardar_adjuntos_formulario_publico(PDO $pdo, int $solicitudId, 
             continue;
         }
         $tmp = $row['tmp_name'];
-        if ($tmp === '' || !is_uploaded_file($tmp)) {
+        if ($tmp === '') {
             continue;
         }
-        $mime = solPub_finfo_mime($tmp);
-        if (!in_array($mime, $allowed, true)) {
+        if (!is_uploaded_file($tmp)) {
             continue;
         }
         $orig = $row['name'] !== '' ? basename($row['name']) : 'adjunto.bin';
         $orig = preg_replace('/[^A-Za-z0-9._\\- ]/', '_', $orig);
         if ($orig === '' || strlen($orig) > 200) {
             $orig = 'adjunto.bin';
+        }
+        $mime = solPub_mime_effective_for_upload(solPub_finfo_mime($tmp), $row['type'], $orig, $allowed);
+        if ($mime === null) {
+            logSolPub('adjunto rechazado mime: ' . $orig . ' finfo=' . solPub_finfo_mime($tmp));
+            continue;
         }
         $ext = pathinfo($orig, PATHINFO_EXTENSION);
         $ext = $ext !== '' ? ('.' . preg_replace('/[^a-zA-Z0-9]/', '', $ext)) : '';
@@ -356,7 +503,7 @@ function solPub_guardar_adjuntos_formulario_publico(PDO $pdo, int $solicitudId, 
         try {
             $insertRow($pdo, $solicitudId, $gestorId, $tamCol, $nombreArchivo, $orig, $rutaDb, $mime, $size, 'Adjunto formulario público');
             $pathsOut[] = $abs;
-            $c++;
+            $n++;
         } catch (Throwable $e) {
             @unlink($abs);
             logSolPub('adj upload insert: ' . $e->getMessage());
@@ -373,6 +520,7 @@ $emailEnviado = false;
 $pdoMain = null;
 $gestorId = null;
 $adjuntosParaCorreo = [];
+$adjuntosCorreoSonTemporales = false;
 
 $emailDestinoVendedor = null;
 if ($token !== '') {
@@ -567,6 +715,14 @@ if ($solicitudId > 0 && $pdoMain instanceof PDO && $gestorId) {
     } catch (Throwable $e) {
         logSolPub('adjuntos form pub: ' . $e->getMessage());
     }
+} elseif (($cedulaImagenDataUrl !== null && $cedulaImagenDataUrl !== '') || solPub_upload_rows_from_request() !== []) {
+    try {
+        $adjuntosParaCorreo = solPub_materialize_adjuntos_temporales_para_correo($cedulaImagenDataUrl);
+        $adjuntosCorreoSonTemporales = true;
+        logSolPub('adjuntos correo (temp, sin solicitud en BD o sin gestor): ' . count($adjuntosParaCorreo) . ' archivo(s)');
+    } catch (Throwable $e) {
+        logSolPub('adjuntos temp correo: ' . $e->getMessage());
+    }
 }
 
 // Correo después de crear solicitud y guardar adjuntos (PDF + identificación + archivos extra)
@@ -613,6 +769,18 @@ if ($emailDestinoVendedor !== null || $emailCliente !== null) {
     } catch (Exception $e) {
         error_log('solicitud_publica email: ' . $e->getMessage());
         logSolPub('email error: ' . $e->getMessage());
+    }
+}
+
+if (!empty($adjuntosCorreoSonTemporales) && is_array($adjuntosParaCorreo)) {
+    foreach ($adjuntosParaCorreo as $ap) {
+        if (!is_string($ap) || $ap === '' || !is_file($ap)) {
+            continue;
+        }
+        $bn = basename($ap);
+        if (preg_match('/^(solpub_ced_|solpub_up_)/', $bn)) {
+            @unlink($ap);
+        }
     }
 }
 
