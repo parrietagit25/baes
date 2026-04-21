@@ -225,16 +225,26 @@ function solPub_finfo_mime(string $path): string {
 
 /** @return list<array{name:string,type:string,tmp_name:string,error:int,size:int}> */
 function solPub_normalize_uploaded_files(string $field): array {
-    if (!isset($_FILES[$field]) || !is_array($_FILES[$field]['name'])) {
+    if (!isset($_FILES[$field]) || !is_array($_FILES[$field])) {
         return [];
     }
     $f = $_FILES[$field];
+    // Con un solo archivo, PHP usa name/type/tmp_name como escalares; con varios, como arrays.
+    if (!is_array($f['name'])) {
+        return [[
+            'name' => (string)$f['name'],
+            'type' => (string)($f['type'] ?? ''),
+            'tmp_name' => (string)$f['tmp_name'],
+            'error' => (int)$f['error'],
+            'size' => (int)$f['size'],
+        ]];
+    }
     $out = [];
     $n = count($f['name']);
     for ($i = 0; $i < $n; $i++) {
         $out[] = [
             'name' => (string)$f['name'][$i],
-            'type' => (string)$f['type'][$i],
+            'type' => (string)($f['type'][$i] ?? ''),
             'tmp_name' => (string)$f['tmp_name'][$i],
             'error' => (int)$f['error'][$i],
             'size' => (int)$f['size'][$i],

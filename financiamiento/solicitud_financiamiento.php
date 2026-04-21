@@ -972,7 +972,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           </div>
         </div>
         <div class="rowActions">
-          <div class="chip"><strong>Paso:</strong> 1 / 6</div>
+          <div class="chip"><strong>Paso:</strong> 1 / 5</div>
           <div class="navBtns">
             <button type="button" data-prev>Atrás</button>
             <button type="button" class="primary" data-next>Siguiente</button>
@@ -1073,7 +1073,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           </div>
         </div>
         <div class="rowActions">
-          <div class="chip"><strong>Paso:</strong> 2 / 6</div>
+          <div class="chip"><strong>Paso:</strong> 2 / 5</div>
           <div class="navBtns">
             <button type="button" data-prev>Atrás</button>
             <button type="button" class="primary" data-next>Siguiente</button>
@@ -1136,7 +1136,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           </div>
         </div>
         <div class="rowActions">
-          <div class="chip"><strong>Paso:</strong> 3 / 6</div>
+          <div class="chip"><strong>Paso:</strong> 3 / 5</div>
           <div class="navBtns">
             <button type="button" data-prev>Atrás</button>
             <button type="button" class="primary" data-next>Siguiente</button>
@@ -1259,7 +1259,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           </div>
         </div>
         <div class="rowActions">
-          <div class="chip"><strong>Paso:</strong> 4 / 6</div>
+          <div class="chip"><strong>Paso:</strong> 4 / 5</div>
           <div class="navBtns">
             <button type="button" data-prev>Atrás</button>
             <button type="button" class="primary" data-next>Siguiente</button>
@@ -1271,7 +1271,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
         <div class="sectionTitle">
           <div>
             <h2>E. Referencias</h2>
-            <p>2 personales (no parientes) y 2 familiares (que no vivan con usted).</p>
+            <p>2 personales (no parientes) y 2 familiares (que no vivan con usted). Para adjuntar PDF u otros documentos use la solapa <strong>Adjuntos</strong> (icono de clip) a la derecha antes de enviar.</p>
           </div>
         </div>
         <div class="grid">
@@ -1387,28 +1387,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           </div>
         </div>
         <div class="rowActions">
-          <div class="chip"><strong>Paso:</strong> 5 / 6</div>
-          <div class="navBtns">
-            <button type="button" data-prev>Atrás</button>
-            <button type="button" class="primary" data-next>Siguiente</button>
-          </div>
-        </div>
-      </fieldset>
-
-      <fieldset data-step="5">
-        <div class="sectionTitle">
-          <div>
-            <h2>F. Adjuntos</h2>
-            <p>Los documentos se agregan desde la solapa <strong>Adjuntos</strong> en el borde derecho (icono de clip). Se guardan en este dispositivo y se envían con la solicitud (correo y sistema). La imagen de cédula de la solapa <strong>Identificación</strong> también se incluye si la capturó.</p>
-          </div>
-        </div>
-        <div class="grid">
-          <div class="col-12">
-            <p class="hint" id="adjuntosResumenPaso" style="margin-top:4px;font-size:calc(14px * var(--fs-scale))">Abra la solapa del clip a la derecha para elegir archivos.</p>
-          </div>
-        </div>
-        <div class="rowActions">
-          <div class="chip"><strong>Paso:</strong> 6 / 6</div>
+          <div class="chip"><strong>Paso:</strong> 5 / 5</div>
           <div class="navBtns">
             <button type="button" data-prev>Atrás</button>
             <button type="submit" class="primary" id="btnSubmit">Enviar</button>
@@ -1554,7 +1533,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
       const btnClear = document.getElementById("btnClear");
       const btnSubmit = document.getElementById("btnSubmit");
 
-      const stepLabels = ["A. Cliente", "B. Dirección", "C. Laboral", "D. Cónyuge", "E. Referencias", "F. Adjuntos"];
+      const stepLabels = ["A. Cliente", "B. Dirección", "C. Laboral", "D. Cónyuge", "E. Referencias"];
       let step = 0;
       let toastTimer = null;
 
@@ -1667,12 +1646,6 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
             badge.textContent = "";
             badge.classList.remove("is-on");
           }
-        }
-        var summaryPaso = document.getElementById("adjuntosResumenPaso");
-        if (summaryPaso){
-          summaryPaso.textContent = extraAdjuntosList.length
-            ? "En lista: " + extraAdjuntosList.length + " archivo(s). Se enviarán al pulsar Enviar en el último paso."
-            : "Aún no hay archivos. Abra la solapa del clip a la derecha para elegir documentos.";
         }
         var attachTab = document.getElementById("attachDockTab");
         if (attachTab){
