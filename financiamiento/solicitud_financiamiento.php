@@ -1361,7 +1361,6 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
             <label class="d-block mb-2"><strong>Firma con el dedo (obligatorio)</strong></label>
             <p class="subtitle mb-2" style="font-size:12px;color:var(--muted)">Firme en todo el recuadro con el dedo o el mouse. Luego confirme abajo.</p>
             <div class="signature-wrap" style="border:2px solid rgba(255,255,255,.2);border-radius:12px;background:rgba(0,0,0,.2);touch-action:none;overflow:hidden;">
-              <img id="tracingBackgroundFin" class="signature-trace-bg d-none" src="" alt="Firma guía para calcar">
               <canvas id="firmaCanvas" width="500" height="180" style="display:block;width:100%;height:180px;cursor:crosshair;border-radius:10px;touch-action:none;"></canvas>
             </div>
             <div style="margin-top:8px;">
@@ -1432,7 +1431,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
     <div class="id-dock-slide">
       <div class="id-panel" role="region" aria-labelledby="idPanelTitle">
         <h2 class="visual-panel-title" id="idPanelTitle">Captura de identificación</h2>
-        <p class="visual-panel-hint">Toma una foto de cédula, recorta el documento y luego recorta la firma para calcarla al final.</p>
+        <p class="visual-panel-hint">Toma una foto de cédula y recorta únicamente el documento.</p>
         <input type="file" id="idCedulaInput" accept="image/*" capture="environment" class="d-none">
         <div class="id-action-row">
           <button type="button" class="btn btn-sm btn-primary" id="idBtnTomarFoto">
@@ -1440,9 +1439,6 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           </button>
           <button type="button" class="btn btn-sm btn-outline-primary" id="idBtnRecortarDoc" disabled>
             <i class="fas fa-crop-alt me-1"></i>Recortar cédula
-          </button>
-          <button type="button" class="btn btn-sm btn-outline-success" id="idBtnRecortarFirma" disabled>
-            <i class="fas fa-signature me-1"></i>Recortar firma
           </button>
         </div>
         <div class="id-mini-preview" id="idMiniPreviewWrap">
