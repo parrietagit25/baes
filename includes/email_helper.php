@@ -917,9 +917,6 @@ function construirResumenSolicitudHtml($solicitud, $vehiculos, $evaluaciones, $a
     $appendCampoSiTieneValor($html, 'Cédula', $solicitud['cedula'] ?? null);
     $appendCampoSiTieneValor($html, 'Edad', $solicitud['edad'] ?? null);
     $appendCampoSiTieneValor($html, 'Género', $solicitud['genero'] ?? null);
-    $appendCampoSiTieneValor($html, 'Teléfono', $solicitud['telefono'] ?? null);
-    $appendCampoSiTieneValor($html, 'Email', $solicitud['email'] ?? null);
-    $appendCampoSiTieneValor($html, 'Email Pipedrive', $solicitud['email_pipedrive'] ?? null);
     $appendCampoSiTieneValor($html, 'Casado/a', $solicitud['casado'] ?? null, function($v) { return ((string) $v === '1') ? 'Sí' : 'No'; });
     $appendCampoSiTieneValor($html, 'Hijos', $solicitud['hijos'] ?? null);
     $appendCampoSiTieneValor($html, 'Provincia', $solicitud['provincia'] ?? null);
