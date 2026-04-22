@@ -841,15 +841,66 @@ function enviarResumenSolicitudBancoTodosUnCorreo($solicitudId) {
 function construirResumenSolicitudHtml($solicitud, $vehiculos, $evaluaciones, $adjuntos, $bancoNombre, $app_url, $mostrarEnlaceMotus = false) {
     $h = function($s) { return htmlspecialchars($s ?? '', ENT_QUOTES, 'UTF-8'); };
     $n = function($v, $dec = 0) { return $v !== null && $v !== '' ? number_format((float)$v, $dec, ',', '.') : 'N/A'; };
-    $formatAbono = function($porcentaje, $monto) use ($n) {
+    $formatSinRedondear = function($v) {
+        if ($v === null || $v === '') {
+            return 'N/A';
+        }
+        $raw = trim((string) $v);
+        if ($raw === '') {
+            return 'N/A';
+        }
+        if (!is_numeric($raw)) {
+            return $raw;
+        }
+        $num = (string) $raw;
+        $neg = false;
+        if (strpos($num, '-') === 0) {
+            $neg = true;
+            $num = substr($num, 1);
+        }
+        $num = str_replace(',', '.', $num);
+        $parts = explode('.', $num, 2);
+        $ent = ltrim($parts[0], '0');
+        if ($ent === '') {
+            $ent = '0';
+        }
+        $dec = isset($parts[1]) ? rtrim($parts[1], '0') : '';
+        $entFormateado = number_format((float) $ent, 0, ',', '.');
+        $out = $dec !== '' ? ($entFormateado . ',' . $dec) : $entFormateado;
+        return $neg ? ('-' . $out) : $out;
+    };
+    $formatEntero = function($v) {
+        if ($v === null || $v === '') {
+            return 'N/A';
+        }
+        if (!is_numeric((string) $v)) {
+            return trim((string) $v);
+        }
+        return number_format((int) round((float) $v, 0), 0, ',', '.');
+    };
+    $formatAbono = function($porcentaje, $monto) use ($formatEntero) {
         $partes = [];
         if ($porcentaje !== null && $porcentaje !== '') {
-            $partes[] = $n($porcentaje, 2) . '%';
+            $partes[] = $formatEntero($porcentaje) . '%';
         }
         if ($monto !== null && $monto !== '') {
-            $partes[] = '$' . $n($monto, 2);
+            $partes[] = '$' . $formatEntero($monto);
         }
         return $partes ? implode(' / ', $partes) : 'N/A';
+    };
+    $appendCampoSiTieneValor = function(&$htmlBloque, $label, $valor, $transform = null) use ($h) {
+        if ($valor === null) {
+            return;
+        }
+        $texto = trim((string) $valor);
+        if ($texto === '') {
+            return;
+        }
+        $valorFinal = $transform ? $transform($texto) : $texto;
+        if ($valorFinal === null || trim((string) $valorFinal) === '' || $valorFinal === 'N/A') {
+            return;
+        }
+        $htmlBloque .= '<p><strong>' . $h($label) . ':</strong> ' . $h((string) $valorFinal) . '</p>';
     };
     
     $linkVer = ($mostrarEnlaceMotus && $app_url)
@@ -861,20 +912,36 @@ function construirResumenSolicitudHtml($solicitud, $vehiculos, $evaluaciones, $a
     $html .= '<p>Se adjunta un resumen de la solicitud para su revisión.</p>';
 
     $html .= '<h3>Datos generales</h3><div class="info-box" style="background:#f8f9fa;border-left:4px solid #0d6efd;padding:12px;margin:10px 0;">';
-    $html .= '<p><strong>Cliente:</strong> ' . $h($solicitud['nombre_cliente']) . '</p>';
-    $html .= '<p><strong>Cédula:</strong> ' . $h($solicitud['cedula']) . '</p>';
-    $html .= '<p><strong>Teléfono:</strong> ' . $h($solicitud['telefono']) . '</p>';
-    $html .= '<p><strong>Email:</strong> ' . $h($solicitud['email']) . '</p>';
-    $html .= '<p><strong>Dirección:</strong> ' . $h($solicitud['direccion']) . '</p>';
-    $html .= '<p><strong>Estado:</strong> ' . $h($solicitud['estado']) . '</p>';
+    $appendCampoSiTieneValor($html, 'Tipo de persona', $solicitud['tipo_persona'] ?? null);
+    $appendCampoSiTieneValor($html, 'Cliente', $solicitud['nombre_cliente'] ?? null);
+    $appendCampoSiTieneValor($html, 'Cédula', $solicitud['cedula'] ?? null);
+    $appendCampoSiTieneValor($html, 'Edad', $solicitud['edad'] ?? null);
+    $appendCampoSiTieneValor($html, 'Género', $solicitud['genero'] ?? null);
+    $appendCampoSiTieneValor($html, 'Teléfono', $solicitud['telefono'] ?? null);
+    $appendCampoSiTieneValor($html, 'Email', $solicitud['email'] ?? null);
+    $appendCampoSiTieneValor($html, 'Email Pipedrive', $solicitud['email_pipedrive'] ?? null);
+    $appendCampoSiTieneValor($html, 'Casado/a', $solicitud['casado'] ?? null, function($v) { return ((string) $v === '1') ? 'Sí' : 'No'; });
+    $appendCampoSiTieneValor($html, 'Hijos', $solicitud['hijos'] ?? null);
+    $appendCampoSiTieneValor($html, 'Provincia', $solicitud['provincia'] ?? null);
+    $appendCampoSiTieneValor($html, 'Distrito', $solicitud['distrito'] ?? null);
+    $appendCampoSiTieneValor($html, 'Corregimiento', $solicitud['corregimiento'] ?? null);
+    $appendCampoSiTieneValor($html, 'Barriada', $solicitud['barriada'] ?? null);
+    $appendCampoSiTieneValor($html, 'Casa/Edificio', $solicitud['casa_edif'] ?? null);
+    $appendCampoSiTieneValor($html, 'Número Casa/Apto', $solicitud['numero_casa_apto'] ?? null);
+    $appendCampoSiTieneValor($html, 'Dirección', $solicitud['direccion'] ?? null);
+    $appendCampoSiTieneValor($html, 'Estado', $solicitud['estado'] ?? null);
     $html .= '</div>';
 
     $html .= '<h3>Perfil financiero</h3><div class="info-box" style="background:#f8f9fa;border-left:4px solid #28a745;padding:12px;margin:10px 0;">';
-    $html .= '<p><strong>Perfil:</strong> ' . $h($solicitud['perfil_financiero']) . '</p>';
-    $html .= '<p><strong>Ingreso:</strong> ' . $n($solicitud['ingreso'], 2) . '</p>';
-    $html .= '<p><strong>Profesión/Ocupación:</strong> ' . $h($solicitud['profesion']) . ' / ' . $h($solicitud['ocupacion']) . '</p>';
-    $html .= '<p><strong>Empresa/Negocio:</strong> ' . $h($solicitud['nombre_empresa_negocio']) . '</p>';
-    $html .= '<p><strong>Estabilidad laboral:</strong> ' . $h($solicitud['estabilidad_laboral']) . '</p>';
+    $appendCampoSiTieneValor($html, 'Perfil', $solicitud['perfil_financiero'] ?? null);
+    $appendCampoSiTieneValor($html, 'Ingreso', $solicitud['ingreso'] ?? null, function($v) use ($n) { return '$' . $n($v, 2); });
+    $appendCampoSiTieneValor($html, 'Tiempo de laborar', $solicitud['tiempo_laborar'] ?? null);
+    $appendCampoSiTieneValor($html, 'Profesión', $solicitud['profesion'] ?? null);
+    $appendCampoSiTieneValor($html, 'Ocupación', $solicitud['ocupacion'] ?? null);
+    $appendCampoSiTieneValor($html, 'Empresa/Negocio', $solicitud['nombre_empresa_negocio'] ?? null);
+    $appendCampoSiTieneValor($html, 'Estabilidad laboral', $solicitud['estabilidad_laboral'] ?? null);
+    $appendCampoSiTieneValor($html, 'Fecha constitución', $solicitud['fecha_constitucion'] ?? null);
+    $appendCampoSiTieneValor($html, 'Continuidad laboral', $solicitud['continuidad_laboral'] ?? null);
     $html .= '</div>';
 
     $comentariosGestor = trim((string)($solicitud['comentarios_gestor'] ?? ''));
@@ -891,14 +958,14 @@ function construirResumenSolicitudHtml($solicitud, $vehiculos, $evaluaciones, $a
         foreach ($vehiculos as $v) {
             $html .= '<p><strong>Vehículo:</strong> ' . $h($v['marca'] ?? '') . ' ' . $h($v['modelo'] ?? '') . ' ' . $h($v['anio'] ?? '') . '</p>';
             $html .= '<p><strong>Kilometraje:</strong> ' . $n($v['kilometraje']) . '</p>';
-            $html .= '<p><strong>Precio:</strong> $' . $n($v['precio']) . '</p>';
+            $html .= '<p><strong>Precio:</strong> $' . $formatSinRedondear($v['precio'] ?? null) . '</p>';
             $html .= '<p><strong>Abono:</strong> ' . $formatAbono($v['abono_porcentaje'] ?? null, $v['abono_monto'] ?? null) . '</p>';
             $html .= '<hr style="border:none;border-top:1px solid #e5e7eb;margin:10px 0;">';
         }
     } else {
         $html .= '<p>Marca: ' . $h($solicitud['marca_auto']) . ', Modelo: ' . $h($solicitud['modelo_auto']) . ', Año: ' . $h($solicitud['año_auto'] ?? $solicitud['ao_auto'] ?? '') . '</p>';
         $html .= '<p>Kilometraje: ' . $n($solicitud['kilometraje']) . '</p>';
-        $html .= '<p>Precio especial: $' . $n($solicitud['precio_especial']) . '</p>';
+        $html .= '<p>Precio especial: $' . $formatSinRedondear($solicitud['precio_especial'] ?? null) . '</p>';
         $html .= '<p>Abono: ' . $formatAbono($solicitud['abono_porcentaje'] ?? null, $solicitud['abono_monto'] ?? null) . '</p>';
     }
     $html .= '</div>';
