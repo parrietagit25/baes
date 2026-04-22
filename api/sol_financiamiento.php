@@ -23,6 +23,49 @@ if (!$puedeAcceder) {
 
 require_once __DIR__ . '/../config/database.php';
 
+/**
+ * Columna opcional: vincula el envío público con solicitudes_credito sin usar financiamiento_registro_id en esa solicitud.
+ */
+function sol_fin_fr_tiene_solicitud_credito_id(PDO $pdo): bool {
+    static $cache = null;
+    if ($cache !== null) {
+        return $cache;
+    }
+    try {
+        $db = $pdo->query('SELECT DATABASE()')->fetchColumn();
+        if (!$db) {
+            $cache = false;
+            return false;
+        }
+        $s = $pdo->prepare("
+            SELECT COUNT(*)
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = ?
+              AND TABLE_NAME = 'financiamiento_registros'
+              AND COLUMN_NAME = 'solicitud_credito_id'
+        ");
+        $s->execute([$db]);
+        $cache = ((int) $s->fetchColumn()) > 0;
+    } catch (Throwable $e) {
+        $cache = false;
+    }
+    return $cache;
+}
+
+/** Expresión SQL correlacionada: cantidad de adjuntos vinculados al registro fr. */
+function sol_fin_sql_adjuntos_count(PDO $pdo, string $frIdRef): string {
+    if (sol_fin_fr_tiene_solicitud_credito_id($pdo)) {
+        return "(SELECT COUNT(*) FROM adjuntos_solicitud a WHERE a.solicitud_id IN (
+            SELECT s.sol_id FROM (
+                SELECT frx.solicitud_credito_id AS sol_id FROM financiamiento_registros frx WHERE frx.id = {$frIdRef} AND frx.solicitud_credito_id IS NOT NULL
+                UNION
+                SELECT sc.id AS sol_id FROM solicitudes_credito sc WHERE sc.financiamiento_registro_id = {$frIdRef}
+            ) s WHERE s.sol_id IS NOT NULL
+        ))";
+    }
+    return "(SELECT COUNT(*) FROM adjuntos_solicitud a INNER JOIN solicitudes_credito sc ON sc.id = a.solicitud_id WHERE sc.financiamiento_registro_id = {$frIdRef})";
+}
+
 try {
     if (isset($_GET['id']) && ctype_digit($_GET['id'])) {
         $stmt = $pdo->prepare("SELECT * FROM financiamiento_registros WHERE id = ?");
@@ -39,11 +82,13 @@ try {
 
     if (isset($_GET['busqueda']) && trim((string)$_GET['busqueda']) !== '') {
         $term = '%' . trim($_GET['busqueda']) . '%';
+        $adjCount = sol_fin_sql_adjuntos_count($pdo, 'fr.id');
         $stmt = $pdo->prepare("
-            SELECT id, cliente_nombre, cliente_id, cliente_correo, celular_cliente
-            FROM financiamiento_registros
-            WHERE cliente_nombre LIKE ? OR cliente_id LIKE ? OR cliente_correo LIKE ? OR celular_cliente LIKE ?
-            ORDER BY fecha_creacion DESC
+            SELECT fr.id, fr.cliente_nombre, fr.cliente_id, fr.cliente_correo, fr.celular_cliente,
+                   {$adjCount} AS adjuntos_count
+            FROM financiamiento_registros fr
+            WHERE fr.cliente_nombre LIKE ? OR fr.cliente_id LIKE ? OR fr.cliente_correo LIKE ? OR fr.celular_cliente LIKE ?
+            ORDER BY fr.fecha_creacion DESC
             LIMIT 20
         ");
         $stmt->execute([$term, $term, $term, $term]);
@@ -59,9 +104,11 @@ try {
     $rows = [];
     if ($limite > 0) {
         $limiteSql = min($limite, 1000);
+        $adjCount = sol_fin_sql_adjuntos_count($pdo, 'fr.id');
         $sqlFiltrado = "
             SELECT fr.id, fr.fecha_creacion, fr.cliente_nombre, fr.cliente_id, fr.cliente_correo, fr.celular_cliente,
-                   fr.empresa_nombre, fr.empresa_salario, fr.marca_auto, fr.modelo_auto, fr.anio_auto, fr.precio_venta
+                   fr.empresa_nombre, fr.empresa_salario, fr.marca_auto, fr.modelo_auto, fr.anio_auto, fr.precio_venta,
+                   {$adjCount} AS adjuntos_count
             FROM financiamiento_registros fr
             WHERE NOT EXISTS (
                 SELECT 1 FROM solicitudes_credito sc
@@ -79,22 +126,26 @@ try {
         } catch (PDOException $e) {
             // Columna no migrada, tablas en otras bases, etc.: devolver listado sin filtrar.
             error_log('sol_financiamiento listado (fallback sin filtro vínculo solicitud): ' . $e->getMessage());
+            $adjCountFb = sol_fin_sql_adjuntos_count($pdo, 'fr.id');
             $sqlSimple = "
-                SELECT id, fecha_creacion, cliente_nombre, cliente_id, cliente_correo, celular_cliente,
-                       empresa_nombre, empresa_salario, marca_auto, modelo_auto, anio_auto, precio_venta
-                FROM financiamiento_registros
-                ORDER BY fecha_creacion DESC
+                SELECT fr.id, fr.fecha_creacion, fr.cliente_nombre, fr.cliente_id, fr.cliente_correo, fr.celular_cliente,
+                       fr.empresa_nombre, fr.empresa_salario, fr.marca_auto, fr.modelo_auto, fr.anio_auto, fr.precio_venta,
+                       {$adjCountFb} AS adjuntos_count
+                FROM financiamiento_registros fr
+                ORDER BY fr.fecha_creacion DESC
                 LIMIT {$limiteSql}
             ";
             $stmt = $pdo->query($sqlSimple);
             $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
     } else {
+        $adjCountAll = sol_fin_sql_adjuntos_count($pdo, 'fr.id');
         $sql = "
-            SELECT id, fecha_creacion, cliente_nombre, cliente_id, cliente_correo, celular_cliente,
-                   empresa_nombre, empresa_salario, marca_auto, modelo_auto, anio_auto, precio_venta
-            FROM financiamiento_registros
-            ORDER BY fecha_creacion DESC
+            SELECT fr.id, fr.fecha_creacion, fr.cliente_nombre, fr.cliente_id, fr.cliente_correo, fr.celular_cliente,
+                   fr.empresa_nombre, fr.empresa_salario, fr.marca_auto, fr.modelo_auto, fr.anio_auto, fr.precio_venta,
+                   {$adjCountAll} AS adjuntos_count
+            FROM financiamiento_registros fr
+            ORDER BY fr.fecha_creacion DESC
         ";
         $stmt = $pdo->query($sql);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);

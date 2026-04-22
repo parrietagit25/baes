@@ -315,6 +315,26 @@ function crearSolicitud() {
         $stmt->execute($valoresInsert);
         
         $solicitudId = $pdo->lastInsertId();
+
+        if ($finRegId > 0) {
+            try {
+                require_once __DIR__ . '/../includes/copiar_adjuntos_solicitud.php';
+                $nCopiados = copiarAdjuntosDesdeRegistroFinanciamiento($pdo, $finRegId, (int) $solicitudId, (int) $_SESSION['user_id']);
+                if ($nCopiados > 0) {
+                    registrarHistorialSolicitud(
+                        $pdo,
+                        (int) $solicitudId,
+                        (int) $_SESSION['user_id'],
+                        'documento_agregado',
+                        'Se copiaron ' . $nCopiados . ' adjunto(s) desde Solicitud de Financiamiento',
+                        null,
+                        null
+                    );
+                }
+            } catch (Throwable $e) {
+                error_log('crearSolicitud copiar adjuntos financiamiento: ' . $e->getMessage());
+            }
+        }
         
         // Crear nota inicial
         $stmt = $pdo->prepare("

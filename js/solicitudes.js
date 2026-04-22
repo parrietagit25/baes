@@ -576,7 +576,12 @@ function cargarClientesFinanciamientoSelect() {
         $sel.empty();
         $sel.append($('<option></option>').val('').text('Seleccionar cliente...'));
         res.data.forEach(function(item) {
-            var texto = [item.cliente_nombre, item.cliente_id, item.cliente_correo].filter(Boolean).join(' — ');
+            var nAdj = parseInt(item.adjuntos_count, 10);
+            if (isNaN(nAdj) || nAdj < 0) {
+                nAdj = 0;
+            }
+            var texto = [item.cliente_nombre, item.cliente_id, item.cliente_correo].filter(Boolean).join(' — ')
+                + ' — adjuntos (' + nAdj + ')';
             $sel.append($('<option></option>').val(String(item.id)).text(texto));
         });
         var vinc = String($('#financiamiento_registro_id').val() || '').trim();

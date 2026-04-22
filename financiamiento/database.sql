@@ -106,11 +106,13 @@ CREATE TABLE IF NOT EXISTS financiamiento_registros (
     comentarios_gestor text DEFAULT NULL,
     firma longtext DEFAULT NULL,
     firmantes_adicionales text DEFAULT NULL,
+    solicitud_credito_id int(11) DEFAULT NULL COMMENT 'Solicitud Motus creada desde este envío (adjuntos)',
 
     PRIMARY KEY (id),
     KEY idx_fecha (fecha_creacion),
     KEY idx_cliente_id (cliente_id),
-    KEY idx_cliente_correo (cliente_correo)
+    KEY idx_cliente_correo (cliente_correo),
+    KEY idx_fin_reg_solicitud_credito (solicitud_credito_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 

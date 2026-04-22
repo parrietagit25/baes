@@ -553,6 +553,7 @@ if (!$pdoReg && is_file(__DIR__ . '/../config/database.php')) {
         logSolPub('financiamiento database: ' . $e->getMessage());
     }
 }
+$finRegistroInsertId = 0;
 if ($pdoReg) {
     try {
         $v = function($key, $trim = true) use ($input) {
@@ -628,6 +629,7 @@ if ($pdoReg) {
             $v('marca_auto'), $v('modelo_auto'), $vInt('anio_auto'), $vInt('kms_cod_auto'), $vNum('precio_venta'), $vNum('abono'),
             $v('sucursal'), $v('nombre_gestor'), $v('comentarios_gestor'), $firmaBase64 ?: null, isset($input['firmantes_adicionales']) ? $input['firmantes_adicionales'] : null
         ]);
+        $finRegistroInsertId = (int) $pdoReg->lastInsertId();
     } catch (PDOException $e) {
         logSolPub('financiamiento_registros: ' . $e->getMessage());
     } catch (Throwable $e) {
@@ -694,6 +696,14 @@ if (is_file($configPath) && is_file($historialPath)) {
                     toNum($input['precio_venta'] ?? null), toNum($input['abono'] ?? null), $comentariosGestor
                 ]);
                 $solicitudId = (int) $pdo->lastInsertId();
+                if ($finRegistroInsertId > 0 && $pdoReg instanceof PDO && $solicitudId > 0) {
+                    try {
+                        $uFr = $pdoReg->prepare('UPDATE financiamiento_registros SET solicitud_credito_id = ? WHERE id = ?');
+                        $uFr->execute([$solicitudId, $finRegistroInsertId]);
+                    } catch (Throwable $e) {
+                        logSolPub('financiamiento solicitud_credito_id: ' . $e->getMessage());
+                    }
+                }
                 try {
                     $stmtNota = $pdo->prepare("INSERT INTO notas_solicitud (solicitud_id, usuario_id, tipo_nota, titulo, contenido) VALUES (?, ?, 'Comentario', 'Solicitud desde formulario público', 'Solicitud enviada desde el formulario de financiamiento (sin login).')");
                     $stmtNota->execute([$solicitudId, $gestorId]);
