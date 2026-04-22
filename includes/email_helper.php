@@ -667,6 +667,7 @@ function enviarResumenSolicitudBancoTodosUnCorreo($solicitudId) {
         $bancos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         $bcc = [];
+        $cc = [];
         $idsUsuariosBanco = [];
         foreach ($bancos as $row) {
             $uid = isset($row['usuario_banco_id']) ? (int) $row['usuario_banco_id'] : 0;
@@ -691,7 +692,7 @@ function enviarResumenSolicitudBancoTodosUnCorreo($solicitudId) {
             if ($vendedor && !empty($vendedor['email'])) {
                 $emailVendedor = trim((string) $vendedor['email']);
                 if ($emailVendedor !== '' && filter_var($emailVendedor, FILTER_VALIDATE_EMAIL)) {
-                    $bcc[] = $emailVendedor;
+                    $cc[] = $emailVendedor;
                 }
             }
         }
@@ -699,7 +700,7 @@ function enviarResumenSolicitudBancoTodosUnCorreo($solicitudId) {
         if (!empty($solicitud['email_pipedrive'])) {
             $emailPipe = trim((string) $solicitud['email_pipedrive']);
             if ($emailPipe !== '' && filter_var($emailPipe, FILTER_VALIDATE_EMAIL)) {
-                $bcc[] = $emailPipe;
+                $cc[] = $emailPipe;
             }
         }
 
@@ -803,7 +804,7 @@ function enviarResumenSolicitudBancoTodosUnCorreo($solicitudId) {
             '',
             strip_tags(preg_replace('/<br\s*\/?>/i', "\n", $html)),
             $archivosAdjuntos,
-            [],
+            array_values(array_unique($cc)),
             $bcc,
             $replyToGestor
         );

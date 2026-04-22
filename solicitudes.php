@@ -1855,7 +1855,7 @@ if ($isBanco && !$isAdmin) {
                 </div>
                 <div class="modal-body">
                     <p class="mb-2">¿Desea enviar por correo un resumen de la solicitud (datos generales, perfil financiero, datos del auto, análisis y adjuntos) a <strong><span class="resumen-todos-cantidad">0</span></strong> usuario(s) banco asignado(s)?</p>
-                    <p class="small text-muted mb-0">Se enviará un solo correo con los usuarios banco en copia oculta (CCO), incluyendo también vendedor y correo Pipedrive cuando existan; las respuestas irán al gestor asignado.</p>
+                    <p class="small text-muted mb-0">Se enviará un solo correo con los usuarios banco en copia oculta (CCO), y con vendedor + correo Pipedrive en copia (CC) cuando existan; las respuestas irán al gestor asignado.</p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
