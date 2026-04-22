@@ -152,10 +152,8 @@ $(document).ready(function() {
         $('#imagenVehiculoModal').modal('show');
     });
 
-    // Cargar desde Sol Financiamiento: select con clientes registrados
-    $('#solicitudModal').on('show.bs.modal', function() {
-        cargarClientesFinanciamientoSelect();
-    });
+    // Cargar desde Sol Financiamiento: el listado se pide desde limpiarFormularioSolicitud() / llenarFormularioEdicion()
+    // para no ejecutar show.bs.modal antes del onclick (solicitud_id stale filtraba todos los registros).
     $('#solicitudModal').on('hidden.bs.modal', function() {
         destruirClienteFinanciamientoSelect2();
     });
@@ -514,6 +512,8 @@ function limpiarFormularioSolicitud() {
     
     // Ocultar pestaña "Cita y Firma" al crear nueva solicitud
     $('#cita-firma-tab-li').hide();
+
+    cargarClientesFinanciamientoSelect();
 }
 
 // ==================== Cargar desde Sol Financiamiento (select) ====================
@@ -536,6 +536,7 @@ function initClienteFinanciamientoSelect2() {
         dropdownParent: $('#solicitudModal'),
         placeholder: $sel.data('placeholder') || 'Seleccionar cliente...',
         allowClear: true,
+        minimumResultsForSearch: 8,
         language: {
             noResults: function() { return 'Sin coincidencias'; },
             searching: function() { return 'Buscando…'; }
@@ -572,7 +573,11 @@ function cargarClientesFinanciamientoSelect() {
         params.solicitud_id = sid;
     }
     $.get('api/sol_financiamiento.php', params, function(res) {
-        if (!res.success || !res.data) return;
+        if (!res.success || !Array.isArray(res.data)) {
+            $sel.empty().append($('<option></option>').val('').text('No se pudo cargar el listado'));
+            initClienteFinanciamientoSelect2();
+            return;
+        }
         $sel.empty();
         $sel.append($('<option></option>').val('').text('Seleccionar cliente...'));
         res.data.forEach(function(item) {
@@ -1068,7 +1073,9 @@ function llenarFormularioEdicion(solicitud) {
     
     // Verificar si hay evaluación seleccionada para mostrar/ocultar pestaña "Cita y Firma"
     verificarEvaluacionSeleccionada(solicitud.id);
-    
+
+    cargarClientesFinanciamientoSelect();
+
     // Mostrar modal
     $('#solicitudModal').modal('show');
 }
