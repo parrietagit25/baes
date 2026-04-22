@@ -15,6 +15,7 @@ if (!isset($_SESSION['user_id'])) {
 $userRoles = $_SESSION['user_roles'] ?? [];
 $puedeAcceder = in_array('ROLE_ADMIN', $userRoles) || in_array('ROLE_GESTOR', $userRoles)
     || in_array('ROLE_BANCO', $userRoles) || in_array('ROLE_VENDEDOR', $userRoles);
+$isAdmin = in_array('ROLE_ADMIN', $userRoles);
 if (!$puedeAcceder) {
     http_response_code(403);
     echo json_encode(['success' => false, 'message' => 'Acceso denegado']);
@@ -63,7 +64,21 @@ function sol_fin_sql_adjuntos_count(PDO $pdo, string $frIdRef): string {
             OR a.solicitud_id = (SELECT frc.solicitud_credito_id FROM financiamiento_registros frc WHERE frc.id = {$frIdRef} AND frc.solicitud_credito_id IS NOT NULL)
         )";
     }
-    return "(SELECT COUNT(*) FROM adjuntos_solicitud a WHERE a.solicitud_id IN (SELECT sc.id FROM solicitudes_credito sc WHERE sc.financiamiento_registro_id = {$frIdRef}))";
+    return "(SELECT COUNT(*) FROM adjuntos_solicitud a WHERE a.solicitud_id IN (
+        SELECT sc.id
+        FROM solicitudes_credito sc
+        LEFT JOIN financiamiento_registros frx ON frx.id = {$frIdRef}
+        WHERE sc.financiamiento_registro_id = {$frIdRef}
+           OR (
+                sc.comentarios_gestor LIKE '%[Solicitud desde formulario público]%'
+                AND frx.cliente_id IS NOT NULL AND frx.cliente_id <> ''
+                AND sc.cedula = frx.cliente_id
+                AND (
+                    (frx.cliente_correo IS NOT NULL AND frx.cliente_correo <> '' AND sc.email = frx.cliente_correo)
+                    OR (frx.cliente_nombre IS NOT NULL AND frx.cliente_nombre <> '' AND sc.nombre_cliente = frx.cliente_nombre)
+                )
+           )
+    ))";
 }
 
 function sol_fin_adjuntar_cero_adjuntos(array $rows): array {
@@ -75,6 +90,28 @@ function sol_fin_adjuntar_cero_adjuntos(array $rows): array {
 }
 
 try {
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && (($_POST['action'] ?? '') === 'delete')) {
+        if (!$isAdmin) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Solo el administrador puede borrar registros.']);
+            exit;
+        }
+        $id = isset($_POST['id']) ? trim((string) $_POST['id']) : '';
+        if ($id === '' || !ctype_digit($id)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'ID inválido.']);
+            exit;
+        }
+        $stmt = $pdo->prepare('DELETE FROM financiamiento_registros WHERE id = ?');
+        $stmt->execute([(int) $id]);
+        if ($stmt->rowCount() < 1) {
+            echo json_encode(['success' => false, 'message' => 'Registro no encontrado o ya eliminado.']);
+            exit;
+        }
+        echo json_encode(['success' => true, 'message' => 'Registro eliminado correctamente.']);
+        exit;
+    }
+
     if (isset($_GET['id']) && ctype_digit($_GET['id'])) {
         $stmt = $pdo->prepare("SELECT * FROM financiamiento_registros WHERE id = ?");
         $stmt->execute([$_GET['id']]);

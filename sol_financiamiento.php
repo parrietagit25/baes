@@ -100,6 +100,8 @@ $isGestor = in_array('ROLE_GESTOR', $userRoles);
     <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
     <script>
     $(function() {
+        var esAdmin = <?php echo $isAdmin ? 'true' : 'false'; ?>;
+
         function enhanceSignatureForView(imgEl, base64) {
             try {
                 if (!imgEl || !base64 || String(base64).length < 50) return;
@@ -157,8 +159,12 @@ $isGestor = in_array('ROLE_GESTOR', $userRoles);
                     return v.length ? v.join(' ') : '—';
                 }},
                 { data: null, orderable: false, render: function(row) {
-                    return '<a href="api/sol_financiamiento_pdf.php?id=' + row.id + '" class="btn btn-sm btn-success me-1" target="_blank" title="Descargar PDF"><i class="fas fa-file-pdf"></i> PDF</a>' +
-                           '<button type="button" class="btn btn-sm btn-info btn-ver-detalle" data-id="' + row.id + '"><i class="fas fa-eye"></i> Ver detalle</button>';
+                    var html = '<a href="api/sol_financiamiento_pdf.php?id=' + row.id + '" class="btn btn-sm btn-success me-1" target="_blank" title="Descargar PDF"><i class="fas fa-file-pdf"></i> PDF</a>' +
+                               '<button type="button" class="btn btn-sm btn-info btn-ver-detalle me-1" data-id="' + row.id + '"><i class="fas fa-eye"></i> Ver detalle</button>';
+                    if (esAdmin) {
+                        html += '<button type="button" class="btn btn-sm btn-danger btn-borrar-registro" data-id="' + row.id + '"><i class="fas fa-trash"></i> Borrar</button>';
+                    }
+                    return html;
                 }}
             ],
             order: [[0, 'desc']],
@@ -223,6 +229,35 @@ $isGestor = in_array('ROLE_GESTOR', $userRoles);
                 })
                 .fail(function() {
                     $content.html('<p class="text-danger">Error al cargar.</p>');
+                });
+        });
+
+        $(document).on('click', '.btn-borrar-registro', function() {
+            if (!esAdmin) {
+                return;
+            }
+            var id = $(this).data('id');
+            if (!id) {
+                return;
+            }
+            if (!confirm('¿Seguro que deseas borrar el registro #' + id + '? Esta acción no se puede deshacer.')) {
+                return;
+            }
+            $.post('api/sol_financiamiento.php', { action: 'delete', id: id })
+                .done(function(res) {
+                    if (res && res.success) {
+                        alert(res.message || 'Registro eliminado.');
+                        table.ajax.reload(null, false);
+                    } else {
+                        alert((res && res.message) ? res.message : 'No se pudo borrar el registro.');
+                    }
+                })
+                .fail(function(xhr) {
+                    var msg = 'Error al borrar el registro.';
+                    if (xhr && xhr.responseJSON && xhr.responseJSON.message) {
+                        msg = xhr.responseJSON.message;
+                    }
+                    alert(msg);
                 });
         });
     });

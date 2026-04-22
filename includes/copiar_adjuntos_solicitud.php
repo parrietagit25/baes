@@ -217,6 +217,34 @@ function copiarAdjuntosDesdeRegistroFinanciamiento(PDO $pdo, int $finRegistroId,
         error_log('copiarAdjuntosDesdeRegistroFinanciamiento (financiamiento_registro_id): ' . $e->getMessage());
     }
 
+    // Fallback para instalaciones sin solicitud_credito_id:
+    // ubica la solicitud origen creada por formulario público por cédula + (email o nombre).
+    try {
+        $st3 = $pdo->prepare("
+            SELECT sc.id
+            FROM solicitudes_credito sc
+            INNER JOIN financiamiento_registros fr ON fr.id = ?
+            WHERE sc.id <> ?
+              AND sc.comentarios_gestor LIKE '%[Solicitud desde formulario público]%'
+              AND fr.cliente_id IS NOT NULL AND fr.cliente_id <> ''
+              AND sc.cedula = fr.cliente_id
+              AND (
+                    (fr.cliente_correo IS NOT NULL AND fr.cliente_correo <> '' AND sc.email = fr.cliente_correo)
+                    OR
+                    (fr.cliente_nombre IS NOT NULL AND fr.cliente_nombre <> '' AND sc.nombre_cliente = fr.cliente_nombre)
+                  )
+            ORDER BY sc.id DESC
+            LIMIT 1
+        ");
+        $st3->execute([$finRegistroId, $nuevaSolicitudId]);
+        $fallbackOrigen = (int) $st3->fetchColumn();
+        if ($fallbackOrigen > 0 && $fallbackOrigen !== $nuevaSolicitudId) {
+            $origenes[] = $fallbackOrigen;
+        }
+    } catch (Throwable $e) {
+        error_log('copiarAdjuntosDesdeRegistroFinanciamiento (fallback por cedula/email): ' . $e->getMessage());
+    }
+
     $origenes = array_values(array_unique($origenes));
     $total = 0;
     foreach ($origenes as $oid) {
