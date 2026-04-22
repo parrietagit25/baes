@@ -926,7 +926,6 @@ function construirResumenSolicitudHtml($solicitud, $vehiculos, $evaluaciones, $a
     $appendCampoSiTieneValor($html, 'Casa/Edificio', $solicitud['casa_edif'] ?? null);
     $appendCampoSiTieneValor($html, 'Número Casa/Apto', $solicitud['numero_casa_apto'] ?? null);
     $appendCampoSiTieneValor($html, 'Dirección', $solicitud['direccion'] ?? null);
-    $appendCampoSiTieneValor($html, 'Estado', $solicitud['estado'] ?? null);
     $html .= '</div>';
 
     $html .= '<h3>Perfil financiero</h3><div class="info-box" style="background:#f8f9fa;border-left:4px solid #28a745;padding:12px;margin:10px 0;">';
