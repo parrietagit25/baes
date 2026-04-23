@@ -30,6 +30,32 @@ function financiamiento_registros_tiene_columna(PDO $pdo, string $nombreColumna)
     return $cache[$nombreColumna];
 }
 
+function solicitudes_credito_tiene_columna(PDO $pdo, string $nombreColumna): bool {
+    static $cache = [];
+    if (array_key_exists($nombreColumna, $cache)) {
+        return $cache[$nombreColumna];
+    }
+    try {
+        $dbName = $pdo->query('SELECT DATABASE()')->fetchColumn();
+        if (!$dbName) {
+            $cache[$nombreColumna] = false;
+            return false;
+        }
+        $stmt = $pdo->prepare("
+            SELECT COUNT(*)
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = ?
+              AND TABLE_NAME = 'solicitudes_credito'
+              AND COLUMN_NAME = ?
+        ");
+        $stmt->execute([$dbName, $nombreColumna]);
+        $cache[$nombreColumna] = ((int) $stmt->fetchColumn()) > 0;
+    } catch (Throwable $e) {
+        $cache[$nombreColumna] = false;
+    }
+    return $cache[$nombreColumna];
+}
+
 function adjuntos_solicitud_tamano_columna(PDO $pdo): ?string {
     static $col = '__unset__';
     if ($col !== '__unset__') {
@@ -204,17 +230,19 @@ function copiarAdjuntosDesdeRegistroFinanciamiento(PDO $pdo, int $finRegistroId,
         }
     }
 
-    try {
-        $st2 = $pdo->prepare('SELECT id FROM solicitudes_credito WHERE financiamiento_registro_id = ? AND id <> ?');
-        $st2->execute([$finRegistroId, $nuevaSolicitudId]);
-        foreach ($st2->fetchAll(PDO::FETCH_COLUMN) as $oid) {
-            $oid = (int) $oid;
-            if ($oid > 0 && $oid !== $nuevaSolicitudId) {
-                $origenes[] = $oid;
+    if (solicitudes_credito_tiene_columna($pdo, 'financiamiento_registro_id')) {
+        try {
+            $st2 = $pdo->prepare('SELECT id FROM solicitudes_credito WHERE financiamiento_registro_id = ? AND id <> ?');
+            $st2->execute([$finRegistroId, $nuevaSolicitudId]);
+            foreach ($st2->fetchAll(PDO::FETCH_COLUMN) as $oid) {
+                $oid = (int) $oid;
+                if ($oid > 0 && $oid !== $nuevaSolicitudId) {
+                    $origenes[] = $oid;
+                }
             }
+        } catch (Throwable $e) {
+            error_log('copiarAdjuntosDesdeRegistroFinanciamiento (financiamiento_registro_id): ' . $e->getMessage());
         }
-    } catch (Throwable $e) {
-        error_log('copiarAdjuntosDesdeRegistroFinanciamiento (financiamiento_registro_id): ' . $e->getMessage());
     }
 
     // Fallback para instalaciones sin solicitud_credito_id:

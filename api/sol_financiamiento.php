@@ -54,31 +54,70 @@ function sol_fin_fr_tiene_solicitud_credito_id(PDO $pdo): bool {
 }
 
 /**
+ * Columna opcional en solicitudes_credito para vínculo directo con financiamiento_registros.
+ */
+function sol_fin_sc_tiene_financiamiento_registro_id(PDO $pdo): bool {
+    static $cache = null;
+    if ($cache !== null) {
+        return $cache;
+    }
+    try {
+        $db = $pdo->query('SELECT DATABASE()')->fetchColumn();
+        if (!$db) {
+            $cache = false;
+            return false;
+        }
+        $s = $pdo->prepare("
+            SELECT COUNT(*)
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = ?
+              AND TABLE_NAME = 'solicitudes_credito'
+              AND COLUMN_NAME = 'financiamiento_registro_id'
+        ");
+        $s->execute([$db]);
+        $cache = ((int) $s->fetchColumn()) > 0;
+    } catch (Throwable $e) {
+        $cache = false;
+    }
+    return $cache;
+}
+
+/**
  * Expresión SQL correlacionada: cantidad de adjuntos vinculados al registro fr.
  * Evita IN(SELECT … UNION …) (puede fallar o comportarse distinto según versión MySQL/MariaDB).
  */
 function sol_fin_sql_adjuntos_count(PDO $pdo, string $frIdRef): string {
-    if (sol_fin_fr_tiene_solicitud_credito_id($pdo)) {
-        return "(SELECT COUNT(*) FROM adjuntos_solicitud a WHERE
-            a.solicitud_id IN (SELECT sc.id FROM solicitudes_credito sc WHERE sc.financiamiento_registro_id = {$frIdRef})
-            OR a.solicitud_id = (SELECT frc.solicitud_credito_id FROM financiamiento_registros frc WHERE frc.id = {$frIdRef} AND frc.solicitud_credito_id IS NOT NULL)
-        )";
+    $condiciones = [];
+    $tieneScFinReg = sol_fin_sc_tiene_financiamiento_registro_id($pdo);
+    $tieneFrSolCred = sol_fin_fr_tiene_solicitud_credito_id($pdo);
+
+    if ($tieneScFinReg) {
+        $condiciones[] = "a.solicitud_id IN (SELECT sc.id FROM solicitudes_credito sc WHERE sc.financiamiento_registro_id = {$frIdRef})";
     }
-    return "(SELECT COUNT(*) FROM adjuntos_solicitud a WHERE a.solicitud_id IN (
+
+    if ($tieneFrSolCred) {
+        $condiciones[] = "a.solicitud_id = (SELECT frc.solicitud_credito_id FROM financiamiento_registros frc WHERE frc.id = {$frIdRef} AND frc.solicitud_credito_id IS NOT NULL)";
+    }
+
+    // Heurística de respaldo para instalaciones sin columnas de vínculo o con datos históricos.
+    $condiciones[] = "a.solicitud_id IN (
         SELECT sc.id
         FROM solicitudes_credito sc
         LEFT JOIN financiamiento_registros frx ON frx.id = {$frIdRef}
-        WHERE sc.financiamiento_registro_id = {$frIdRef}
-           OR (
-                sc.comentarios_gestor LIKE '%[Solicitud desde formulario público]%'
-                AND frx.cliente_id IS NOT NULL AND frx.cliente_id <> ''
-                AND sc.cedula = frx.cliente_id
-                AND (
-                    (frx.cliente_correo IS NOT NULL AND frx.cliente_correo <> '' AND sc.email = frx.cliente_correo)
-                    OR (frx.cliente_nombre IS NOT NULL AND frx.cliente_nombre <> '' AND sc.nombre_cliente = frx.cliente_nombre)
-                )
-           )
-    ))";
+        WHERE sc.comentarios_gestor LIKE '%[Solicitud desde formulario público]%'
+          AND frx.cliente_id IS NOT NULL AND frx.cliente_id <> ''
+          AND sc.cedula = frx.cliente_id
+          AND (
+                (frx.cliente_correo IS NOT NULL AND frx.cliente_correo <> '' AND sc.email = frx.cliente_correo)
+                OR (frx.cliente_nombre IS NOT NULL AND frx.cliente_nombre <> '' AND sc.nombre_cliente = frx.cliente_nombre)
+          )
+    )";
+
+    if (!$condiciones) {
+        return "0";
+    }
+
+    return "(SELECT COUNT(*) FROM adjuntos_solicitud a WHERE " . implode(' OR ', $condiciones) . ")";
 }
 
 function sol_fin_adjuntar_cero_adjuntos(array $rows): array {
