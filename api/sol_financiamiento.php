@@ -106,15 +106,12 @@ function sol_fin_sql_adjuntos_count(PDO $pdo, string $frIdRef): string {
         FROM solicitudes_credito sc
         LEFT JOIN financiamiento_registros frx ON frx.id = {$frIdRef}
         WHERE frx.cliente_id IS NOT NULL AND frx.cliente_id <> ''
-          AND sc.cedula = frx.cliente_id
-          AND (
-                (frx.cliente_correo IS NOT NULL AND frx.cliente_correo <> '' AND sc.email = frx.cliente_correo)
-                OR (frx.cliente_nombre IS NOT NULL AND frx.cliente_nombre <> '' AND sc.nombre_cliente = frx.cliente_nombre)
-          )
+          AND REPLACE(REPLACE(UPPER(COALESCE(sc.cedula,'')),'-',''),' ','') =
+              REPLACE(REPLACE(UPPER(COALESCE(frx.cliente_id,'')),'-',''),' ','')
           AND (
                 frx.fecha_creacion IS NULL
                 OR sc.fecha_creacion IS NULL
-                OR ABS(TIMESTAMPDIFF(DAY, sc.fecha_creacion, frx.fecha_creacion)) <= 7
+                OR ABS(TIMESTAMPDIFF(DAY, sc.fecha_creacion, frx.fecha_creacion)) <= 30
           )
     )";
 
@@ -169,23 +166,16 @@ function sol_fin_obtener_adjuntos_por_registro(PDO $pdo, int $frId): array {
                 SELECT sc2.id
                 FROM solicitudes_credito sc2
                 INNER JOIN financiamiento_registros fr2 ON fr2.id = ?
-                WHERE sc2.cedula = ?
+                WHERE REPLACE(REPLACE(UPPER(COALESCE(sc2.cedula,'')),'-',''),' ','') =
+                      REPLACE(REPLACE(UPPER(COALESCE(?,'')),'-',''),' ','')
         ";
         $params[] = $frId;
         $params[] = (string)$fr['cliente_id'];
-        if (!empty($fr['cliente_correo'])) {
-            $fallback .= " AND (sc2.email = ? OR sc2.nombre_cliente = ?)";
-            $params[] = (string)$fr['cliente_correo'];
-            $params[] = (string)($fr['cliente_nombre'] ?? '');
-        } elseif (!empty($fr['cliente_nombre'])) {
-            $fallback .= " AND sc2.nombre_cliente = ?";
-            $params[] = (string)$fr['cliente_nombre'];
-        }
         $fallback .= "
                 AND (
                     fr2.fecha_creacion IS NULL
                     OR sc2.fecha_creacion IS NULL
-                    OR ABS(TIMESTAMPDIFF(DAY, sc2.fecha_creacion, fr2.fecha_creacion)) <= 7
+                    OR ABS(TIMESTAMPDIFF(DAY, sc2.fecha_creacion, fr2.fecha_creacion)) <= 30
                 )
         ";
         $fallback .= ")";
