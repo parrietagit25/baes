@@ -94,6 +94,23 @@ $isGestor = in_array('ROLE_GESTOR', $userRoles);
         </div>
     </div>
 
+    <div class="modal fade" id="adjuntosModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header" style="background: linear-gradient(135deg, #4f46e5 0%, #2563eb 100%);">
+                    <h5 class="modal-title text-white"><i class="fas fa-paperclip me-2"></i>Adjuntos del registro</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="adjuntosContent">
+                    <p class="text-muted">Cargando...</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
@@ -160,7 +177,8 @@ $isGestor = in_array('ROLE_GESTOR', $userRoles);
                 }},
                 { data: null, orderable: false, render: function(row) {
                     var html = '<a href="api/sol_financiamiento_pdf.php?id=' + row.id + '" class="btn btn-sm btn-success me-1" target="_blank" title="Descargar PDF"><i class="fas fa-file-pdf"></i> PDF</a>' +
-                               '<button type="button" class="btn btn-sm btn-info btn-ver-detalle me-1" data-id="' + row.id + '"><i class="fas fa-eye"></i> Ver detalle</button>';
+                               '<button type="button" class="btn btn-sm btn-info btn-ver-detalle me-1" data-id="' + row.id + '"><i class="fas fa-eye"></i> Ver detalle</button>' +
+                               '<button type="button" class="btn btn-sm btn-primary btn-ver-adjuntos me-1" data-id="' + row.id + '"><i class="fas fa-paperclip"></i> Adjuntos</button>';
                     if (esAdmin) {
                         html += '<button type="button" class="btn btn-sm btn-danger btn-borrar-registro" data-id="' + row.id + '"><i class="fas fa-trash"></i> Borrar</button>';
                     }
@@ -258,6 +276,49 @@ $isGestor = in_array('ROLE_GESTOR', $userRoles);
                         msg = xhr.responseJSON.message;
                     }
                     alert(msg);
+                });
+        });
+
+        $(document).on('click', '.btn-ver-adjuntos', function() {
+            var id = $(this).data('id');
+            var $content = $('#adjuntosContent');
+            $content.html('<p class="text-muted">Cargando adjuntos...</p>');
+            $('#adjuntosModal').modal('show');
+
+            $.get('api/sol_financiamiento.php?adjuntos_id=' + id)
+                .done(function(res) {
+                    if (!res || !res.success) {
+                        $content.html('<p class="text-danger">No se pudieron consultar los adjuntos.</p>');
+                        return;
+                    }
+                    var rows = Array.isArray(res.data) ? res.data : [];
+                    if (!rows.length) {
+                        $content.html('<p class="text-muted mb-0">Este registro no tiene adjuntos vinculados.</p>');
+                        return;
+                    }
+                    var html = '<div class="list-group">';
+                    rows.forEach(function(a) {
+                        var nombre = a.nombre_original || a.ruta_archivo || ('Adjunto #' + a.id);
+                        var ruta = String(a.ruta_archivo || '');
+                        var href = ruta ? ruta.replace(/^\/+/, '') : '#';
+                        var tipo = a.tipo_archivo || '—';
+                        var fecha = a.fecha_subida || '—';
+                        var solicitud = a.solicitud_id || '—';
+
+                        html += '<a href="' + href + '" target="_blank" rel="noopener" class="list-group-item list-group-item-action">';
+                        html +=   '<div class="d-flex w-100 justify-content-between">';
+                        html +=     '<h6 class="mb-1"><i class="fas fa-file me-2 text-primary"></i>' + $('<div>').text(nombre).html() + '</h6>';
+                        html +=     '<small class="text-muted">Solicitud #' + $('<div>').text(String(solicitud)).html() + '</small>';
+                        html +=   '</div>';
+                        html +=   '<p class="mb-1"><code>' + $('<div>').text(ruta || '—').html() + '</code></p>';
+                        html +=   '<small class="text-muted">Tipo: ' + $('<div>').text(tipo).html() + ' · Fecha: ' + $('<div>').text(String(fecha)).html() + '</small>';
+                        html += '</a>';
+                    });
+                    html += '</div>';
+                    $content.html(html);
+                })
+                .fail(function() {
+                    $content.html('<p class="text-danger">Error al cargar adjuntos.</p>');
                 });
         });
     });

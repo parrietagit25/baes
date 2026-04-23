@@ -128,6 +128,79 @@ function sol_fin_adjuntar_cero_adjuntos(array $rows): array {
     return $rows;
 }
 
+/**
+ * Lista adjuntos vinculados a un registro de financiamiento.
+ *
+ * @return array<int, array<string, mixed>>
+ */
+function sol_fin_obtener_adjuntos_por_registro(PDO $pdo, int $frId): array {
+    if ($frId <= 0) {
+        return [];
+    }
+
+    $stmtFr = $pdo->prepare("SELECT id, cliente_id, cliente_correo, cliente_nombre, solicitud_credito_id FROM financiamiento_registros WHERE id = ?");
+    $stmtFr->execute([$frId]);
+    $fr = $stmtFr->fetch(PDO::FETCH_ASSOC);
+    if (!$fr) {
+        return [];
+    }
+
+    $orConds = [];
+    $params = [];
+    $tieneScFinReg = sol_fin_sc_tiene_financiamiento_registro_id($pdo);
+    $tieneFrSolCred = sol_fin_fr_tiene_solicitud_credito_id($pdo);
+
+    if ($tieneScFinReg) {
+        $orConds[] = "s.id IN (SELECT sc.id FROM solicitudes_credito sc WHERE sc.financiamiento_registro_id = ?)";
+        $params[] = $frId;
+    }
+    if ($tieneFrSolCred && !empty($fr['solicitud_credito_id'])) {
+        $orConds[] = "s.id = ?";
+        $params[] = (int)$fr['solicitud_credito_id'];
+    }
+    if (!empty($fr['cliente_id'])) {
+        $fallback = "
+            s.id IN (
+                SELECT sc2.id
+                FROM solicitudes_credito sc2
+                WHERE sc2.comentarios_gestor LIKE '%[Solicitud desde formulario público]%'
+                  AND sc2.cedula = ?
+        ";
+        $params[] = (string)$fr['cliente_id'];
+        if (!empty($fr['cliente_correo'])) {
+            $fallback .= " AND (sc2.email = ? OR sc2.nombre_cliente = ?)";
+            $params[] = (string)$fr['cliente_correo'];
+            $params[] = (string)($fr['cliente_nombre'] ?? '');
+        } elseif (!empty($fr['cliente_nombre'])) {
+            $fallback .= " AND sc2.nombre_cliente = ?";
+            $params[] = (string)$fr['cliente_nombre'];
+        }
+        $fallback .= ")";
+        $orConds[] = $fallback;
+    }
+
+    if (!$orConds) {
+        return [];
+    }
+
+    $sql = "
+        SELECT
+            a.id,
+            a.solicitud_id,
+            a.nombre_original,
+            a.ruta_archivo,
+            a.tipo_archivo,
+            a.fecha_subida
+        FROM adjuntos_solicitud a
+        INNER JOIN solicitudes_credito s ON s.id = a.solicitud_id
+        WHERE " . implode(' OR ', $orConds) . "
+        ORDER BY a.fecha_subida DESC, a.id DESC
+    ";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+}
+
 try {
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && (($_POST['action'] ?? '') === 'delete')) {
         if (!$isAdmin) {
@@ -161,6 +234,13 @@ try {
         } else {
             echo json_encode(['success' => false, 'message' => 'Registro no encontrado']);
         }
+        exit;
+    }
+
+    if (isset($_GET['adjuntos_id']) && ctype_digit($_GET['adjuntos_id'])) {
+        $frId = (int)$_GET['adjuntos_id'];
+        $rows = sol_fin_obtener_adjuntos_por_registro($pdo, $frId);
+        echo json_encode(['success' => true, 'data' => $rows], JSON_UNESCAPED_UNICODE);
         exit;
     }
 
