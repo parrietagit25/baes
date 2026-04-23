@@ -118,6 +118,9 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
         <div class="full">
           <label for="apiUrl">Endpoint API</label>
           <input id="apiUrl" value="" />
+          <p class="muted" style="margin-top:6px;">
+            Recomendado para pruebas: endpoint local relativo (mismo servidor) para evitar bloqueo de Cloudflare.
+          </p>
         </div>
         <div>
           <label for="emailVendedor">Email vendedor (token)</label>
@@ -161,13 +164,17 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
       var estado = document.getElementById("estado");
       var adjuntosExtra = document.getElementById("adjuntosExtra");
 
-      function getDefaultApiUrl() {
-        if (apiUrlConfig && String(apiUrlConfig).trim() !== "") {
-          return String(apiUrlConfig).trim();
-        }
+      function getLocalApiUrl() {
         var p = window.location.pathname || "/";
         var base = p.replace(/\/financiamiento\/[^/]*$/, "");
         return window.location.origin + (base === "/" ? "" : base) + "/api/solicitud_publica.php";
+      }
+
+      function getDefaultApiUrl() {
+        // Para evitar 403 por challenge de Cloudflare en dominios externos,
+        // el formulario test usa por defecto el endpoint local del mismo host.
+        // Si necesitas apuntar a otro endpoint, puedes editar el campo manualmente.
+        return getLocalApiUrl();
       }
 
       function encodeBase64Url(text) {
@@ -372,6 +379,13 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
       }
 
       apiUrlInput.value = getDefaultApiUrl();
+      if (apiUrlConfig && String(apiUrlConfig).trim() !== "" && String(apiUrlConfig).trim() !== apiUrlInput.value) {
+        setState(
+          "Tip: se detecto un endpoint configurado externo en config.php.\n" +
+          "Para pruebas sin bloqueo, usa este endpoint local:\n" + apiUrlInput.value,
+          true
+        );
+      }
       refreshPayload();
 
       document.getElementById("btnAutoFill").addEventListener("click", refreshPayload);
