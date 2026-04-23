@@ -14,7 +14,7 @@ CREDENCIALES_SENDGRID.txt
 vendor/
 
 # Archivos temporales de desarrollo
-debug_*.php
+# debug_*.php
 verificar_*.php
 ejecutar_*.php
 migrar_*.php
