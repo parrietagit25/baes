@@ -100,16 +100,21 @@ function sol_fin_sql_adjuntos_count(PDO $pdo, string $frIdRef): string {
     }
 
     // Heurística de respaldo para instalaciones sin columnas de vínculo o con datos históricos.
+    // No depende del marcador en comentarios (puede truncarse en algunas instalaciones).
     $condiciones[] = "a.solicitud_id IN (
         SELECT sc.id
         FROM solicitudes_credito sc
         LEFT JOIN financiamiento_registros frx ON frx.id = {$frIdRef}
-        WHERE sc.comentarios_gestor LIKE '%[Solicitud desde formulario público]%'
-          AND frx.cliente_id IS NOT NULL AND frx.cliente_id <> ''
+        WHERE frx.cliente_id IS NOT NULL AND frx.cliente_id <> ''
           AND sc.cedula = frx.cliente_id
           AND (
                 (frx.cliente_correo IS NOT NULL AND frx.cliente_correo <> '' AND sc.email = frx.cliente_correo)
                 OR (frx.cliente_nombre IS NOT NULL AND frx.cliente_nombre <> '' AND sc.nombre_cliente = frx.cliente_nombre)
+          )
+          AND (
+                frx.fecha_creacion IS NULL
+                OR sc.fecha_creacion IS NULL
+                OR ABS(TIMESTAMPDIFF(DAY, sc.fecha_creacion, frx.fecha_creacion)) <= 7
           )
     )";
 
@@ -163,9 +168,10 @@ function sol_fin_obtener_adjuntos_por_registro(PDO $pdo, int $frId): array {
             s.id IN (
                 SELECT sc2.id
                 FROM solicitudes_credito sc2
-                WHERE sc2.comentarios_gestor LIKE '%[Solicitud desde formulario público]%'
-                  AND sc2.cedula = ?
+                INNER JOIN financiamiento_registros fr2 ON fr2.id = ?
+                WHERE sc2.cedula = ?
         ";
+        $params[] = $frId;
         $params[] = (string)$fr['cliente_id'];
         if (!empty($fr['cliente_correo'])) {
             $fallback .= " AND (sc2.email = ? OR sc2.nombre_cliente = ?)";
@@ -175,6 +181,13 @@ function sol_fin_obtener_adjuntos_por_registro(PDO $pdo, int $frId): array {
             $fallback .= " AND sc2.nombre_cliente = ?";
             $params[] = (string)$fr['cliente_nombre'];
         }
+        $fallback .= "
+                AND (
+                    fr2.fecha_creacion IS NULL
+                    OR sc2.fecha_creacion IS NULL
+                    OR ABS(TIMESTAMPDIFF(DAY, sc2.fecha_creacion, fr2.fecha_creacion)) <= 7
+                )
+        ";
         $fallback .= ")";
         $orConds[] = $fallback;
     }
