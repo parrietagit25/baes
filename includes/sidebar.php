@@ -76,9 +76,6 @@ $isVendedor = in_array('ROLE_VENDEDOR', $_SESSION['user_roles']);
         <?php endif; ?>
 
         <?php if ($isAdmin): ?>
-        <a class="nav-link <?php echo ($current_page == 'encuestas_resultados.php') ? 'active' : ''; ?>" href="encuestas_resultados.php">
-            <i class="fas fa-poll me-2"></i>Resultados de encuestas
-        </a>
         <a class="nav-link <?php echo ($current_page == 'configuracion.php') ? 'active' : ''; ?>" href="configuracion.php">
             <i class="fas fa-sliders-h me-2"></i>Configuración
         </a>
@@ -104,6 +101,9 @@ $isVendedor = in_array('ROLE_VENDEDOR', $_SESSION['user_roles']);
         </a>
         <a class="nav-link ps-4 py-1 small <?php echo ($report_submenu === 'emails') ? 'active' : ''; ?>" href="reportes.php?submenu=emails">
             <i class="fas fa-envelope me-1"></i> Rep. Correos
+        </a>
+        <a class="nav-link ps-4 py-1 small <?php echo ($report_submenu === 'encuestas') ? 'active' : ''; ?>" href="reportes.php?submenu=encuestas">
+            <i class="fas fa-poll me-1"></i> Rep. Encuestas
         </a>
         <?php endif; ?>
         

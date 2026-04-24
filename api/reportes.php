@@ -35,6 +35,9 @@ switch ($action) {
     case 'reporte_emails_resumen':
         reporteEmailsResumen();
         break;
+    case 'reporte_encuestas':
+        reporteEncuestas();
+        break;
     default:
         echo json_encode(['success' => false, 'message' => 'Acción no válida']);
 }
@@ -333,4 +336,116 @@ function reporteEmailsResumen() {
         http_response_code(500);
         echo json_encode(['success' => false, 'message' => 'Error de base de datos']);
     }
+}
+
+/**
+ * Resumen y detalle de encuestas (formulario público vendedores y proceso gestor)
+ */
+function reporteEncuestas() {
+    global $pdo;
+    require_once __DIR__ . '/../includes/encuestas_satisfaccion_data.php';
+
+    $vendedor = _reporteEncuestasBloque($pdo, 'encuesta_formulario_publico_vendedor', $ENCUESTA_VENDEDOR_PREGUNTAS);
+    $gestor = _reporteEncuestasBloque($pdo, 'encuesta_proceso_gestor', $ENCUESTA_GESTOR_PREGUNTAS);
+
+    echo json_encode([
+        'success' => true,
+        'vendedor' => $vendedor,
+        'gestor' => $gestor,
+    ]);
+}
+
+/**
+ * @param array<int,string> $preguntas
+ * @return array{resumen: ?array, filas: array, error: ?string, preguntas: array}
+ */
+function _reporteEncuestasBloque(PDO $pdo, string $table, array $preguntas) {
+    $vacio = [
+        'resumen' => null,
+        'filas' => [],
+        'error' => null,
+        'preguntas' => $preguntas,
+    ];
+
+    $sqlResumen = "
+        SELECT
+            COUNT(*) AS total,
+            AVG((puntuacion_1 + puntuacion_2 + puntuacion_3 + puntuacion_4 + puntuacion_5) / 5.0) AS promedio_global,
+            AVG(puntuacion_1) AS promedio_p1,
+            AVG(puntuacion_2) AS promedio_p2,
+            AVG(puntuacion_3) AS promedio_p3,
+            AVG(puntuacion_4) AS promedio_p4,
+            AVG(puntuacion_5) AS promedio_p5,
+            MIN(creado_en) AS desde,
+            MAX(creado_en) AS hasta,
+            SUM(
+                CASE
+                    WHEN recomendaciones IS NULL OR TRIM(recomendaciones) = '' THEN 0
+                    ELSE 1
+                END
+            ) AS con_recomendacion
+        FROM `{$table}`
+    ";
+
+    $sqlFilas = "
+        SELECT
+            id, nombre_completo, cargo,
+            puntuacion_1, puntuacion_2, puntuacion_3, puntuacion_4, puntuacion_5,
+            recomendaciones, creado_en
+        FROM `{$table}`
+        ORDER BY creado_en DESC
+        LIMIT 2000
+    ";
+
+    try {
+        $r = $pdo->query($sqlResumen)->fetch(PDO::FETCH_ASSOC);
+        $total = (int) ($r['total'] ?? 0);
+        if ($total === 0) {
+            $vacio['resumen'] = [
+                'total' => 0,
+                'promedio_global' => null,
+                'promedios' => [1 => null, 2 => null, 3 => null, 4 => null, 5 => null],
+                'desde' => null,
+                'hasta' => null,
+                'con_recomendacion' => 0,
+            ];
+        } else {
+            $vacio['resumen'] = [
+                'total' => $total,
+                'promedio_global' => $r['promedio_global'] !== null
+                    ? round((float) $r['promedio_global'], 2)
+                    : null,
+                'promedios' => [
+                    1 => $r['promedio_p1'] !== null ? round((float) $r['promedio_p1'], 2) : null,
+                    2 => $r['promedio_p2'] !== null ? round((float) $r['promedio_p2'], 2) : null,
+                    3 => $r['promedio_p3'] !== null ? round((float) $r['promedio_p3'], 2) : null,
+                    4 => $r['promedio_p4'] !== null ? round((float) $r['promedio_p4'], 2) : null,
+                    5 => $r['promedio_p5'] !== null ? round((float) $r['promedio_p5'], 2) : null,
+                ],
+                'desde' => $r['desde'] ? (string) $r['desde'] : null,
+                'hasta' => $r['hasta'] ? (string) $r['hasta'] : null,
+                'con_recomendacion' => (int) ($r['con_recomendacion'] ?? 0),
+            ];
+        }
+
+        $filas = $pdo->query($sqlFilas)->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($filas as &$f) {
+            $p1 = (int) $f['puntuacion_1'];
+            $p2 = (int) $f['puntuacion_2'];
+            $p3 = (int) $f['puntuacion_3'];
+            $p4 = (int) $f['puntuacion_4'];
+            $p5 = (int) $f['puntuacion_5'];
+            $f['promedio_fila'] = round(($p1 + $p2 + $p3 + $p4 + $p5) / 5.0, 2);
+        }
+        unset($f);
+        $vacio['filas'] = $filas;
+    } catch (PDOException $e) {
+        if ((int) ($e->errorInfo[1] ?? 0) === 1146) {
+            $vacio['error'] = 'Aún no existe la tabla. Ejecute database/migracion_encuestas_satisfaccion.sql en la base de datos.';
+        } else {
+            $vacio['error'] = 'Error al leer las encuestas.';
+        }
+    }
+
+    return $vacio;
 }

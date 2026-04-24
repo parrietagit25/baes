@@ -15,11 +15,11 @@ if (!in_array('ROLE_ADMIN', $_SESSION['user_roles'])) {
 }
 
 $submenu = $_GET['submenu'] ?? 'usuarios';
-if (!in_array($submenu, ['usuarios', 'tiempo', 'banco', 'emails'], true)) {
+if (!in_array($submenu, ['usuarios', 'tiempo', 'banco', 'emails', 'encuestas'], true)) {
     $submenu = 'usuarios';
 }
 $estadosCol = ['Nueva', 'En Revisión Banco', 'Aprobada', 'Rechazada', 'Completada', 'Desistimiento'];
-$titulosReporte = ['usuarios' => 'Rep. Usuarios', 'tiempo' => 'Rep. Tiempo', 'banco' => 'Rep. Banco', 'emails' => 'Rep. Correos'];
+$titulosReporte = ['usuarios' => 'Rep. Usuarios', 'tiempo' => 'Rep. Tiempo', 'banco' => 'Rep. Banco', 'emails' => 'Rep. Correos', 'encuestas' => 'Rep. Encuestas'];
 ?>
 
 <!DOCTYPE html>
@@ -44,6 +44,10 @@ $titulosReporte = ['usuarios' => 'Rep. Usuarios', 'tiempo' => 'Rep. Tiempo', 'ba
         .total-click:hover { text-decoration: underline; }
         .modal-header.reportes { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 15px 15px 0 0; }
         .table-reportes { font-size: 0.9rem; }
+        .enc-kpi .card { border: none; border-radius: 12px; }
+        .enc-bloque-title { color: #495057; font-weight: 600; font-size: 1.1rem; margin: 1.5rem 0 1rem; }
+        .enc-bloque-title.v { border-left: 4px solid #0d6efd; padding-left: 0.5rem; }
+        .enc-bloque-title.g { border-left: 4px solid #6f42c1; padding-left: 0.5rem; }
     </style>
 </head>
 <body>
@@ -59,6 +63,7 @@ $titulosReporte = ['usuarios' => 'Rep. Usuarios', 'tiempo' => 'Rep. Tiempo', 'ba
                             if ($submenu === 'usuarios') echo 'Total de solicitudes por usuario y estado';
                             elseif ($submenu === 'tiempo') echo 'Tiempo entre cambios de estado por solicitud';
                             elseif ($submenu === 'banco') echo 'Tiempo que tardan los bancos en dar respuesta a las solicitudes asignadas';
+                            elseif ($submenu === 'encuestas') echo 'Promedios, totales y detalle de respuestas a las encuestas públicas (vendedores y gestores)';
                             else echo 'Cantidad de correos enviados/fallidos y detalle de destinatarios';
                         ?></p>
                     </div>
@@ -133,6 +138,11 @@ $titulosReporte = ['usuarios' => 'Rep. Usuarios', 'tiempo' => 'Rep. Tiempo', 'ba
                                 </div>
                             </div>
                         </div>
+                    </div>
+
+                    <!-- Rep. Encuestas -->
+                    <div id="panel-encuestas" class="report-panel" style="display: <?php echo $submenu === 'encuestas' ? 'block' : 'none'; ?>">
+                        <div id="encuestas-contenido" class="py-3 text-muted text-center">Cargando encuestas…</div>
                     </div>
 
                     <!-- Rep. Correos -->
@@ -259,6 +269,8 @@ $titulosReporte = ['usuarios' => 'Rep. Usuarios', 'tiempo' => 'Rep. Tiempo', 'ba
         loadReporteBanco();
     } else if (submenu === 'emails') {
         loadReporteEmails();
+    } else if (submenu === 'encuestas') {
+        loadReporteEncuestas();
     }
 
     function loadReporteUsuarios() {
@@ -434,6 +446,92 @@ $titulosReporte = ['usuarios' => 'Rep. Usuarios', 'tiempo' => 'Rep. Tiempo', 'ba
     const btnFiltrarEmails = document.getElementById('btnFiltrarEmails');
     if (btnFiltrarEmails) {
         btnFiltrarEmails.addEventListener('click', loadReporteEmails);
+    }
+
+    function numFmt(v) {
+        if (v == null) return '—';
+        return String(v).replace('.', ',');
+    }
+
+    function buildBloqueEnc(titleClass, label, data) {
+        if (data.error) {
+            return '<div class="alert alert-warning">' + escapeHtml(data.error) + '</div>';
+        }
+        const res = data.resumen || {};
+        const preg = data.preguntas || {};
+        const tot = res.total != null ? res.total : 0;
+        const pg = res.promedio_global;
+        const cr = res.con_recomendacion != null ? res.con_recomendacion : 0;
+        const desde = res.desde || '—';
+        const hasta = res.hasta || '—';
+        const pr = res.promedios || {};
+
+        let kpi = '<div class="row g-3 mb-3 enc-kpi">'
+            + '<div class="col-6 col-md-3"><div class="card shadow-sm p-3 text-center"><div class="text-muted small">Respuestas</div><div class="h4 mb-0 text-primary">' + tot + '</div></div></div>'
+            + '<div class="col-6 col-md-3"><div class="card shadow-sm p-3 text-center"><div class="text-muted small">Promedio general (1–5)</div><div class="h4 mb-0 text-success">' + (pg == null ? '—' : numFmt(pg)) + '</div></div></div>'
+            + '<div class="col-6 col-md-3"><div class="card shadow-sm p-3 text-center"><div class="text-muted small">Con recomendaciones</div><div class="h4 mb-0">' + cr + '</div></div></div>'
+            + '<div class="col-6 col-md-3"><div class="card shadow-sm p-3 text-center"><div class="text-muted small">Período (primero → último)</div><div class="small"><strong>' + escapeHtml(String(desde)) + '</strong><br><span class="text-muted">↔</span> <strong>' + escapeHtml(String(hasta)) + '</strong></div></div></div>'
+            + '</div>';
+
+        let filasP = '<table class="table table-bordered table-sm table-reportes mb-4"><thead class="table-light"><tr><th>Ítem</th><th class="text-end">Promedio</th></tr></thead><tbody>';
+        for (let n = 1; n <= 5; n++) {
+            const prom = pr[n] != null ? pr[n] : null;
+            filasP += '<tr><td><strong>P' + n + '</strong> ' + escapeHtml(preg[n] || '') + '</td><td class="text-end fw-bold">' + (prom == null ? '—' : numFmt(prom)) + '</td></tr>';
+        }
+        filasP += '</tbody></table>';
+
+        const filas = data.filas || [];
+        let tab = '<div class="table-responsive"><table class="table table-bordered table-sm table-hover table-reportes">'
+            + '<thead class="table-light"><tr><th>Fecha</th><th>Nombre</th><th>Cargo</th><th class="text-center">P1</th><th class="text-center">P2</th><th class="text-center">P3</th><th class="text-center">P4</th><th class="text-center">P5</th><th class="text-end">Prom.</th><th>Recomendaciones</th></tr></thead><tbody>';
+        if (!filas.length) {
+            tab += '<tr><td colspan="10" class="text-center text-muted">Sin respuestas registradas</td></tr>';
+        } else {
+            filas.forEach(function(row) {
+                const rec = (row.recomendaciones == null || String(row.recomendaciones).trim() === '') ? '—' : String(row.recomendaciones);
+                const recHtml = rec === '—' ? '—' : ('<div class="small" style="max-width: 280px; white-space: pre-wrap;">' + escapeHtml(rec) + '</div>');
+                tab += '<tr><td class="text-nowrap">' + escapeHtml(row.creado_en || '') + '</td>'
+                    + '<td>' + escapeHtml(row.nombre_completo || '') + '</td>'
+                    + '<td>' + escapeHtml(row.cargo || '') + '</td>'
+                    + '<td class="text-center">' + (row.puntuacion_1 != null ? row.puntuacion_1 : '') + '</td>'
+                    + '<td class="text-center">' + (row.puntuacion_2 != null ? row.puntuacion_2 : '') + '</td>'
+                    + '<td class="text-center">' + (row.puntuacion_3 != null ? row.puntuacion_3 : '') + '</td>'
+                    + '<td class="text-center">' + (row.puntuacion_4 != null ? row.puntuacion_4 : '') + '</td>'
+                    + '<td class="text-center">' + (row.puntuacion_5 != null ? row.puntuacion_5 : '') + '</td>'
+                    + '<td class="text-end fw-bold">' + (row.promedio_fila != null ? numFmt(row.promedio_fila) : '—') + '</td>'
+                    + '<td>' + recHtml + '</td></tr>';
+            });
+        }
+        tab += '</tbody></table></div>';
+        if (filas.length >= 2000) {
+            tab += '<p class="small text-muted">Mostrando las 2000 respuestas más recientes.</p>';
+        }
+
+        return '<div class="mb-5">'
+            + '<div class="enc-bloque-title ' + titleClass + '"><i class="fas fa-clipboard-list me-2"></i>' + escapeHtml(label) + '</div>'
+            + (tot === 0 && !data.error ? '<p class="text-muted small mb-2">Aún no hay encuestas enviadas o la tabla está vacía.</p>' : '')
+            + kpi + '<h6 class="mb-2">Promedio por pregunta (escala 1 a 5)</h6>' + filasP
+            + '<h6 class="mb-2">Detalle de respuestas (personas)</h6>' + tab
+            + '</div>';
+    }
+
+    function loadReporteEncuestas() {
+        const box = document.getElementById('encuestas-contenido');
+        if (!box) return;
+        box.innerHTML = '<div class="text-center text-muted py-4">Cargando…</div>';
+        fetch('api/reportes.php?action=reporte_encuestas')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (!data.success) {
+                    box.innerHTML = '<div class="alert alert-danger">No se pudo cargar el reporte.</div>';
+                    return;
+                }
+                const v = data.vendedor;
+                const g = data.gestor;
+                box.innerHTML = buildBloqueEnc('v', 'Encuesta: formulario público (vendedores)', v) + buildBloqueEnc('g', 'Encuesta: proceso y sistema (gestores)', g);
+            })
+            .catch(function() {
+                document.getElementById('encuestas-contenido').innerHTML = '<div class="alert alert-danger">Error de red o servidor al cargar encuestas.</div>';
+            });
     }
 })();
     </script>
