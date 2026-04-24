@@ -1,8 +1,15 @@
 -- Encuestas de satisfacción: formulario público (vendedores) y proceso de gestor
--- Base: solicitud_credito (o la usada en config/database.php)
--- Ejecutar: mysql -u root -p solicitud_credito < database/migracion_encuestas_satisfaccion.sql
+--
+-- Ejecutar sobre la misma base que use la app (XAMPP: solicitud_credito; Docker: motus_baes).
+-- Ejemplos (ajuste usuario y contraseña):
+--   mysql -u root -p motus_baes < database/migracion_encuestas_satisfaccion.sql
+--   mysql -u motus_user -p motus_baes < database/migracion_encuestas_satisfaccion.sql
+-- Desde contenedor MySQL (Docker):
+--   docker exec -i motus_db mysql -u motus_user -pmotus_pass_2024 motus_baes < database/migracion_encuestas_satisfaccion.sql
 
 SET NAMES utf8mb4;
+-- Si prefiere fijar la base aquí, descomente (y quite el nombre de la base en la línea de comando):
+-- USE motus_baes;
 
 -- Encuesta 1: evaluación del formulario público (quienes comparten el link a clientes)
 CREATE TABLE IF NOT EXISTS `encuesta_formulario_publico_vendedor` (
