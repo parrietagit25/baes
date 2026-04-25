@@ -852,11 +852,27 @@ if ($emailDestinoVendedor !== null || $emailCliente !== null) {
             $attachments = array_merge([$pdfPath], $adjuntosParaCorreo);
 
             if ($emailDestinoVendedor !== null) {
-                $result = $emailService->enviarCorreo($emailDestinoVendedor, $asuntoVendedor, $cuerpoVendedor, '', strip_tags($cuerpoVendedor), $attachments);
+                $result = $emailService->enviarCorreo(
+                    $emailDestinoVendedor,
+                    $asuntoVendedor,
+                    $cuerpoVendedor,
+                    '',
+                    strip_tags($cuerpoVendedor),
+                    $attachments,
+                    ['fyi@automarketpan.com']
+                );
                 $emailEnviado = !empty($result['success']);
             }
             if ($emailCliente !== null && $emailCliente !== $emailDestinoVendedor) {
-                $resultCliente = $emailService->enviarCorreo($emailCliente, $asuntoCliente, $cuerpoCliente, '', strip_tags($cuerpoCliente), $attachments);
+                $resultCliente = $emailService->enviarCorreo(
+                    $emailCliente,
+                    $asuntoCliente,
+                    $cuerpoCliente,
+                    '',
+                    strip_tags($cuerpoCliente),
+                    $attachments,
+                    ['fyi@automarketpan.com']
+                );
                 if (!empty($resultCliente['success'])) {
                     $emailEnviado = true;
                 }

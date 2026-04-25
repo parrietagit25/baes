@@ -333,6 +333,7 @@ function cargarSolicitudes() {
                 response.data.forEach(function(solicitud) {
                     const estadoClass = getEstadoClass(solicitud.estado);
                     const respuestaClass = getRespuestaClass(solicitud.respuesta_banco);
+                    const vendedorNombre = [solicitud.vendedor_nombre || '', solicitud.vendedor_apellido || ''].join(' ').trim() || 'Sin vendedor';
                     const idCelda = (window.userRoles && window.userRoles.isAdmin)
                         ? ('<a href="javascript:void(0);" class="link-cronologia-solicitud text-primary fw-semibold text-decoration-underline" role="button" data-id="' +
                             solicitud.id + '" data-nombre="' + escDataAttr(solicitud.nombre_cliente) + '" title="Ver cronología de la solicitud">#' + solicitud.id + '</a>')
@@ -393,6 +394,7 @@ function cargarSolicitudes() {
                             </td>
                             <td>${solicitud.marca_auto || '-'} ${solicitud.modelo_auto || ''} ${solicitud.año_auto || ''}</td>
                             <td>${solicitud.gestor_nombre} ${solicitud.gestor_apellido}</td>
+                            <td>${vendedorNombre}</td>
                             <td><span class="badge badge-estado ${estadoClass}">${solicitud.estado}</span></td>
                             <td>${formatearFecha(solicitud.fecha_creacion)}</td>
                             <td>${accionesComunes}</td>
@@ -405,6 +407,7 @@ function cargarSolicitudes() {
                             <td>${solicitud.cedula}</td>
                             <td>${solicitud.marca_auto || '-'} ${solicitud.modelo_auto || ''} ${solicitud.año_auto || ''}</td>
                             <td>${solicitud.gestor_nombre} ${solicitud.gestor_apellido}</td>
+                            <td>${vendedorNombre}</td>
                             <td>
                                 ${solicitud.banco_nombre ? 
                                     `<span class="badge bg-info">

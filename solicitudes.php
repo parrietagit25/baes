@@ -270,6 +270,7 @@ if ($isBanco && !$isAdmin) {
                                             <?php endif; ?>
                                             <th>Vehículo</th>
                                             <th>Gestor</th>
+                                            <th>Vendedor</th>
                                             <?php if (!$isBanco): ?>
                                             <th>Banco Asignado</th>
                                             <?php endif; ?>
