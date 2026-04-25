@@ -610,6 +610,73 @@ function escapeHtml(s) {
     return div.innerHTML;
 }
 
+/**
+ * Rellena Ejecutivo de ventas desde id_vendedor o email_vendedor en financiamiento_registros.
+ * Prioridad: id en catálogo; si no hay match, búsqueda por email (data-email o texto del option).
+ */
+function aplicarEjecutivoVentaDesdeFinanciamiento(d) {
+    if (!d) {
+        return;
+    }
+    var $sel = $('#ejecutivo_ventas_id');
+    var $inp = $('#buscar_ejecutivo');
+    if (!$sel.length) {
+        return;
+    }
+    var idRaw = d.id_vendedor;
+    if (idRaw !== null && idRaw !== undefined && idRaw !== '') {
+        var idV = parseInt(String(idRaw), 10);
+        if (!isNaN(idV) && idV > 0) {
+            var $opt = $sel.find('option[value="' + String(idV) + '"]');
+            if ($opt.length) {
+                $sel.val(String(idV));
+                if ($inp.length) {
+                    $inp.val($opt.first().text().trim());
+                }
+                return;
+            }
+        }
+    }
+    var em = d.email_vendedor;
+    if (em === null || em === undefined) {
+        return;
+    }
+    em = String(em).trim();
+    if (!em) {
+        return;
+    }
+    var emLower = em.toLowerCase();
+    var $match = null;
+    $sel.find('option').each(function() {
+        if (!this.value) {
+            return;
+        }
+        var $o = $(this);
+        var de = ($o.attr('data-email') || '').toString().trim().toLowerCase();
+        if (de && de === emLower) {
+            $match = $o;
+            return false;
+        }
+    });
+    if (!$match || !$match.length) {
+        $sel.find('option').each(function() {
+            if (!this.value) {
+                return;
+            }
+            if ($(this).text().toLowerCase().indexOf(emLower) !== -1) {
+                $match = $(this);
+                return false;
+            }
+        });
+    }
+    if ($match && $match.length && $match.val()) {
+        $sel.val($match.val());
+        if ($inp.length) {
+            $inp.val($match.text().trim());
+        }
+    }
+}
+
 function prefillFormularioDesdeFinanciamiento(d) {
     if (!d) return;
     function set(id, val) {
@@ -672,6 +739,7 @@ function prefillFormularioDesdeFinanciamiento(d) {
         }];
         renderizarVehiculos();
     }
+    aplicarEjecutivoVentaDesdeFinanciamiento(d);
     mostrarAlerta('Datos cargados desde Sol Financiamiento. Revise y complete los campos que falten.', 'success');
 }
 

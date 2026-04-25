@@ -628,7 +628,8 @@ if ($isBanco && !$isAdmin) {
                                                         $search = mb_strtolower($label, 'UTF-8');
                                                     ?>
                                                     <option value="<?php echo (int) $ej['id']; ?>"
-                                                            data-search="<?php echo htmlspecialchars($search, ENT_QUOTES, 'UTF-8'); ?>">
+                                                            data-search="<?php echo htmlspecialchars($search, ENT_QUOTES, 'UTF-8'); ?>"
+                                                            <?php if ($emailEj !== ''): ?>data-email="<?php echo htmlspecialchars($emailEj, ENT_QUOTES, 'UTF-8'); ?>"<?php endif; ?>>
                                                         <?php echo htmlspecialchars($label, ENT_QUOTES, 'UTF-8'); ?>
                                                     </option>
                                                 <?php endforeach; ?>
