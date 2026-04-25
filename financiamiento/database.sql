@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS financiamiento_registros (
     prov_dist_corr varchar(200) DEFAULT NULL,
     tel_residencia varchar(50) DEFAULT NULL,
     barriada_calle_casa varchar(500) DEFAULT NULL,
+    calle varchar(120) DEFAULT NULL,
     celular_cliente varchar(50) DEFAULT NULL,
     edificio_apto varchar(200) DEFAULT NULL,
     correo_residencial varchar(255) DEFAULT NULL,
