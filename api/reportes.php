@@ -4,17 +4,23 @@
  */
 
 session_start();
-header('Content-Type: application/json');
+$action = $_GET['action'] ?? '';
 
 if (!isset($_SESSION['user_id']) || !in_array('ROLE_ADMIN', $_SESSION['user_roles'] ?? [])) {
     http_response_code(403);
+    header('Content-Type: application/json; charset=utf-8');
     echo json_encode(['success' => false, 'message' => 'Acceso denegado']);
     exit();
 }
 
 require_once __DIR__ . '/../config/database.php';
 
-$action = $_GET['action'] ?? '';
+if ($action === 'exportar_todos_excel') {
+    exportarTodosReportesExcel();
+    exit();
+}
+
+header('Content-Type: application/json; charset=utf-8');
 
 switch ($action) {
     case 'reporte_usuarios':
@@ -38,8 +44,303 @@ switch ($action) {
     case 'reporte_encuestas':
         reporteEncuestas();
         break;
+    case 'exportar_todos_excel':
+        // Ya atendido al inicio.
+        echo json_encode(['success' => false, 'message' => 'Acción ya ejecutada']);
+        break;
     default:
         echo json_encode(['success' => false, 'message' => 'Acción no válida']);
+}
+
+function exportarTodosReportesExcel() {
+    global $pdo;
+    require_once __DIR__ . '/../includes/encuestas_satisfaccion_data.php';
+    $tmpZip = tempnam(sys_get_temp_dir(), 'rep_motus_');
+    if ($tmpZip === false) {
+        http_response_code(500);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => false, 'message' => 'No se pudo crear archivo temporal']);
+        return;
+    }
+
+    $zipPath = $tmpZip . '.zip';
+    @rename($tmpZip, $zipPath);
+
+    $zip = new ZipArchive();
+    if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+        @unlink($zipPath);
+        http_response_code(500);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => false, 'message' => 'No se pudo crear ZIP de exportación']);
+        return;
+    }
+
+    $usuarios = _dataReporteUsuarios($pdo);
+    _zipAddCsv($zip, 'reporte_usuarios.csv', [
+        'Usuario ID', 'Nombre', 'Email', 'Nueva', 'En Revision Banco', 'Aprobada', 'Rechazada', 'Completada', 'Desistimiento', 'Total'
+    ], array_map(static function(array $r): array {
+        return [
+            $r['usuario_id'] ?? '',
+            $r['nombre'] ?? '',
+            $r['email'] ?? '',
+            $r['Nueva'] ?? 0,
+            $r['En Revisión Banco'] ?? 0,
+            $r['Aprobada'] ?? 0,
+            $r['Rechazada'] ?? 0,
+            $r['Completada'] ?? 0,
+            $r['Desistimiento'] ?? 0,
+            $r['total'] ?? 0,
+        ];
+    }, $usuarios));
+
+    $tiempo = _dataReporteTiempo($pdo);
+    _zipAddCsv($zip, 'reporte_tiempo.csv', [
+        'Solicitud ID', 'Cliente', 'Cedula', 'Estado', 'Fecha Creacion', 'Fecha Actualizacion', 'Dias Estado Actual', 'Horas Estado Actual'
+    ], array_map(static function(array $r): array {
+        return [
+            $r['id'] ?? '',
+            $r['nombre_cliente'] ?? '',
+            $r['cedula'] ?? '',
+            $r['estado'] ?? '',
+            $r['fecha_creacion'] ?? '',
+            $r['fecha_actualizacion'] ?? '',
+            $r['dias_en_estado_actual'] ?? '',
+            $r['horas_en_estado_actual'] ?? '',
+        ];
+    }, $tiempo));
+
+    $banco = _dataReporteBanco($pdo);
+    _zipAddCsv($zip, 'reporte_banco.csv', [
+        'Solicitud ID', 'Cliente', 'Cedula', 'Estado Solicitud', 'Banco', 'Fecha Asignacion', 'Fecha Respuesta', 'Pendiente', 'Dias Respuesta', 'Horas Respuesta'
+    ], array_map(static function(array $r): array {
+        return [
+            $r['solicitud_id'] ?? '',
+            $r['nombre_cliente'] ?? '',
+            $r['cedula'] ?? '',
+            $r['estado'] ?? '',
+            $r['banco_nombre'] ?? '',
+            $r['fecha_asignacion'] ?? '',
+            $r['fecha_respuesta'] ?? '',
+            !empty($r['pendiente']) ? 'Si' : 'No',
+            $r['dias_respuesta'] ?? '',
+            $r['horas_respuesta'] ?? '',
+        ];
+    }, $banco));
+
+    $emails = _dataReporteEmails($pdo);
+    _zipAddCsv($zip, 'reporte_correos.csv', [
+        'ID', 'Solicitud ID', 'Cliente', 'Destinatario', 'Tipo Envio', 'Estado', 'Provider', 'Provider Message ID', 'Mensaje', 'Fecha Envio'
+    ], array_map(static function(array $r): array {
+        return [
+            $r['id'] ?? '',
+            $r['solicitud_id'] ?? '',
+            $r['nombre_cliente'] ?? '',
+            $r['destinatario_email'] ?? '',
+            $r['tipo_envio'] ?? '',
+            $r['estado'] ?? '',
+            $r['provider'] ?? '',
+            $r['provider_message_id'] ?? '',
+            $r['mensaje'] ?? '',
+            $r['fecha_envio'] ?? '',
+        ];
+    }, $emails));
+
+    $encV = _reporteEncuestasBloque($pdo, 'encuesta_formulario_publico_vendedor', $ENCUESTA_VENDEDOR_PREGUNTAS);
+    $encG = _reporteEncuestasBloque($pdo, 'encuesta_proceso_gestor', $ENCUESTA_GESTOR_PREGUNTAS);
+    _zipAddCsv($zip, 'reporte_encuestas_vendedores.csv', [
+        'ID', 'Fecha', 'Nombre Completo', 'Cargo', 'P1', 'P2', 'P3', 'P4', 'P5', 'Promedio', 'Recomendaciones'
+    ], array_map(static function(array $r): array {
+        return [
+            $r['id'] ?? '',
+            $r['creado_en'] ?? '',
+            $r['nombre_completo'] ?? '',
+            $r['cargo'] ?? '',
+            $r['puntuacion_1'] ?? '',
+            $r['puntuacion_2'] ?? '',
+            $r['puntuacion_3'] ?? '',
+            $r['puntuacion_4'] ?? '',
+            $r['puntuacion_5'] ?? '',
+            $r['promedio_fila'] ?? '',
+            $r['recomendaciones'] ?? '',
+        ];
+    }, $encV['filas'] ?? []));
+    _zipAddCsv($zip, 'reporte_encuestas_gestores.csv', [
+        'ID', 'Fecha', 'Nombre Completo', 'Cargo', 'P1', 'P2', 'P3', 'P4', 'P5', 'Promedio', 'Recomendaciones'
+    ], array_map(static function(array $r): array {
+        return [
+            $r['id'] ?? '',
+            $r['creado_en'] ?? '',
+            $r['nombre_completo'] ?? '',
+            $r['cargo'] ?? '',
+            $r['puntuacion_1'] ?? '',
+            $r['puntuacion_2'] ?? '',
+            $r['puntuacion_3'] ?? '',
+            $r['puntuacion_4'] ?? '',
+            $r['puntuacion_5'] ?? '',
+            $r['promedio_fila'] ?? '',
+            $r['recomendaciones'] ?? '',
+        ];
+    }, $encG['filas'] ?? []));
+
+    $zip->close();
+
+    header('Content-Type: application/zip');
+    header('Content-Disposition: attachment; filename="reportes_motus_' . date('Ymd_His') . '.zip"');
+    header('Content-Length: ' . (string) filesize($zipPath));
+    readfile($zipPath);
+    @unlink($zipPath);
+}
+
+function _zipAddCsv(ZipArchive $zip, string $fileName, array $headers, array $rows): void {
+    $fp = fopen('php://temp', 'r+');
+    if ($fp === false) {
+        return;
+    }
+    fwrite($fp, "\xEF\xBB\xBF");
+    fputcsv($fp, $headers, ';');
+    foreach ($rows as $row) {
+        $safe = [];
+        foreach ($row as $value) {
+            if (is_bool($value)) {
+                $safe[] = $value ? '1' : '0';
+            } elseif ($value === null) {
+                $safe[] = '';
+            } else {
+                $safe[] = (string) $value;
+            }
+        }
+        fputcsv($fp, $safe, ';');
+    }
+    rewind($fp);
+    $csv = stream_get_contents($fp);
+    fclose($fp);
+    if ($csv !== false) {
+        $zip->addFromString($fileName, $csv);
+    }
+}
+
+function _dataReporteUsuarios(PDO $pdo): array {
+    $sql = "
+        SELECT 
+            u.id as usuario_id,
+            u.nombre,
+            u.apellido,
+            u.email,
+            s.estado,
+            COUNT(s.id) as total
+        FROM usuarios u
+        LEFT JOIN solicitudes_credito s ON s.gestor_id = u.id
+        WHERE u.activo = 1
+          AND EXISTS (
+            SELECT 1 FROM usuario_roles ur 
+            INNER JOIN roles r ON ur.rol_id = r.id 
+            WHERE ur.usuario_id = u.id AND r.nombre IN ('ROLE_GESTOR', 'ROLE_ADMIN')
+          )
+        GROUP BY u.id, u.nombre, u.apellido, u.email, s.estado
+        ORDER BY u.apellido, u.nombre, s.estado
+    ";
+    $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+    $porUsuario = [];
+    foreach ($rows as $r) {
+        $id = $r['usuario_id'];
+        if (!isset($porUsuario[$id])) {
+            $porUsuario[$id] = [
+                'usuario_id' => $id,
+                'nombre' => trim(($r['nombre'] ?? '') . ' ' . ($r['apellido'] ?? '')),
+                'email' => $r['email'],
+                'Nueva' => 0,
+                'En Revisión Banco' => 0,
+                'Aprobada' => 0,
+                'Rechazada' => 0,
+                'Completada' => 0,
+                'Desistimiento' => 0,
+                'total' => 0,
+            ];
+        }
+        if (!empty($r['estado'])) {
+            $porUsuario[$id][$r['estado']] = (int) $r['total'];
+            $porUsuario[$id]['total'] += (int) $r['total'];
+        }
+    }
+    return array_values($porUsuario);
+}
+
+function _dataReporteTiempo(PDO $pdo): array {
+    $rows = $pdo->query("
+        SELECT s.id, s.nombre_cliente, s.cedula, s.estado, s.fecha_creacion, s.fecha_actualizacion
+        FROM solicitudes_credito s
+        ORDER BY s.fecha_actualizacion DESC
+    ")->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($rows as &$r) {
+        $r['dias_en_estado_actual'] = null;
+        $r['horas_en_estado_actual'] = null;
+        if (!empty($r['fecha_actualizacion'])) {
+            $st = $pdo->prepare("SELECT TIMESTAMPDIFF(DAY, ?, NOW()) as dias, TIMESTAMPDIFF(HOUR, ?, NOW()) as horas");
+            $st->execute([$r['fecha_actualizacion'], $r['fecha_actualizacion']]);
+            $d = $st->fetch(PDO::FETCH_ASSOC);
+            $r['dias_en_estado_actual'] = (int) ($d['dias'] ?? 0);
+            $r['horas_en_estado_actual'] = (int) ($d['horas'] ?? 0);
+        }
+    }
+    unset($r);
+    return $rows;
+}
+
+function _dataReporteBanco(PDO $pdo): array {
+    $sql = "
+        SELECT 
+            s.id AS solicitud_id,
+            s.nombre_cliente,
+            s.cedula,
+            s.estado,
+            b.id AS banco_id,
+            b.nombre AS banco_nombre,
+            ubs.fecha_asignacion,
+            MIN(eb.fecha_evaluacion) AS fecha_respuesta
+        FROM solicitudes_credito s
+        INNER JOIN usuarios_banco_solicitudes ubs ON ubs.solicitud_id = s.id
+        INNER JOIN usuarios u ON u.id = ubs.usuario_banco_id
+        LEFT JOIN bancos b ON b.id = u.banco_id
+        LEFT JOIN evaluaciones_banco eb ON eb.solicitud_id = s.id AND eb.usuario_banco_id = ubs.id
+        GROUP BY s.id, s.nombre_cliente, s.cedula, s.estado, b.id, b.nombre, ubs.id, ubs.fecha_asignacion
+        ORDER BY ubs.fecha_asignacion DESC
+    ";
+    $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($rows as &$r) {
+        $r['dias_respuesta'] = null;
+        $r['horas_respuesta'] = null;
+        $r['pendiente'] = empty($r['fecha_respuesta']);
+        if (!$r['pendiente'] && !empty($r['fecha_asignacion'])) {
+            $st = $pdo->prepare("SELECT TIMESTAMPDIFF(DAY, ?, ?) AS dias, TIMESTAMPDIFF(HOUR, ?, ?) AS horas");
+            $st->execute([$r['fecha_asignacion'], $r['fecha_respuesta'], $r['fecha_asignacion'], $r['fecha_respuesta']]);
+            $d = $st->fetch(PDO::FETCH_ASSOC);
+            $r['dias_respuesta'] = (int) ($d['dias'] ?? 0);
+            $r['horas_respuesta'] = (int) ($d['horas'] ?? 0);
+        }
+    }
+    unset($r);
+    return $rows;
+}
+
+function _dataReporteEmails(PDO $pdo): array {
+    $sql = "
+        SELECT
+            l.id, l.solicitud_id, l.usuario_banco_id, l.destinatario_email, l.tipo_envio, l.estado,
+            l.provider, l.provider_message_id, l.mensaje, l.fecha_envio,
+            s.nombre_cliente
+        FROM email_resumen_banco_log l
+        LEFT JOIN solicitudes_credito s ON s.id = l.solicitud_id
+        ORDER BY l.fecha_envio DESC
+        LIMIT 1000
+    ";
+    try {
+        return $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        if (($e->errorInfo[1] ?? null) === 1146) {
+            return [];
+        }
+        throw $e;
+    }
 }
 
 /**

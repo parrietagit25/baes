@@ -58,7 +58,12 @@ $titulosReporte = ['usuarios' => 'Rep. Usuarios', 'tiempo' => 'Rep. Tiempo', 'ba
             <div class="col-md-9 col-lg-10 main-content">
                 <div class="container-fluid py-4">
                     <div class="reportes-header">
-                        <h2 class="mb-1"><i class="fas fa-chart-bar me-2"></i><?php echo htmlspecialchars($titulosReporte[$submenu]); ?></h2>
+                        <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+                            <h2 class="mb-1"><i class="fas fa-chart-bar me-2"></i><?php echo htmlspecialchars($titulosReporte[$submenu]); ?></h2>
+                            <a href="api/reportes.php?action=exportar_todos_excel" class="btn btn-light btn-sm">
+                                <i class="fas fa-file-excel me-1"></i>Exportar todos a Excel
+                            </a>
+                        </div>
                         <p class="mb-0 opacity-90"><?php
                             if ($submenu === 'usuarios') echo 'Total de solicitudes por usuario y estado';
                             elseif ($submenu === 'tiempo') echo 'Tiempo entre cambios de estado por solicitud';
