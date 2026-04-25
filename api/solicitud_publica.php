@@ -372,6 +372,29 @@ function solPub_buscar_id_ejecutivo_por_email(PDO $pdo, ?string $email): ?int
 }
 
 /**
+ * Solo lectura: nombre de ejecutivos_ventas por email.
+ */
+function solPub_buscar_nombre_ejecutivo_por_email(PDO $pdo, ?string $email): ?string
+{
+    if ($email === null || $email === '') {
+        return null;
+    }
+    $em = trim(strtolower($email));
+    if (!filter_var($em, FILTER_VALIDATE_EMAIL)) {
+        return null;
+    }
+    try {
+        $st = $pdo->prepare('SELECT nombre FROM ejecutivos_ventas WHERE LOWER(TRIM(COALESCE(email, \'\'))) = ? ORDER BY id ASC LIMIT 1');
+        $st->execute([$em]);
+        $r = $st->fetch(PDO::FETCH_ASSOC);
+        $nombre = trim((string)($r['nombre'] ?? ''));
+        return $nombre !== '' ? $nombre : null;
+    } catch (Throwable $e) {
+        return null;
+    }
+}
+
+/**
  * Vincula el correo del enlace generado (vendedor) con el catálogo `ejecutivos_ventas` para rellenar
  * "Ejecutivo de Ventas" en Motus. Busca por email; si no existe, crea un registro mínimo.
  */
@@ -843,7 +866,24 @@ if ($emailDestinoVendedor !== null || $emailCliente !== null) {
         if ($pdfPath && file_exists($pdfPath)) {
             require_once __DIR__ . '/../includes/EmailService.php';
             $emailService = new EmailService();
-            $asuntoVendedor = 'Solicitud de Financiamiento completada - ' . $nombre;
+            $nombreClienteAsunto = trim((string)$nombre);
+            if ($nombreClienteAsunto === '') {
+                $nombreClienteAsunto = 'Cliente sin nombre';
+            }
+            $nombreVendedorAsunto = null;
+            if ($pdoEjecutivos instanceof PDO) {
+                $nombreVendedorAsunto = solPub_buscar_nombre_ejecutivo_por_email($pdoEjecutivos, $emailDestinoVendedor);
+            }
+            if ($nombreVendedorAsunto === null && $emailDestinoVendedor !== null) {
+                $local = explode('@', $emailDestinoVendedor, 2)[0] ?? '';
+                $local = str_replace(['.', '_', '-'], ' ', trim($local));
+                $nombreVendedorAsunto = trim($local);
+            }
+            if ($nombreVendedorAsunto === null || $nombreVendedorAsunto === '') {
+                $nombreVendedorAsunto = 'Vendedor';
+            }
+            $numeroSolicitudAsunto = $solicitudId > 0 ? (string)$solicitudId : 'N/A';
+            $asuntoVendedor = 'MOTUS #' . $numeroSolicitudAsunto . ' Cliente ' . $nombreClienteAsunto . ' - ' . $nombreVendedorAsunto;
             $txtAdj = count($adjuntosParaCorreo) > 0
                 ? 'Adjuntos: PDF de la solicitud, identificación y/o otros documentos enviados por el cliente.'
                 : 'Adjunto: PDF con todos los datos y la firma.';
