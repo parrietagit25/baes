@@ -26,6 +26,8 @@ CREATE TABLE IF NOT EXISTS financiamiento_registros (
 
     token_email varchar(255) DEFAULT NULL,
     ip varchar(45) DEFAULT NULL,
+    email_vendedor varchar(255) DEFAULT NULL COMMENT 'Correo decodificado del enlace (vendedor)',
+    id_vendedor int(11) DEFAULT NULL COMMENT 'ID en ejecutivos_ventas si el email estaba registrado',
 
     cliente_nombre varchar(200) DEFAULT NULL,
     cliente_estado_civil varchar(50) DEFAULT NULL,
@@ -112,7 +114,8 @@ CREATE TABLE IF NOT EXISTS financiamiento_registros (
     KEY idx_fecha (fecha_creacion),
     KEY idx_cliente_id (cliente_id),
     KEY idx_cliente_correo (cliente_correo),
-    KEY idx_fin_reg_solicitud_credito (solicitud_credito_id)
+    KEY idx_fin_reg_solicitud_credito (solicitud_credito_id),
+    KEY idx_id_vendedor (id_vendedor)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 

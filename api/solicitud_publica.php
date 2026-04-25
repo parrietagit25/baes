@@ -349,6 +349,28 @@ function solPub_save_cedula_from_data_url(?string $dataUrl, string $absPathNoExt
 }
 
 /**
+ * Solo lectura: id de ejecutivos_ventas por email (vendedor ya registrado). No inserta filas.
+ */
+function solPub_buscar_id_ejecutivo_por_email(PDO $pdo, ?string $email): ?int
+{
+    if ($email === null || $email === '') {
+        return null;
+    }
+    $em = trim(strtolower($email));
+    if (!filter_var($em, FILTER_VALIDATE_EMAIL)) {
+        return null;
+    }
+    try {
+        $st = $pdo->prepare('SELECT id FROM ejecutivos_ventas WHERE LOWER(TRIM(COALESCE(email, \'\'))) = ? ORDER BY id ASC LIMIT 1');
+        $st->execute([$em]);
+        $r = $st->fetch(PDO::FETCH_ASSOC);
+        return $r ? (int) $r['id'] : null;
+    } catch (Throwable $e) {
+        return null;
+    }
+}
+
+/**
  * Vincula el correo del enlace generado (vendedor) con el catálogo `ejecutivos_ventas` para rellenar
  * "Ejecutivo de Ventas" en Motus. Busca por email; si no existe, crea un registro mínimo.
  */
@@ -595,6 +617,24 @@ if (!$pdoReg && is_file(__DIR__ . '/../config/database.php')) {
         logSolPub('financiamiento database: ' . $e->getMessage());
     }
 }
+/** PDO principal (motus_baes): catálogo ejecutivos_ventas; puede ser distinto de pdoReg en GoDaddy */
+$pdoEjecutivos = null;
+if (is_file(__DIR__ . '/../config/database.php')) {
+    try {
+        require_once __DIR__ . '/../config/database.php';
+        if (isset($pdo) && $pdo instanceof PDO) {
+            $pdoEjecutivos = $pdo;
+        }
+    } catch (Throwable $e) {
+        logSolPub('config database (ejecutivos vendedor): ' . $e->getMessage());
+    }
+}
+$emailVendedorFr = $emailDestinoVendedor;
+$idVendedorFr = null;
+if ($emailVendedorFr !== null && $pdoEjecutivos) {
+    $idVendedorFr = solPub_buscar_id_ejecutivo_por_email($pdoEjecutivos, $emailVendedorFr);
+}
+
 $finRegistroInsertId = 0;
 if ($pdoReg) {
     try {
@@ -620,7 +660,7 @@ if ($pdoReg) {
         };
         $stmtReg = $pdoReg->prepare("
             INSERT INTO financiamiento_registros (
-                token_email, ip,
+                token_email, ip, email_vendedor, id_vendedor,
                 cliente_nombre, cliente_estado_civil, cliente_sexo, cliente_id, cliente_nacimiento, cliente_edad,
                 cliente_nacionalidad, cliente_dependientes, cliente_correo, cliente_peso, cliente_estatura,
                 vivienda, vivienda_monto, prov_dist_corr, tel_residencia, barriada_calle_casa, celular_cliente,
@@ -637,7 +677,7 @@ if ($pdoReg) {
                 marca_auto, modelo_auto, anio_auto, kms_cod_auto, precio_venta, abono,
                 sucursal, nombre_gestor, comentarios_gestor, firma, firmantes_adicionales
             ) VALUES (
-                ?, ?,
+                ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?,
                 ?, ?,
@@ -653,7 +693,7 @@ if ($pdoReg) {
             )
         ");
         $stmtReg->execute([
-            $token ?: null, $_SERVER['REMOTE_ADDR'] ?? null,
+            $token ?: null, $_SERVER['REMOTE_ADDR'] ?? null, $emailVendedorFr, $idVendedorFr,
             $v('cliente_nombre'), $v('cliente_estado_civil'), $v('cliente_sexo'), $v('cliente_id'), $vDate('cliente_nacimiento'), $vInt('cliente_edad'),
             $v('cliente_nacionalidad'), $vInt('cliente_dependientes'), $v('cliente_correo'), $vNum('cliente_peso'), $vNum('cliente_estatura'),
             $v('vivienda'), $vNum('vivienda_monto'), $v('prov_dist_corr'), $v('tel_residencia'), $v('barriada_calle_casa'), $v('celular_cliente'),
