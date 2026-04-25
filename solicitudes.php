@@ -287,6 +287,7 @@ if ($isBanco && !$isAdmin) {
                                           $sql = "
                                               SELECT s.*, 
                                                      u.nombre as gestor_nombre, u.apellido as gestor_apellido,
+                                                     uv.nombre as vendedor_nombre, uv.apellido as vendedor_apellido,
                                                      (SELECT COUNT(*) FROM usuarios_banco_solicitudes WHERE solicitud_id = s.id AND estado = 'activo') as total_usuarios_banco,
                                                      s.evaluacion_seleccionada,
                                                      (SELECT ubs.usuario_banco_id FROM evaluaciones_banco e 
@@ -294,6 +295,7 @@ if ($isBanco && !$isAdmin) {
                                                       WHERE e.id = s.evaluacion_seleccionada) as usuario_banco_id_seleccionado
                                               FROM solicitudes_credito s
                                               LEFT JOIN usuarios u ON s.gestor_id = u.id
+                                              LEFT JOIN usuarios uv ON s.vendedor_id = uv.id
                                           ";
                                         
                                                                                   // Aplicar filtro según el rol del usuario
@@ -377,6 +379,12 @@ if ($isBanco && !$isAdmin) {
                                                 <?php else: ?>
                                                     <?php echo htmlspecialchars($solicitud['gestor_nombre'] . ' ' . $solicitud['gestor_apellido']); ?>
                                                 <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <?php
+                                                $vendedorNombre = trim((string)($solicitud['vendedor_nombre'] ?? '') . ' ' . (string)($solicitud['vendedor_apellido'] ?? ''));
+                                                echo htmlspecialchars($vendedorNombre !== '' ? $vendedorNombre : 'Sin vendedor');
+                                                ?>
                                             </td>
                                             <?php if (!$esUsuarioBancoLista): ?>
                                             <td>
