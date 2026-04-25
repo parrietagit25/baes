@@ -404,7 +404,11 @@ function cargarSolicitudes() {
                         <tr>
                             <td>${idCelda}</td>
                             <td>${solicitud.nombre_cliente}</td>
-                            <td>${solicitud.cedula}</td>
+                            <td>
+                                <button type="button" class="btn btn-sm btn-primary" onclick="verRespuestasBanco(${solicitud.id})" title="Ver respuestas de bancos en esta solicitud">
+                                    <i class="fas fa-clipboard-list me-1"></i>Ver respuestas
+                                </button>
+                            </td>
                             <td>${solicitud.marca_auto || '-'} ${solicitud.modelo_auto || ''} ${solicitud.año_auto || ''}</td>
                             <td>${solicitud.gestor_nombre} ${solicitud.gestor_apellido}</td>
                             <td>${vendedorNombre}</td>
