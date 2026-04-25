@@ -89,6 +89,25 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
                         <div class="card">
                             <div class="card-body">
                                 <h5 class="card-title mb-3">Total de solicitudes por usuario y estado</h5>
+                                <div class="row g-2 mb-3">
+                                    <div class="col-md-5">
+                                        <input type="text" id="filtroUsuariosTexto" class="form-control form-control-sm" placeholder="Filtrar por nombre o email...">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <select id="filtroUsuariosEstado" class="form-select form-select-sm">
+                                            <option value="">Todos los estados</option>
+                                            <?php foreach ($estadosCol as $e): ?>
+                                            <option value="<?php echo htmlspecialchars($e); ?>"><?php echo htmlspecialchars($e); ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <input type="number" min="0" id="filtroUsuariosMinTotal" class="form-control form-control-sm" placeholder="Total mín.">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <button type="button" class="btn btn-primary btn-sm w-100" id="btnFiltrarUsuarios"><i class="fas fa-filter me-1"></i>Filtrar</button>
+                                    </div>
+                                </div>
                                 <div class="table-responsive">
                                     <table class="table table-bordered table-reportes" id="tabla-usuarios">
                                         <thead class="table-light">
@@ -112,6 +131,28 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
                         <div class="card">
                             <div class="card-body">
                                 <h5 class="card-title mb-3">Tiempo entre cambios de estado por solicitud</h5>
+                                <div class="row g-2 mb-3">
+                                    <div class="col-md-4">
+                                        <input type="text" id="filtroTiempoTexto" class="form-control form-control-sm" placeholder="Filtrar por cliente o cédula...">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <select id="filtroTiempoEstado" class="form-select form-select-sm">
+                                            <option value="">Todos los estados</option>
+                                            <?php foreach ($estadosCol as $e): ?>
+                                            <option value="<?php echo htmlspecialchars($e); ?>"><?php echo htmlspecialchars($e); ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <input type="date" id="filtroTiempoDesde" class="form-control form-control-sm">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <input type="date" id="filtroTiempoHasta" class="form-control form-control-sm">
+                                    </div>
+                                    <div class="col-md-1">
+                                        <button type="button" class="btn btn-primary btn-sm w-100" id="btnFiltrarTiempo"><i class="fas fa-filter"></i></button>
+                                    </div>
+                                </div>
                                 <div class="table-responsive">
                                     <table class="table table-bordered table-reportes" id="tabla-tiempo">
                                         <thead class="table-light">
@@ -137,6 +178,21 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
                         <div class="card">
                             <div class="card-body">
                                 <h5 class="card-title mb-3">Tiempo de respuesta del banco por solicitud</h5>
+                                <div class="row g-2 mb-3">
+                                    <div class="col-md-5">
+                                        <input type="text" id="filtroBancoTexto" class="form-control form-control-sm" placeholder="Filtrar por cliente o banco...">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <select id="filtroBancoPendiente" class="form-select form-select-sm">
+                                            <option value="">Todos</option>
+                                            <option value="si">Pendientes</option>
+                                            <option value="no">Respondidos</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <button type="button" class="btn btn-primary btn-sm w-100" id="btnFiltrarBanco"><i class="fas fa-filter me-1"></i>Filtrar</button>
+                                    </div>
+                                </div>
                                 <div class="table-responsive">
                                     <table class="table table-bordered table-reportes" id="tabla-banco">
                                         <thead class="table-light">
@@ -165,6 +221,14 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
                             <a href="api/reportes.php?action=exportar_excel_encuestas_gestores" class="btn btn-outline-primary btn-sm">
                                 <i class="fas fa-file-excel me-1"></i>Descargar Enc. Gestores
                             </a>
+                        </div>
+                        <div class="row g-2 mb-2">
+                            <div class="col-md-6">
+                                <input type="text" id="filtroEncuestasTexto" class="form-control form-control-sm" placeholder="Filtrar encuestas por nombre, cargo o recomendación...">
+                            </div>
+                            <div class="col-md-2">
+                                <button type="button" class="btn btn-primary btn-sm w-100" id="btnFiltrarEncuestas"><i class="fas fa-filter me-1"></i>Filtrar</button>
+                            </div>
                         </div>
                         <div id="encuestas-contenido" class="py-3 text-muted text-center">Cargando encuestas…</div>
                     </div>
@@ -471,10 +535,98 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
     if (btnFiltrarEmails) {
         btnFiltrarEmails.addEventListener('click', loadReporteEmails);
     }
+    const btnFiltrarUsuarios = document.getElementById('btnFiltrarUsuarios');
+    if (btnFiltrarUsuarios) {
+        btnFiltrarUsuarios.addEventListener('click', aplicarFiltroUsuarios);
+    }
+    const btnFiltrarTiempo = document.getElementById('btnFiltrarTiempo');
+    if (btnFiltrarTiempo) {
+        btnFiltrarTiempo.addEventListener('click', aplicarFiltroTiempo);
+    }
+    const btnFiltrarBanco = document.getElementById('btnFiltrarBanco');
+    if (btnFiltrarBanco) {
+        btnFiltrarBanco.addEventListener('click', aplicarFiltroBanco);
+    }
+    const btnFiltrarEncuestas = document.getElementById('btnFiltrarEncuestas');
+    if (btnFiltrarEncuestas) {
+        btnFiltrarEncuestas.addEventListener('click', aplicarFiltroEncuestas);
+    }
 
     function numFmt(v) {
         if (v == null) return '—';
         return String(v).replace('.', ',');
+    }
+
+    function aplicarFiltroUsuarios() {
+        const txt = ((document.getElementById('filtroUsuariosTexto') || {}).value || '').toLowerCase().trim();
+        const estado = ((document.getElementById('filtroUsuariosEstado') || {}).value || '').trim();
+        const minRaw = ((document.getElementById('filtroUsuariosMinTotal') || {}).value || '').trim();
+        const minTotal = minRaw === '' ? null : parseInt(minRaw, 10);
+        const filas = document.querySelectorAll('#tabla-usuarios tbody tr');
+        const mapEstado = { 'Nueva': 1, 'En Revisión Banco': 2, 'Aprobada': 3, 'Rechazada': 4, 'Completada': 5, 'Desistimiento': 6 };
+        filas.forEach(tr => {
+            if (tr.querySelector('td[colspan]')) return;
+            const celdas = tr.querySelectorAll('td');
+            const ref = (celdas[0]?.innerText || '').toLowerCase();
+            const total = parseInt((celdas[7]?.innerText || '0').replace(/[^\d]/g, ''), 10) || 0;
+            let visible = true;
+            if (txt && ref.indexOf(txt) === -1) visible = false;
+            if (estado && mapEstado[estado] != null) {
+                const idx = mapEstado[estado];
+                const valEstado = parseInt((celdas[idx]?.innerText || '0').replace(/[^\d]/g, ''), 10) || 0;
+                if (valEstado <= 0) visible = false;
+            }
+            if (minTotal !== null && !isNaN(minTotal) && total < minTotal) visible = false;
+            tr.style.display = visible ? '' : 'none';
+        });
+    }
+
+    function aplicarFiltroTiempo() {
+        const txt = ((document.getElementById('filtroTiempoTexto') || {}).value || '').toLowerCase().trim();
+        const estado = ((document.getElementById('filtroTiempoEstado') || {}).value || '').trim();
+        const desde = ((document.getElementById('filtroTiempoDesde') || {}).value || '').trim();
+        const hasta = ((document.getElementById('filtroTiempoHasta') || {}).value || '').trim();
+        const filas = document.querySelectorAll('#tabla-tiempo tbody tr');
+        filas.forEach(tr => {
+            if (tr.querySelector('td[colspan]')) return;
+            const c = tr.querySelectorAll('td');
+            const ref = ((c[1]?.innerText || '') + ' ' + (c[2]?.innerText || '')).toLowerCase();
+            const est = (c[3]?.innerText || '').trim();
+            const fecha = (c[4]?.innerText || '').slice(0, 10);
+            let visible = true;
+            if (txt && ref.indexOf(txt) === -1) visible = false;
+            if (estado && est !== estado) visible = false;
+            if (desde && fecha && fecha < desde) visible = false;
+            if (hasta && fecha && fecha > hasta) visible = false;
+            tr.style.display = visible ? '' : 'none';
+        });
+    }
+
+    function aplicarFiltroBanco() {
+        const txt = ((document.getElementById('filtroBancoTexto') || {}).value || '').toLowerCase().trim();
+        const pendiente = ((document.getElementById('filtroBancoPendiente') || {}).value || '').trim();
+        const filas = document.querySelectorAll('#tabla-banco tbody tr');
+        filas.forEach(tr => {
+            if (tr.querySelector('td[colspan]')) return;
+            const c = tr.querySelectorAll('td');
+            const ref = ((c[1]?.innerText || '') + ' ' + (c[2]?.innerText || '')).toLowerCase();
+            const tiempoTxt = (c[5]?.innerText || '').toLowerCase();
+            let visible = true;
+            if (txt && ref.indexOf(txt) === -1) visible = false;
+            if (pendiente === 'si' && tiempoTxt.indexOf('pendiente') === -1) visible = false;
+            if (pendiente === 'no' && tiempoTxt.indexOf('pendiente') !== -1) visible = false;
+            tr.style.display = visible ? '' : 'none';
+        });
+    }
+
+    function aplicarFiltroEncuestas() {
+        const txt = ((document.getElementById('filtroEncuestasTexto') || {}).value || '').toLowerCase().trim();
+        const filas = document.querySelectorAll('#encuestas-contenido table tbody tr');
+        filas.forEach(tr => {
+            if (tr.querySelector('td[colspan]')) return;
+            const ref = (tr.innerText || '').toLowerCase();
+            tr.style.display = (!txt || ref.indexOf(txt) !== -1) ? '' : 'none';
+        });
     }
 
     function buildBloqueEnc(titleClass, label, data) {
@@ -552,6 +704,7 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
                 const v = data.vendedor;
                 const g = data.gestor;
                 box.innerHTML = buildBloqueEnc('v', 'Encuesta: formulario público (vendedores)', v) + buildBloqueEnc('g', 'Encuesta: proceso y sistema (gestores)', g);
+                aplicarFiltroEncuestas();
             })
             .catch(function() {
                 document.getElementById('encuestas-contenido').innerHTML = '<div class="alert alert-danger">Error de red o servidor al cargar encuestas.</div>';
