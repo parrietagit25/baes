@@ -333,7 +333,7 @@ function cargarSolicitudes() {
                 response.data.forEach(function(solicitud) {
                     const estadoClass = getEstadoClass(solicitud.estado);
                     const respuestaClass = getRespuestaClass(solicitud.respuesta_banco);
-                    const vendedorNombre = [solicitud.vendedor_nombre || '', solicitud.vendedor_apellido || ''].join(' ').trim() || 'Sin vendedor';
+                    const vendedorNombre = (solicitud.vendedor_nombre || '').toString().trim() || 'Sin vendedor';
                     const idCelda = (window.userRoles && window.userRoles.isAdmin)
                         ? ('<a href="javascript:void(0);" class="link-cronologia-solicitud text-primary fw-semibold text-decoration-underline" role="button" data-id="' +
                             solicitud.id + '" data-nombre="' + escDataAttr(solicitud.nombre_cliente) + '" title="Ver cronología de la solicitud">#' + solicitud.id + '</a>')

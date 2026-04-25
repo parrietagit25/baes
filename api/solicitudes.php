@@ -96,13 +96,13 @@ function obtenerSolicitudes() {
         // Construir query según el rol del usuario
         $sql = "
             SELECT s.*, u.nombre as gestor_nombre, u.apellido as gestor_apellido,
-                   uv.nombre as vendedor_nombre, uv.apellido as vendedor_apellido,
+                   ev.nombre as vendedor_nombre,
                    ub.nombre as banco_nombre, ub.apellido as banco_apellido,
                    b.nombre as banco_institucion,
                    COUNT(DISTINCT n.id) as total_notas
             FROM solicitudes_credito s
             LEFT JOIN usuarios u ON s.gestor_id = u.id
-            LEFT JOIN usuarios uv ON s.vendedor_id = uv.id
+            LEFT JOIN ejecutivos_ventas ev ON s.ejecutivo_ventas_id = ev.id
             LEFT JOIN usuarios_banco_solicitudes ubs ON s.id = ubs.solicitud_id AND ubs.estado = 'activo'
             LEFT JOIN usuarios ub ON ubs.usuario_banco_id = ub.id
             LEFT JOIN bancos b ON ub.banco_id = b.id
@@ -131,7 +131,7 @@ function obtenerSolicitudes() {
             return;
         }
         
-        $sql .= $whereClause . " GROUP BY s.id, u.nombre, u.apellido, uv.nombre, uv.apellido, ub.nombre, ub.apellido, b.nombre ORDER BY s.fecha_creacion DESC";
+        $sql .= $whereClause . " GROUP BY s.id, u.nombre, u.apellido, ev.nombre, ub.nombre, ub.apellido, b.nombre ORDER BY s.fecha_creacion DESC";
         
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
