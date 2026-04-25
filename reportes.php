@@ -15,11 +15,11 @@ if (!in_array('ROLE_ADMIN', $_SESSION['user_roles'])) {
 }
 
 $submenu = $_GET['submenu'] ?? 'usuarios';
-if (!in_array($submenu, ['usuarios', 'tiempo', 'banco', 'emails', 'encuestas'], true)) {
+if (!in_array($submenu, ['usuarios', 'tiempo', 'banco', 'emails', 'encuestas', 'telemetria'], true)) {
     $submenu = 'usuarios';
 }
 $estadosCol = ['Nueva', 'En Revisión Banco', 'Aprobada', 'Rechazada', 'Completada', 'Desistimiento'];
-$titulosReporte = ['usuarios' => 'Rep. Usuarios', 'tiempo' => 'Rep. Tiempo', 'banco' => 'Rep. Banco', 'emails' => 'Rep. Correos', 'encuestas' => 'Rep. Encuestas'];
+$titulosReporte = ['usuarios' => 'Rep. Usuarios', 'tiempo' => 'Rep. Tiempo', 'banco' => 'Rep. Banco', 'emails' => 'Rep. Correos', 'encuestas' => 'Rep. Encuestas', 'telemetria' => 'Rep. Telemetría'];
 $exportActionPorSubmenu = [
     'usuarios' => ['action' => 'exportar_excel_usuarios', 'label' => 'Descargar Rep. Usuarios'],
     'tiempo' => ['action' => 'exportar_excel_tiempo', 'label' => 'Descargar Rep. Tiempo'],
@@ -27,6 +27,7 @@ $exportActionPorSubmenu = [
     'emails' => ['action' => 'exportar_excel_correos', 'label' => 'Descargar Rep. Correos'],
     // En encuestas se prioriza vendedores; se deja botón adicional dentro del panel para gestores.
     'encuestas' => ['action' => 'exportar_excel_encuestas_vendedores', 'label' => 'Descargar Enc. Vendedores'],
+    'telemetria' => ['action' => 'exportar_excel_telemetria', 'label' => 'Descargar Rep. Telemetría'],
 ];
 $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
 ?>
@@ -80,6 +81,7 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
                             elseif ($submenu === 'tiempo') echo 'Tiempo entre cambios de estado por solicitud';
                             elseif ($submenu === 'banco') echo 'Tiempo que tardan los bancos en dar respuesta a las solicitudes asignadas';
                             elseif ($submenu === 'encuestas') echo 'Promedios, totales y detalle de respuestas a las encuestas públicas (vendedores y gestores)';
+                            elseif ($submenu === 'telemetria') echo 'Tiempos del wizard, inicio/fin, dispositivo, IP y datos de contacto capturados en solicitud pública';
                             else echo 'Cantidad de correos enviados/fallidos y detalle de destinatarios';
                         ?></p>
                     </div>
@@ -233,6 +235,57 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
                         <div id="encuestas-contenido" class="py-3 text-muted text-center">Cargando encuestas…</div>
                     </div>
 
+                    <!-- Rep. Telemetría -->
+                    <div id="panel-telemetria" class="report-panel" style="display: <?php echo $submenu === 'telemetria' ? 'block' : 'none'; ?>">
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-3"><div class="card"><div class="card-body text-center"><div class="text-muted small">Registros</div><div class="h4 mb-0" id="telTotalRegistros">0</div></div></div></div>
+                            <div class="col-md-3"><div class="card"><div class="card-body text-center"><div class="text-muted small">Duración promedio</div><div class="h4 mb-0 text-primary" id="telDurProm">—</div></div></div></div>
+                            <div class="col-md-6"><div class="card"><div class="card-body text-center"><div class="text-muted small">Promedio por paso (A/B/C/D/E)</div><div class="h5 mb-0" id="telPasoProm">—</div></div></div></div>
+                        </div>
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="row g-2 mb-3">
+                                    <div class="col-md-4">
+                                        <input type="text" id="filtroTelemetriaTexto" class="form-control form-control-sm" placeholder="Filtrar por cliente, cédula, celular, email o IP...">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <input type="number" min="0" id="filtroTelemetriaDurMin" class="form-control form-control-sm" placeholder="Duración mín (seg)">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <input type="date" id="filtroTelemetriaDesde" class="form-control form-control-sm">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <input type="date" id="filtroTelemetriaHasta" class="form-control form-control-sm">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <button type="button" class="btn btn-primary btn-sm w-100" id="btnFiltrarTelemetria"><i class="fas fa-filter me-1"></i>Filtrar</button>
+                                    </div>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-bordered table-sm table-reportes" id="tabla-telemetria">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Fecha</th>
+                                                <th>Cliente</th>
+                                                <th>Cédula</th>
+                                                <th>Contacto</th>
+                                                <th>IP</th>
+                                                <th>Duración total</th>
+                                                <th>Paso A</th>
+                                                <th>Paso B</th>
+                                                <th>Paso C</th>
+                                                <th>Paso D</th>
+                                                <th>Paso E</th>
+                                                <th>Dispositivo</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Rep. Correos -->
                     <div id="panel-emails" class="report-panel" style="display: <?php echo $submenu === 'emails' ? 'block' : 'none'; ?>">
                         <div class="row g-3 mb-3">
@@ -359,6 +412,8 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
         loadReporteEmails();
     } else if (submenu === 'encuestas') {
         loadReporteEncuestas();
+    } else if (submenu === 'telemetria') {
+        loadReporteTelemetria();
     }
 
     function loadReporteUsuarios() {
@@ -551,6 +606,10 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
     if (btnFiltrarEncuestas) {
         btnFiltrarEncuestas.addEventListener('click', aplicarFiltroEncuestas);
     }
+    const btnFiltrarTelemetria = document.getElementById('btnFiltrarTelemetria');
+    if (btnFiltrarTelemetria) {
+        btnFiltrarTelemetria.addEventListener('click', aplicarFiltroTelemetria);
+    }
 
     function numFmt(v) {
         if (v == null) return '—';
@@ -626,6 +685,29 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
             if (tr.querySelector('td[colspan]')) return;
             const ref = (tr.innerText || '').toLowerCase();
             tr.style.display = (!txt || ref.indexOf(txt) !== -1) ? '' : 'none';
+        });
+    }
+
+    function aplicarFiltroTelemetria() {
+        const txt = ((document.getElementById('filtroTelemetriaTexto') || {}).value || '').toLowerCase().trim();
+        const durMinRaw = ((document.getElementById('filtroTelemetriaDurMin') || {}).value || '').trim();
+        const durMin = durMinRaw === '' ? null : parseInt(durMinRaw, 10);
+        const desde = ((document.getElementById('filtroTelemetriaDesde') || {}).value || '').trim();
+        const hasta = ((document.getElementById('filtroTelemetriaHasta') || {}).value || '').trim();
+        const filas = document.querySelectorAll('#tabla-telemetria tbody tr');
+        filas.forEach(function(tr) {
+            if (tr.querySelector('td[colspan]')) return;
+            const c = tr.querySelectorAll('td');
+            const ref = ((c[1]?.innerText || '') + ' ' + (c[2]?.innerText || '') + ' ' + (c[3]?.innerText || '') + ' ' + (c[4]?.innerText || '')).toLowerCase();
+            const fecha = (c[0]?.getAttribute('data-date') || '');
+            const durTxt = (c[5]?.innerText || '').replace(/[^\d]/g, '');
+            const dur = durTxt ? parseInt(durTxt, 10) : 0;
+            let visible = true;
+            if (txt && ref.indexOf(txt) === -1) visible = false;
+            if (durMin !== null && !isNaN(durMin) && dur < durMin) visible = false;
+            if (desde && fecha && fecha < desde) visible = false;
+            if (hasta && fecha && fecha > hasta) visible = false;
+            tr.style.display = visible ? '' : 'none';
         });
     }
 
@@ -708,6 +790,59 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
             })
             .catch(function() {
                 document.getElementById('encuestas-contenido').innerHTML = '<div class="alert alert-danger">Error de red o servidor al cargar encuestas.</div>';
+            });
+    }
+
+    function loadReporteTelemetria() {
+        const tbody = document.querySelector('#tabla-telemetria tbody');
+        if (!tbody) return;
+        tbody.innerHTML = '<tr><td colspan="12" class="text-center text-muted">Cargando…</td></tr>';
+        fetch('api/reportes.php?action=reporte_telemetria')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (!data.success) {
+                    tbody.innerHTML = '<tr><td colspan="12" class="text-center text-danger">' + escapeHtml(data.message || 'No se pudo cargar telemetría') + '</td></tr>';
+                    return;
+                }
+                const res = data.resumen || {};
+                document.getElementById('telTotalRegistros').textContent = String(res.total_registros ?? 0);
+                document.getElementById('telDurProm').textContent = (res.duracion_promedio_seg != null ? String(res.duracion_promedio_seg) + ' seg' : '—');
+                const pp = res.paso_promedio_seg || {};
+                document.getElementById('telPasoProm').textContent = ['0','1','2','3','4'].map(function(k){
+                    return (pp[k] != null ? pp[k] : '—');
+                }).join(' / ');
+
+                const rows = data.data || [];
+                if (!rows.length) {
+                    tbody.innerHTML = '<tr><td colspan="12" class="text-center text-muted">Sin datos de telemetría</td></tr>';
+                    return;
+                }
+                let html = '';
+                rows.forEach(function(r) {
+                    const f = String(r.fecha_creacion || '');
+                    const fDate = f.length >= 10 ? f.slice(0, 10) : '';
+                    const contacto = [r.celular_cliente || '', r.cliente_correo || ''].filter(Boolean).join('<br>');
+                    const disp = [r.platform || '', r.viewport || '', r.timezone || ''].filter(Boolean).join(' | ');
+                    html += '<tr>'
+                        + '<td class="text-nowrap" data-date="' + escapeHtml(fDate) + '">' + escapeHtml(f) + '</td>'
+                        + '<td>' + escapeHtml(r.cliente_nombre || '') + '</td>'
+                        + '<td>' + escapeHtml(r.cliente_id || '') + '</td>'
+                        + '<td>' + (contacto ? '<small>' + contacto + '</small>' : '—') + '</td>'
+                        + '<td class="text-nowrap">' + escapeHtml(r.ip || '') + '</td>'
+                        + '<td class="text-end fw-bold">' + (r.telemetria_duracion_segundos != null ? r.telemetria_duracion_segundos + ' seg' : '—') + '</td>'
+                        + '<td class="text-end">' + (r.paso0_seg != null ? r.paso0_seg : 0) + '</td>'
+                        + '<td class="text-end">' + (r.paso1_seg != null ? r.paso1_seg : 0) + '</td>'
+                        + '<td class="text-end">' + (r.paso2_seg != null ? r.paso2_seg : 0) + '</td>'
+                        + '<td class="text-end">' + (r.paso3_seg != null ? r.paso3_seg : 0) + '</td>'
+                        + '<td class="text-end">' + (r.paso4_seg != null ? r.paso4_seg : 0) + '</td>'
+                        + '<td><small>' + escapeHtml(disp || '—') + '</small></td>'
+                        + '</tr>';
+                });
+                tbody.innerHTML = html;
+                aplicarFiltroTelemetria();
+            })
+            .catch(function() {
+                tbody.innerHTML = '<tr><td colspan="12" class="text-center text-danger">Error de red o servidor</td></tr>';
             });
     }
 })();

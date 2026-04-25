@@ -26,6 +26,7 @@ if (in_array($action, [
     'exportar_excel_correos',
     'exportar_excel_encuestas_vendedores',
     'exportar_excel_encuestas_gestores',
+    'exportar_excel_telemetria',
 ], true)) {
     exportarReporteCsv($action);
     exit();
@@ -55,6 +56,9 @@ switch ($action) {
     case 'reporte_encuestas':
         reporteEncuestas();
         break;
+    case 'reporte_telemetria':
+        reporteTelemetria();
+        break;
     case 'exportar_todos_excel':
         // Ya atendido al inicio.
         echo json_encode(['success' => false, 'message' => 'Acción ya ejecutada']);
@@ -65,6 +69,7 @@ switch ($action) {
     case 'exportar_excel_correos':
     case 'exportar_excel_encuestas_vendedores':
     case 'exportar_excel_encuestas_gestores':
+    case 'exportar_excel_telemetria':
         // Ya atendido al inicio.
         echo json_encode(['success' => false, 'message' => 'Acción ya ejecutada']);
         break;
@@ -200,6 +205,41 @@ function exportarReporteCsv(string $action): void {
         }, $enc['filas'] ?? []);
         _outputXlsxDownload('reporte_encuestas_gestores.xlsx', 'Enc Gestores', [
             'ID', 'Fecha', 'Nombre Completo', 'Cargo', 'P1', 'P2', 'P3', 'P4', 'P5', 'Promedio', 'Recomendaciones'
+        ], $rows);
+        return;
+    }
+
+    if ($action === 'exportar_excel_telemetria') {
+        $rowsData = _dataReporteTelemetria($pdo);
+        $rows = array_map(static function(array $r): array {
+            return [
+                $r['id'] ?? '',
+                $r['fecha_creacion'] ?? '',
+                $r['cliente_nombre'] ?? '',
+                $r['cliente_id'] ?? '',
+                $r['celular_cliente'] ?? '',
+                $r['cliente_correo'] ?? '',
+                $r['ip'] ?? '',
+                $r['telemetria_session_id'] ?? '',
+                $r['telemetria_started_at'] ?? '',
+                $r['telemetria_submitted_at'] ?? '',
+                $r['telemetria_duracion_segundos'] ?? '',
+                $r['paso0_seg'] ?? '',
+                $r['paso1_seg'] ?? '',
+                $r['paso2_seg'] ?? '',
+                $r['paso3_seg'] ?? '',
+                $r['paso4_seg'] ?? '',
+                $r['platform'] ?? '',
+                $r['timezone'] ?? '',
+                $r['viewport'] ?? '',
+                $r['screen'] ?? '',
+            ];
+        }, $rowsData);
+        _outputXlsxDownload('reporte_telemetria.xlsx', 'Rep Telemetria', [
+            'ID', 'Fecha Registro', 'Cliente', 'Cedula', 'Celular', 'Email', 'IP',
+            'Sesion', 'Inicio', 'Fin', 'Duracion Seg',
+            'Paso A Seg', 'Paso B Seg', 'Paso C Seg', 'Paso D Seg', 'Paso E Seg',
+            'Plataforma', 'Timezone', 'Viewport', 'Pantalla'
         ], $rows);
         return;
     }
@@ -680,6 +720,37 @@ function _dataReporteEmails(PDO $pdo): array {
     }
 }
 
+function _dataReporteTelemetria(PDO $pdo): array {
+    $sql = "
+        SELECT
+            id, fecha_creacion, cliente_nombre, cliente_id, celular_cliente, cliente_correo, ip,
+            telemetria_session_id, telemetria_started_at, telemetria_submitted_at, telemetria_duracion_segundos,
+            telemetria_paso_tiempos_json, telemetria_dispositivo_json
+        FROM financiamiento_registros
+        WHERE telemetria_session_id IS NOT NULL
+          AND TRIM(telemetria_session_id) <> ''
+        ORDER BY fecha_creacion DESC
+        LIMIT 5000
+    ";
+    $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($rows as &$r) {
+        $steps = json_decode((string)($r['telemetria_paso_tiempos_json'] ?? ''), true);
+        if (!is_array($steps)) $steps = [];
+        for ($i = 0; $i <= 4; $i++) {
+            $ms = isset($steps[(string)$i]) && is_numeric($steps[(string)$i]) ? (int)$steps[(string)$i] : 0;
+            $r['paso' . $i . '_seg'] = $ms > 0 ? (int) floor($ms / 1000) : 0;
+        }
+        $dev = json_decode((string)($r['telemetria_dispositivo_json'] ?? ''), true);
+        if (!is_array($dev)) $dev = [];
+        $r['platform'] = (string)($dev['platform'] ?? '');
+        $r['timezone'] = (string)($dev['timezone'] ?? '');
+        $r['viewport'] = (string)($dev['viewport'] ?? '');
+        $r['screen'] = (string)($dev['screen'] ?? '');
+    }
+    unset($r);
+    return $rows;
+}
+
 /**
  * Total de solicitudes por usuario (gestor) y por estado
  */
@@ -991,6 +1062,56 @@ function reporteEncuestas() {
         'vendedor' => $vendedor,
         'gestor' => $gestor,
     ]);
+}
+
+function reporteTelemetria() {
+    global $pdo;
+    try {
+        $rows = _dataReporteTelemetria($pdo);
+        $total = count($rows);
+        $dur = 0;
+        $durN = 0;
+        $sumPasos = [0, 0, 0, 0, 0];
+        $sumPasosN = [0, 0, 0, 0, 0];
+        foreach ($rows as $r) {
+            if (isset($r['telemetria_duracion_segundos']) && is_numeric($r['telemetria_duracion_segundos'])) {
+                $dur += (int)$r['telemetria_duracion_segundos'];
+                $durN++;
+            }
+            for ($i = 0; $i <= 4; $i++) {
+                $k = 'paso' . $i . '_seg';
+                if (isset($r[$k]) && is_numeric($r[$k])) {
+                    $sumPasos[$i] += (int)$r[$k];
+                    $sumPasosN[$i]++;
+                }
+            }
+        }
+        echo json_encode([
+            'success' => true,
+            'resumen' => [
+                'total_registros' => $total,
+                'duracion_promedio_seg' => $durN > 0 ? round($dur / $durN, 2) : null,
+                'paso_promedio_seg' => [
+                    0 => $sumPasosN[0] > 0 ? round($sumPasos[0] / $sumPasosN[0], 2) : null,
+                    1 => $sumPasosN[1] > 0 ? round($sumPasos[1] / $sumPasosN[1], 2) : null,
+                    2 => $sumPasosN[2] > 0 ? round($sumPasos[2] / $sumPasosN[2], 2) : null,
+                    3 => $sumPasosN[3] > 0 ? round($sumPasos[3] / $sumPasosN[3], 2) : null,
+                    4 => $sumPasosN[4] > 0 ? round($sumPasos[4] / $sumPasosN[4], 2) : null,
+                ],
+            ],
+            'data' => $rows
+        ]);
+    } catch (PDOException $e) {
+        if (($e->errorInfo[1] ?? null) === 1054) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Faltan columnas de telemetría. Ejecute la migración de telemetría.'
+            ]);
+            return;
+        }
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Error de base de datos']);
+    }
 }
 
 /**
