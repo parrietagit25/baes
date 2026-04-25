@@ -1537,6 +1537,112 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
       const stepLabels = ["A. Cliente", "B. Dirección", "C. Laboral", "D. Cónyuge", "E. Referencias"];
       let step = 0;
       let toastTimer = null;
+      let telemetry = null;
+
+      function nowIso(){ return new Date().toISOString(); }
+      function safeJsonClone(obj){
+        try { return JSON.parse(JSON.stringify(obj)); } catch (e) { return null; }
+      }
+      function genTelemetrySessionId(){
+        return "tel_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 10);
+      }
+      function captureDeviceInfo(){
+        var nav = window.navigator || {};
+        var scr = window.screen || {};
+        return {
+          user_agent: String(nav.userAgent || ""),
+          language: String(nav.language || ""),
+          platform: String(nav.platform || ""),
+          cookie_enabled: !!nav.cookieEnabled,
+          hardware_concurrency: Number(nav.hardwareConcurrency || 0) || null,
+          device_memory_gb: Number(nav.deviceMemory || 0) || null,
+          max_touch_points: Number(nav.maxTouchPoints || 0) || null,
+          screen: (scr.width && scr.height) ? (String(scr.width) + "x" + String(scr.height)) : "",
+          viewport: String(window.innerWidth || 0) + "x" + String(window.innerHeight || 0),
+          timezone: (window.Intl && Intl.DateTimeFormat) ? String(Intl.DateTimeFormat().resolvedOptions().timeZone || "") : "",
+          referrer: String(document.referrer || "")
+        };
+      }
+      function normalizeTelemetry(raw){
+        var base = {
+          session_id: genTelemetrySessionId(),
+          started_at_iso: nowIso(),
+          submitted_at_iso: "",
+          total_duration_ms: 0,
+          step_times_ms: { "0": 0, "1": 0, "2": 0, "3": 0, "4": 0 },
+          events: [],
+          device: captureDeviceInfo(),
+          current_step: step,
+          last_step_entered_at_ms: Date.now()
+        };
+        if (!raw || typeof raw !== "object") return base;
+        var merged = Object.assign({}, base, raw);
+        if (!merged.step_times_ms || typeof merged.step_times_ms !== "object"){
+          merged.step_times_ms = { "0": 0, "1": 0, "2": 0, "3": 0, "4": 0 };
+        }
+        for (var i = 0; i < fieldsets.length; i++){
+          var key = String(i);
+          var v = Number(merged.step_times_ms[key] || 0);
+          merged.step_times_ms[key] = Number.isFinite(v) && v >= 0 ? Math.round(v) : 0;
+        }
+        if (!Array.isArray(merged.events)) merged.events = [];
+        if (!merged.session_id) merged.session_id = genTelemetrySessionId();
+        if (!merged.started_at_iso) merged.started_at_iso = nowIso();
+        merged.current_step = Math.max(0, Math.min(fieldsets.length - 1, Number(merged.current_step || 0)));
+        merged.last_step_entered_at_ms = Number(merged.last_step_entered_at_ms || Date.now());
+        if (!Number.isFinite(merged.last_step_entered_at_ms) || merged.last_step_entered_at_ms <= 0){
+          merged.last_step_entered_at_ms = Date.now();
+        }
+        return merged;
+      }
+      function initTelemetry(restored){
+        telemetry = normalizeTelemetry(restored || null);
+        telemetry.current_step = step;
+        telemetry.last_step_entered_at_ms = Date.now();
+        telemetry.device = captureDeviceInfo();
+        recordTelemetryEvent("form_open", { step: step });
+      }
+      function recordTelemetryEvent(eventName, detail){
+        if (!telemetry) return;
+        telemetry.events.push({
+          at: nowIso(),
+          event: String(eventName || "event"),
+          step: step,
+          detail: safeJsonClone(detail || {})
+        });
+        if (telemetry.events.length > 200){
+          telemetry.events = telemetry.events.slice(telemetry.events.length - 200);
+        }
+      }
+      function telemetryCloseCurrentStep(){
+        if (!telemetry) return;
+        var nowMs = Date.now();
+        var prevStep = Math.max(0, Math.min(fieldsets.length - 1, Number(telemetry.current_step || step)));
+        var spent = nowMs - Number(telemetry.last_step_entered_at_ms || nowMs);
+        if (Number.isFinite(spent) && spent > 0){
+          var k = String(prevStep);
+          var prevVal = Number(telemetry.step_times_ms[k] || 0);
+          telemetry.step_times_ms[k] = Math.round(prevVal + spent);
+        }
+      }
+      function buildTelemetryPayloadForSubmit(){
+        if (!telemetry) initTelemetry(null);
+        telemetryCloseCurrentStep();
+        telemetry.submitted_at_iso = nowIso();
+        var startedMs = Date.parse(telemetry.started_at_iso || nowIso());
+        telemetry.total_duration_ms = Number.isFinite(startedMs) ? Math.max(0, Date.now() - startedMs) : 0;
+        telemetry.device = captureDeviceInfo();
+        recordTelemetryEvent("submit_attempt", { total_duration_ms: telemetry.total_duration_ms });
+        return {
+          session_id: telemetry.session_id,
+          started_at_iso: telemetry.started_at_iso,
+          submitted_at_iso: telemetry.submitted_at_iso,
+          total_duration_ms: telemetry.total_duration_ms,
+          step_times_ms: safeJsonClone(telemetry.step_times_ms || {}),
+          events: safeJsonClone(telemetry.events || []),
+          device: safeJsonClone(telemetry.device || {})
+        };
+      }
 
       // Firma: canvas principal (todo el recuadro usable; botón Limpiar fuera del área de firma)
       var canvas = document.getElementById("firmaCanvas");
@@ -1970,9 +2076,16 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
       }
 
       function goTo(next){
+        telemetryCloseCurrentStep();
+        var fromStep = step;
         fieldsets[step].classList.remove("active");
         step = Math.max(0, Math.min(fieldsets.length - 1, next));
         fieldsets[step].classList.add("active");
+        if (telemetry){
+          telemetry.current_step = step;
+          telemetry.last_step_entered_at_ms = Date.now();
+          recordTelemetryEvent("step_change", { from: fromStep, to: step });
+        }
         setChipState();
         calcProgress();
         window.scrollTo({top:0, behavior:"smooth"});
@@ -1997,6 +2110,16 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           data[el.name] = el.value;
         });
         data.__meta = { step: step, savedAt: new Date().toISOString() };
+        if (telemetry){
+          data.__meta.telemetry = {
+            session_id: telemetry.session_id,
+            started_at_iso: telemetry.started_at_iso,
+            step_times_ms: safeJsonClone(telemetry.step_times_ms || {}),
+            events: safeJsonClone(telemetry.events || []),
+            current_step: telemetry.current_step,
+            last_step_entered_at_ms: telemetry.last_step_entered_at_ms
+          };
+        }
         return data;
       }
 
@@ -2017,6 +2140,9 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
         });
         if(data.__meta && typeof data.__meta.step === "number"){
           step = Math.max(0, Math.min(fieldsets.length - 1, data.__meta.step));
+        }
+        if (data.__meta && data.__meta.telemetry){
+          telemetry = normalizeTelemetry(data.__meta.telemetry);
         }
         var nacEl = form.elements["cliente_nacimiento"];
         if (nacEl && data.cliente_nacimiento != null && data.cliente_nacimiento !== undefined){
@@ -2628,7 +2754,9 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           calcProgress();
           saveState.textContent = "Restaurado";
           showToast("Progreso restaurado");
+          if (!telemetry) initTelemetry(draft && draft.__meta ? draft.__meta.telemetry : null);
         } else {
+          initTelemetry(null);
           setChipState();
           calcProgress();
         }
@@ -2651,6 +2779,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
             setChipState();
             calcProgress();
             localStorage.removeItem(STORAGE_KEY);
+            initTelemetry(null);
           }
         });
 
@@ -2669,6 +2798,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           delete payload.__meta;
           delete payload.acepta;
           aplicarCompatibilidadDireccion(payload);
+          payload.__telemetria = buildTelemetryPayloadForSubmit();
           if(TOKEN_LINK) payload.token = TOKEN_LINK;
           if(firmaDataInput && firmaDataInput.value) payload.firma = firmaDataInput.value;
           var faBlocks = document.querySelectorAll(".firmante-adicional-block");
@@ -2704,6 +2834,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
             if(result.ok && result.data.success){
               localStorage.removeItem(STORAGE_KEY);
               saveState.textContent = "Enviado";
+              recordTelemetryEvent("submit_success", { response_id: result.data && result.data.data ? result.data.data.id : null });
               showToast(result.data.message || "Solicitud registrada correctamente.", "ok");
               form.reset();
               setTimeout(function(){
@@ -2714,13 +2845,16 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
                   setChipState();
                   calcProgress();
                   saveState.textContent = "Sin guardar";
+                  initTelemetry(null);
                 }
               }, 400);
             } else {
+              recordTelemetryEvent("submit_error", { message: result && result.data ? result.data.message : "" });
               showToast(result.data.message || "Error al enviar. Intente de nuevo.", "err");
             }
           })
           .catch(function(){
+            recordTelemetryEvent("submit_network_error", {});
             showToast("Error de conexión. Intente de nuevo.", "err");
           })
           .finally(function(){

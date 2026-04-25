@@ -86,6 +86,8 @@ unset($input['imagen_cedula']);
 $token = isset($input['token']) ? trim($input['token']) : '';
 $token = $token !== '' ? urldecode($token) : '';
 $firmaBase64 = isset($input['firma']) ? $input['firma'] : '';
+$_telemetria = isset($input['__telemetria']) && is_array($input['__telemetria']) ? $input['__telemetria'] : [];
+unset($input['__telemetria']);
 unset($input['token'], $input['firma']);
 
 // Validación mínima (no depende de base de datos)
@@ -178,6 +180,17 @@ function normalizeDateToSql($v) {
     }
 
     return null;
+}
+
+function normalizeDateTimeToSql($v) {
+    $x = trim((string)$v);
+    if ($x === '') return null;
+    try {
+        $dt = new DateTime($x);
+        return $dt->format('Y-m-d H:i:s');
+    } catch (Throwable $e) {
+        return null;
+    }
 }
 
 /** Columna de tamaño en adjuntos_solicitud (nombre puede variar por instalación). */
@@ -657,6 +670,43 @@ if ($emailVendedorFr !== null && $pdoEjecutivos) {
     $idVendedorFr = solPub_buscar_id_ejecutivo_por_email($pdoEjecutivos, $emailVendedorFr);
 }
 
+$telemetriaSessionId = null;
+$telemetriaStartedAt = null;
+$telemetriaSubmittedAt = null;
+$telemetriaDuracionSeg = null;
+$telemetriaPasoTiemposJson = null;
+$telemetriaEventosJson = null;
+$telemetriaDispositivoJson = null;
+if (!empty($_telemetria)) {
+    $telemetriaSessionId = isset($_telemetria['session_id']) ? trim((string)$_telemetria['session_id']) : null;
+    if ($telemetriaSessionId === '') $telemetriaSessionId = null;
+    if ($telemetriaSessionId !== null && strlen($telemetriaSessionId) > 100) {
+        $telemetriaSessionId = substr($telemetriaSessionId, 0, 100);
+    }
+    $telemetriaStartedAt = normalizeDateTimeToSql($_telemetria['started_at_iso'] ?? '');
+    $telemetriaSubmittedAt = normalizeDateTimeToSql($_telemetria['submitted_at_iso'] ?? '');
+    $durMs = isset($_telemetria['total_duration_ms']) && is_numeric($_telemetria['total_duration_ms'])
+        ? (int)$_telemetria['total_duration_ms']
+        : null;
+    if ($durMs !== null && $durMs >= 0) {
+        $telemetriaDuracionSeg = (int) floor($durMs / 1000);
+    }
+    if (isset($_telemetria['step_times_ms']) && is_array($_telemetria['step_times_ms'])) {
+        $telemetriaPasoTiemposJson = json_encode($_telemetria['step_times_ms'], JSON_UNESCAPED_UNICODE);
+    }
+    if (isset($_telemetria['events']) && is_array($_telemetria['events'])) {
+        $telemetriaEventosJson = json_encode($_telemetria['events'], JSON_UNESCAPED_UNICODE);
+    }
+    if (isset($_telemetria['device']) && is_array($_telemetria['device'])) {
+        $telemetriaDispositivoJson = json_encode($_telemetria['device'], JSON_UNESCAPED_UNICODE);
+    } else {
+        $telemetriaDispositivoJson = json_encode([
+            'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? '',
+            'accept_language' => $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? ''
+        ], JSON_UNESCAPED_UNICODE);
+    }
+}
+
 $finRegistroInsertId = 0;
 if ($pdoReg) {
     try {
@@ -697,7 +747,9 @@ if ($pdoReg) {
                 reff1_nombre, reff1_cel, reff1_dir_res, reff1_dir_lab,
                 reff2_nombre, reff2_cel, reff2_dir_res, reff2_dir_lab,
                 marca_auto, modelo_auto, anio_auto, kms_cod_auto, precio_venta, abono,
-                sucursal, nombre_gestor, comentarios_gestor, firma, firmantes_adicionales
+                sucursal, nombre_gestor, comentarios_gestor, firma, firmantes_adicionales,
+                telemetria_session_id, telemetria_started_at, telemetria_submitted_at, telemetria_duracion_segundos,
+                telemetria_paso_tiempos_json, telemetria_eventos_json, telemetria_dispositivo_json
             ) VALUES (
                 ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
@@ -711,7 +763,7 @@ if ($pdoReg) {
                 ?, ?, ?, ?,
                 ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
             )
         ");
         $stmtReg->execute([
@@ -731,7 +783,9 @@ if ($pdoReg) {
             $v('reff1_nombre'), $v('reff1_cel'), $v('reff1_dir_res'), $v('reff1_dir_lab'),
             $v('reff2_nombre'), $v('reff2_cel'), $v('reff2_dir_res'), $v('reff2_dir_lab'),
             $v('marca_auto'), $v('modelo_auto'), $vInt('anio_auto'), $vInt('kms_cod_auto'), $vNum('precio_venta'), $vNum('abono'),
-            $v('sucursal'), $v('nombre_gestor'), $v('comentarios_gestor'), $firmaBase64 ?: null, isset($input['firmantes_adicionales']) ? $input['firmantes_adicionales'] : null
+            $v('sucursal'), $v('nombre_gestor'), $v('comentarios_gestor'), $firmaBase64 ?: null, isset($input['firmantes_adicionales']) ? $input['firmantes_adicionales'] : null,
+            $telemetriaSessionId, $telemetriaStartedAt, $telemetriaSubmittedAt, $telemetriaDuracionSeg,
+            $telemetriaPasoTiemposJson, $telemetriaEventosJson, $telemetriaDispositivoJson
         ]);
         $finRegistroInsertId = (int) $pdoReg->lastInsertId();
     } catch (PDOException $e) {

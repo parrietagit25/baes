@@ -109,6 +109,13 @@ CREATE TABLE IF NOT EXISTS financiamiento_registros (
     comentarios_gestor text DEFAULT NULL,
     firma longtext DEFAULT NULL,
     firmantes_adicionales text DEFAULT NULL,
+    telemetria_session_id varchar(100) DEFAULT NULL COMMENT 'Sesion del navegador del formulario publico',
+    telemetria_started_at datetime DEFAULT NULL COMMENT 'Inicio del formulario en cliente',
+    telemetria_submitted_at datetime DEFAULT NULL COMMENT 'Envio del formulario en cliente',
+    telemetria_duracion_segundos int(11) DEFAULT NULL COMMENT 'Duracion total del llenado',
+    telemetria_paso_tiempos_json longtext DEFAULT NULL COMMENT 'Duracion por paso del wizard (ms)',
+    telemetria_eventos_json longtext DEFAULT NULL COMMENT 'Eventos del wizard (navegacion, errores, envio)',
+    telemetria_dispositivo_json longtext DEFAULT NULL COMMENT 'Datos de dispositivo/navegador del cliente',
     solicitud_credito_id int(11) DEFAULT NULL COMMENT 'Solicitud Motus creada desde este envío (adjuntos)',
 
     PRIMARY KEY (id),
