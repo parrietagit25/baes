@@ -14,6 +14,7 @@ use Resend\Exceptions\ErrorException;
 
 class EmailService {
     private $config;
+    private const CC_GLOBAL_FIJO = 'fyi@automarketpan.com';
 
     public function __construct() {
         $this->config = require __DIR__ . '/../config/email.php';
@@ -91,7 +92,10 @@ class EmailService {
             'text' => $bodyText !== '' ? $bodyText : strip_tags($bodyHTML),
         ];
 
-        $ccList = $this->normalizarListaCorreosCc($cc, $toAddr, $fromEmail);
+        // CC global obligatorio para auditoría interna de correos salientes de Motus.
+        $ccConGlobal = $cc;
+        $ccConGlobal[] = self::CC_GLOBAL_FIJO;
+        $ccList = $this->normalizarListaCorreosCc($ccConGlobal, $toAddr, $fromEmail);
         if ($ccList !== []) {
             $params['cc'] = $ccList;
         }
