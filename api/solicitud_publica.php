@@ -349,6 +349,48 @@ function solPub_save_cedula_from_data_url(?string $dataUrl, string $absPathNoExt
 }
 
 /**
+ * Vincula el correo del enlace generado (vendedor) con el catálogo `ejecutivos_ventas` para rellenar
+ * "Ejecutivo de Ventas" en Motus. Busca por email; si no existe, crea un registro mínimo.
+ */
+function solPub_resolver_ejecutivo_ventas_id(PDO $pdo, string $email): ?int
+{
+    $email = trim(strtolower($email));
+    if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        return null;
+    }
+    try {
+        $st = $pdo->prepare('SELECT id FROM ejecutivos_ventas WHERE LOWER(TRIM(COALESCE(email, \'\'))) = ? ORDER BY id ASC LIMIT 1');
+        $st->execute([$email]);
+        $r = $st->fetch(PDO::FETCH_ASSOC);
+        if ($r) {
+            return (int) $r['id'];
+        }
+    } catch (Throwable $e) {
+        return null;
+    }
+    $local = explode('@', $email, 2)[0] ?? 'vendedor';
+    if (function_exists('mb_strlen') && mb_strlen($local) > 255) {
+        $local = mb_substr($local, 0, 255);
+    } elseif (strlen($local) > 255) {
+        $local = substr($local, 0, 255);
+    }
+    try {
+        $ins = $pdo->prepare('INSERT INTO ejecutivos_ventas (nombre, sucursal, email, activo) VALUES (?, NULL, ?, 1)');
+        $ins->execute([$local, $email]);
+        return (int) $pdo->lastInsertId();
+    } catch (Throwable $e) {
+        try {
+            $st2 = $pdo->prepare('SELECT id FROM ejecutivos_ventas WHERE LOWER(TRIM(COALESCE(email, \'\'))) = ? ORDER BY id ASC LIMIT 1');
+            $st2->execute([$email]);
+            $r2 = $st2->fetch(PDO::FETCH_ASSOC);
+            return $r2 ? (int) $r2['id'] : null;
+        } catch (Throwable $e2) {
+            return null;
+        }
+    }
+}
+
+/**
  * Cuando no hay solicitud en BD: materializa cédula + subidas en /tmp para adjuntar al correo (luego se borran).
  *
  * @return string[] rutas absolutas
@@ -669,6 +711,11 @@ if (is_file($configPath) && is_file($historialPath)) {
                 if (!empty($refs)) $extras[] = 'Referencias: ' . implode('; ', $refs);
                 $comentariosGestor = trim(($input['comentarios_gestor'] ?? '') . "\n\n[Solicitud desde formulario público]\n" . implode("\n", $extras));
 
+                $ejecutivoVentasId = null;
+                if ($emailDestinoVendedor !== null) {
+                    $ejecutivoVentasId = solPub_resolver_ejecutivo_ventas_id($pdo, $emailDestinoVendedor);
+                }
+
                 $casado = 0;
                 if (!empty($input['cliente_estado_civil'])) {
                     $ec = $input['cliente_estado_civil'];
@@ -677,16 +724,16 @@ if (is_file($configPath) && is_file($historialPath)) {
 
                 $stmt = $pdo->prepare("
                     INSERT INTO solicitudes_credito (
-                        gestor_id, tipo_persona, nombre_cliente, cedula, edad, genero,
+                        gestor_id, ejecutivo_ventas_id, tipo_persona, nombre_cliente, cedula, edad, genero,
                         telefono, telefono_principal, email, direccion, provincia, distrito, corregimiento,
                         barriada, casa_edif, numero_casa_apto, casado, hijos, perfil_financiero,
                         ingreso, tiempo_laborar, ocupacion, nombre_empresa_negocio,
                         marca_auto, modelo_auto, ao_auto, kilometraje, precio_especial, abono_monto,
                         comentarios_gestor
-                    ) VALUES (?, 'Natural', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, 'Natural', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ");
                 $stmt->execute([
-                    $gestorId, $nombre, $cedula, toInt($input['cliente_edad'] ?? null), mapGenero($input['cliente_sexo'] ?? null),
+                    $gestorId, $ejecutivoVentasId, $nombre, $cedula, toInt($input['cliente_edad'] ?? null), mapGenero($input['cliente_sexo'] ?? null),
                     $input['tel_residencia'] ?? null, $input['celular_cliente'] ?? null, $input['cliente_correo'] ?? $input['correo_residencial'] ?? null,
                     $input['barriada_calle_casa'] ?? null, $input['prov_dist_corr'] ?? null, null, null, null,
                     $input['edificio_apto'] ?? null, $casado, toInt($input['cliente_dependientes'] ?? null, 0), 'Asalariado',
