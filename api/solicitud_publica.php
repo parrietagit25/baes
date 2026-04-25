@@ -605,8 +605,6 @@ require_once __DIR__ . '/../includes/pdf_financiamiento.php';
 
 $solicitudId = 0;
 $emailEnviado = false;
-$pdoMain = null;
-$gestorId = null;
 $adjuntosParaCorreo = [];
 $adjuntosCorreoSonTemporales = false;
 
@@ -743,101 +741,9 @@ if ($pdoReg) {
     }
 }
 
-// 2b) Opcional: guardar en solicitudes_credito (panel Motus). Requiere config/database.php e historial_helper
-$configPath = __DIR__ . '/../config/database.php';
-$historialPath = __DIR__ . '/../includes/historial_helper.php';
-if (is_file($configPath) && is_file($historialPath)) {
-    try {
-        require_once $configPath;
-        require_once $historialPath;
-        if (isset($pdo) && $pdo instanceof PDO) {
-            $pdoMain = $pdo;
-            $gestorId = getDefaultGestorId($pdo);
-            if ($gestorId) {
-                // Construir comentarios_gestor con datos extra del wizard
-                $extras = [];
-                if (!empty($input['sucursal'])) $extras[] = 'Sucursal: ' . $input['sucursal'];
-                if (!empty($input['nombre_gestor'])) $extras[] = 'Gestor indicado: ' . $input['nombre_gestor'];
-                if (!empty($input['vivienda'])) $extras[] = 'Vivienda: ' . $input['vivienda'] . (isset($input['vivienda_monto']) && $input['vivienda_monto'] !== '' ? ' (Monto: ' . $input['vivienda_monto'] . ')' : '');
-                if (!empty($input['cliente_nacionalidad'])) $extras[] = 'Nacionalidad: ' . $input['cliente_nacionalidad'];
-                if (!empty($input['prov_dist_corr'])) $extras[] = 'Prov/Dist/Corr: ' . $input['prov_dist_corr'];
-                if (!empty($input['calle'])) $extras[] = 'Calle: ' . $input['calle'];
-                if (!empty($input['empresa_direccion'])) $extras[] = 'Dirección laboral: ' . $input['empresa_direccion'];
-                if (!empty($input['otros_ingresos'])) $extras[] = 'Otros ingresos: ' . $input['otros_ingresos'];
-                if (!empty($input['trabajo_anterior'])) $extras[] = 'Trabajo anterior: ' . $input['trabajo_anterior'];
-                if (!empty($input['tiene_conyuge']) && !empty($input['con_nombre'])) {
-                    $extras[] = 'Cónyuge: ' . $input['con_nombre'] . ' | Cédula: ' . ($input['con_id'] ?? '') . ' | Empresa: ' . ($input['con_empresa'] ?? '') . ' | Salario: ' . ($input['con_salario'] ?? '');
-                }
-                $refs = [];
-                if (!empty($input['refp1_nombre'])) $refs[] = 'Ref. Personal 1: ' . $input['refp1_nombre'] . ' ' . ($input['refp1_cel'] ?? '');
-                if (!empty($input['refp2_nombre'])) $refs[] = 'Ref. Personal 2: ' . $input['refp2_nombre'] . ' ' . ($input['refp2_cel'] ?? '');
-                if (!empty($input['reff1_nombre'])) $refs[] = 'Ref. Familiar 1: ' . $input['reff1_nombre'] . ' ' . ($input['reff1_cel'] ?? '');
-                if (!empty($input['reff2_nombre'])) $refs[] = 'Ref. Familiar 2: ' . $input['reff2_nombre'] . ' ' . ($input['reff2_cel'] ?? '');
-                if (!empty($refs)) $extras[] = 'Referencias: ' . implode('; ', $refs);
-                $comentariosGestor = trim(($input['comentarios_gestor'] ?? '') . "\n\n[Solicitud desde formulario público]\n" . implode("\n", $extras));
-
-                $ejecutivoVentasId = null;
-                if ($emailDestinoVendedor !== null) {
-                    $ejecutivoVentasId = solPub_resolver_ejecutivo_ventas_id($pdo, $emailDestinoVendedor);
-                }
-
-                $casado = 0;
-                if (!empty($input['cliente_estado_civil'])) {
-                    $ec = $input['cliente_estado_civil'];
-                    if (stripos($ec, 'Casado') !== false || stripos($ec, 'Unión') !== false) $casado = 1;
-                }
-
-                $stmt = $pdo->prepare("
-                    INSERT INTO solicitudes_credito (
-                        gestor_id, ejecutivo_ventas_id, tipo_persona, nombre_cliente, cedula, edad, genero,
-                        telefono, telefono_principal, email, direccion, provincia, distrito, corregimiento,
-                        barriada, casa_edif, numero_casa_apto, casado, hijos, perfil_financiero,
-                        ingreso, tiempo_laborar, ocupacion, nombre_empresa_negocio,
-                        marca_auto, modelo_auto, ao_auto, kilometraje, precio_especial, abono_monto,
-                        comentarios_gestor
-                    ) VALUES (?, ?, 'Natural', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ");
-                $stmt->execute([
-                    $gestorId, $ejecutivoVentasId, $nombre, $cedula, toInt($input['cliente_edad'] ?? null), mapGenero($input['cliente_sexo'] ?? null),
-                    $input['tel_residencia'] ?? null, $input['celular_cliente'] ?? null, $input['cliente_correo'] ?? $input['correo_residencial'] ?? null,
-                    $input['barriada_calle_casa'] ?? null, $input['prov_dist_corr'] ?? null, null, null, null,
-                    $input['edificio_apto'] ?? null, $casado, toInt($input['cliente_dependientes'] ?? null, 0), 'Asalariado',
-                    toNum($input['empresa_salario'] ?? null), isset($input['empresa_anios']) ? $input['empresa_anios'] . ' años' : null,
-                    $input['empresa_ocupacion'] ?? null, $input['empresa_nombre'] ?? null,
-                    $input['marca_auto'] ?? null, $input['modelo_auto'] ?? null, toInt($input['anio_auto'] ?? null), toInt($input['kms_cod_auto'] ?? null),
-                    toNum($input['precio_venta'] ?? null), toNum($input['abono'] ?? null), $comentariosGestor
-                ]);
-                $solicitudId = (int) $pdo->lastInsertId();
-                if ($finRegistroInsertId > 0 && $pdoReg instanceof PDO && $solicitudId > 0) {
-                    try {
-                        $uFr = $pdoReg->prepare('UPDATE financiamiento_registros SET solicitud_credito_id = ? WHERE id = ?');
-                        $uFr->execute([$solicitudId, $finRegistroInsertId]);
-                    } catch (Throwable $e) {
-                        logSolPub('financiamiento solicitud_credito_id: ' . $e->getMessage());
-                    }
-                }
-                try {
-                    $stmtNota = $pdo->prepare("INSERT INTO notas_solicitud (solicitud_id, usuario_id, tipo_nota, titulo, contenido) VALUES (?, ?, 'Comentario', 'Solicitud desde formulario público', 'Solicitud enviada desde el formulario de financiamiento (sin login).')");
-                    $stmtNota->execute([$solicitudId, $gestorId]);
-                } catch (PDOException $e) { /* ignorar */ }
-                try {
-                    registrarHistorialSolicitud($pdo, $solicitudId, $gestorId, 'creacion', 'Solicitud enviada desde formulario público de financiamiento', null, 'Nueva');
-                } catch (Throwable $e) { /* ignorar */ }
-            }
-        }
-    } catch (Throwable $e) {
-        logSolPub('DB optional fail: ' . $e->getMessage());
-        error_log('solicitud_publica DB: ' . $e->getMessage());
-    }
-}
-
-if ($solicitudId > 0 && $pdoMain instanceof PDO && $gestorId) {
-    try {
-        $adjuntosParaCorreo = solPub_guardar_adjuntos_formulario_publico($pdoMain, $solicitudId, (int)$gestorId, $cedulaImagenDataUrl);
-    } catch (Throwable $e) {
-        logSolPub('adjuntos form pub: ' . $e->getMessage());
-    }
-} elseif (($cedulaImagenDataUrl !== null && $cedulaImagenDataUrl !== '') || solPub_upload_rows_from_request() !== []) {
+// 2b) No crear solicitudes_credito aquí.
+// La relación con solicitud de crédito se hace después, cuando el gestor carga "Sol Financiamiento" en Motus.
+if (($cedulaImagenDataUrl !== null && $cedulaImagenDataUrl !== '') || solPub_upload_rows_from_request() !== []) {
     try {
         $adjuntosParaCorreo = solPub_materialize_adjuntos_temporales_para_correo($cedulaImagenDataUrl);
         $adjuntosCorreoSonTemporales = true;
@@ -847,7 +753,7 @@ if ($solicitudId > 0 && $pdoMain instanceof PDO && $gestorId) {
     }
 }
 
-// Correo después de crear solicitud y guardar adjuntos (PDF + identificación + archivos extra)
+// Correo después de registrar la solicitud pública y preparar adjuntos (PDF + identificación + archivos extra)
 if ($emailDestinoVendedor !== null || $emailCliente !== null) {
     try {
         $pdfPath = null;
@@ -882,7 +788,9 @@ if ($emailDestinoVendedor !== null || $emailCliente !== null) {
             if ($nombreVendedorAsunto === null || $nombreVendedorAsunto === '') {
                 $nombreVendedorAsunto = 'Vendedor';
             }
-            $numeroSolicitudAsunto = $solicitudId > 0 ? (string)$solicitudId : 'N/A';
+            $numeroSolicitudAsunto = $solicitudId > 0
+                ? (string)$solicitudId
+                : (($finRegistroInsertId > 0) ? (string)$finRegistroInsertId : '0');
             $asuntoVendedor = 'MOTUS #' . $numeroSolicitudAsunto . ' Cliente ' . $nombreClienteAsunto . ' - ' . $nombreVendedorAsunto;
             $txtAdj = count($adjuntosParaCorreo) > 0
                 ? 'Adjuntos: PDF de la solicitud, identificación y/o otros documentos enviados por el cliente.'
@@ -945,6 +853,6 @@ echo json_encode([
     'message' => $emailEnviado
         ? 'Solicitud enviada correctamente. Se ha enviado una copia por correo.'
         : 'Solicitud enviada correctamente. Nos pondremos en contacto contigo.',
-    'data' => ['id' => $solicitudId]
+    'data' => ['id' => $finRegistroInsertId > 0 ? $finRegistroInsertId : $solicitudId]
 ]);
 exit();
