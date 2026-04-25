@@ -106,8 +106,9 @@ if (empty($input['prov_dist_corr'])) {
 }
 if (empty($input['barriada_calle_casa'])) {
     $barriada = trim((string)($input['barriada'] ?? ''));
+    $calle = trim((string)($input['calle'] ?? ''));
     $direccion = trim((string)($input['direccion'] ?? ''));
-    $input['barriada_calle_casa'] = implode(' - ', array_values(array_filter([$barriada, $direccion], function($x){ return $x !== ''; })));
+    $input['barriada_calle_casa'] = implode(' - ', array_values(array_filter([$barriada, $calle, $direccion], function($x){ return $x !== ''; })));
 }
 if (empty($input['edificio_apto'])) {
     $casaEdif = trim((string)($input['casa_edif'] ?? ''));
@@ -737,6 +738,7 @@ if (is_file($configPath) && is_file($historialPath)) {
                 if (!empty($input['vivienda'])) $extras[] = 'Vivienda: ' . $input['vivienda'] . (isset($input['vivienda_monto']) && $input['vivienda_monto'] !== '' ? ' (Monto: ' . $input['vivienda_monto'] . ')' : '');
                 if (!empty($input['cliente_nacionalidad'])) $extras[] = 'Nacionalidad: ' . $input['cliente_nacionalidad'];
                 if (!empty($input['prov_dist_corr'])) $extras[] = 'Prov/Dist/Corr: ' . $input['prov_dist_corr'];
+                if (!empty($input['calle'])) $extras[] = 'Calle: ' . $input['calle'];
                 if (!empty($input['empresa_direccion'])) $extras[] = 'Dirección laboral: ' . $input['empresa_direccion'];
                 if (!empty($input['otros_ingresos'])) $extras[] = 'Otros ingresos: ' . $input['otros_ingresos'];
                 if (!empty($input['trabajo_anterior'])) $extras[] = 'Trabajo anterior: ' . $input['trabajo_anterior'];

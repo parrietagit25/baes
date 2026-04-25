@@ -1061,9 +1061,14 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
             <input id="numero_casa_apto" name="numero_casa_apto" maxlength="120" />
             <div class="error" data-error-for="numero_casa_apto"></div>
           </div>
-          <div class="col-12">
-            <label for="direccion">Dirección completa *</label>
-            <textarea id="direccion" name="direccion" required maxlength="300"></textarea>
+          <div class="col-6">
+            <label for="calle">Calle</label>
+            <input id="calle" name="calle" maxlength="120" />
+            <div class="error" data-error-for="calle"></div>
+          </div>
+          <div class="col-6">
+            <label for="direccion">Dirección completa</label>
+            <textarea id="direccion" name="direccion" maxlength="300"></textarea>
             <div class="error" data-error-for="direccion"></div>
           </div>
           <div class="col-6">
@@ -2082,12 +2087,13 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
         var distrito = String(payload.distrito || "").trim();
         var corregimiento = String(payload.corregimiento || "").trim();
         var barriada = String(payload.barriada || "").trim();
+        var calle = String(payload.calle || "").trim();
         var casaEdif = String(payload.casa_edif || "").trim();
         var numeroCasaApto = String(payload.numero_casa_apto || "").trim();
         var direccion = String(payload.direccion || "").trim();
 
         payload.prov_dist_corr = [provincia, distrito, corregimiento].filter(Boolean).join(", ");
-        payload.barriada_calle_casa = [barriada, direccion].filter(Boolean).join(" - ");
+        payload.barriada_calle_casa = [barriada, calle, direccion].filter(Boolean).join(" - ");
         payload.edificio_apto = [casaEdif, numeroCasaApto].filter(Boolean).join(", ");
       }
 
