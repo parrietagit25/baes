@@ -19,6 +19,17 @@ if ($action === 'exportar_todos_excel') {
     exportarTodosReportesExcel();
     exit();
 }
+if (in_array($action, [
+    'exportar_excel_usuarios',
+    'exportar_excel_tiempo',
+    'exportar_excel_banco',
+    'exportar_excel_correos',
+    'exportar_excel_encuestas_vendedores',
+    'exportar_excel_encuestas_gestores',
+], true)) {
+    exportarReporteCsv($action);
+    exit();
+}
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -48,8 +59,175 @@ switch ($action) {
         // Ya atendido al inicio.
         echo json_encode(['success' => false, 'message' => 'Acción ya ejecutada']);
         break;
+    case 'exportar_excel_usuarios':
+    case 'exportar_excel_tiempo':
+    case 'exportar_excel_banco':
+    case 'exportar_excel_correos':
+    case 'exportar_excel_encuestas_vendedores':
+    case 'exportar_excel_encuestas_gestores':
+        // Ya atendido al inicio.
+        echo json_encode(['success' => false, 'message' => 'Acción ya ejecutada']);
+        break;
     default:
         echo json_encode(['success' => false, 'message' => 'Acción no válida']);
+}
+
+function exportarReporteCsv(string $action): void {
+    global $pdo;
+    require_once __DIR__ . '/../includes/encuestas_satisfaccion_data.php';
+
+    if ($action === 'exportar_excel_usuarios') {
+        $rows = array_map(static function(array $r): array {
+            return [
+                $r['usuario_id'] ?? '',
+                $r['nombre'] ?? '',
+                $r['email'] ?? '',
+                $r['Nueva'] ?? 0,
+                $r['En Revisión Banco'] ?? 0,
+                $r['Aprobada'] ?? 0,
+                $r['Rechazada'] ?? 0,
+                $r['Completada'] ?? 0,
+                $r['Desistimiento'] ?? 0,
+                $r['total'] ?? 0,
+            ];
+        }, _dataReporteUsuarios($pdo));
+        _outputCsvDownload('reporte_usuarios.csv', [
+            'Usuario ID', 'Nombre', 'Email', 'Nueva', 'En Revision Banco', 'Aprobada', 'Rechazada', 'Completada', 'Desistimiento', 'Total'
+        ], $rows);
+        return;
+    }
+
+    if ($action === 'exportar_excel_tiempo') {
+        $rows = array_map(static function(array $r): array {
+            return [
+                $r['id'] ?? '',
+                $r['nombre_cliente'] ?? '',
+                $r['cedula'] ?? '',
+                $r['estado'] ?? '',
+                $r['fecha_creacion'] ?? '',
+                $r['fecha_actualizacion'] ?? '',
+                $r['dias_en_estado_actual'] ?? '',
+                $r['horas_en_estado_actual'] ?? '',
+            ];
+        }, _dataReporteTiempo($pdo));
+        _outputCsvDownload('reporte_tiempo.csv', [
+            'Solicitud ID', 'Cliente', 'Cedula', 'Estado', 'Fecha Creacion', 'Fecha Actualizacion', 'Dias Estado Actual', 'Horas Estado Actual'
+        ], $rows);
+        return;
+    }
+
+    if ($action === 'exportar_excel_banco') {
+        $rows = array_map(static function(array $r): array {
+            return [
+                $r['solicitud_id'] ?? '',
+                $r['nombre_cliente'] ?? '',
+                $r['cedula'] ?? '',
+                $r['estado'] ?? '',
+                $r['banco_nombre'] ?? '',
+                $r['fecha_asignacion'] ?? '',
+                $r['fecha_respuesta'] ?? '',
+                !empty($r['pendiente']) ? 'Si' : 'No',
+                $r['dias_respuesta'] ?? '',
+                $r['horas_respuesta'] ?? '',
+            ];
+        }, _dataReporteBanco($pdo));
+        _outputCsvDownload('reporte_banco.csv', [
+            'Solicitud ID', 'Cliente', 'Cedula', 'Estado Solicitud', 'Banco', 'Fecha Asignacion', 'Fecha Respuesta', 'Pendiente', 'Dias Respuesta', 'Horas Respuesta'
+        ], $rows);
+        return;
+    }
+
+    if ($action === 'exportar_excel_correos') {
+        $rows = array_map(static function(array $r): array {
+            return [
+                $r['id'] ?? '',
+                $r['solicitud_id'] ?? '',
+                $r['nombre_cliente'] ?? '',
+                $r['destinatario_email'] ?? '',
+                $r['tipo_envio'] ?? '',
+                $r['estado'] ?? '',
+                $r['provider'] ?? '',
+                $r['provider_message_id'] ?? '',
+                $r['mensaje'] ?? '',
+                $r['fecha_envio'] ?? '',
+            ];
+        }, _dataReporteEmails($pdo));
+        _outputCsvDownload('reporte_correos.csv', [
+            'ID', 'Solicitud ID', 'Cliente', 'Destinatario', 'Tipo Envio', 'Estado', 'Provider', 'Provider Message ID', 'Mensaje', 'Fecha Envio'
+        ], $rows);
+        return;
+    }
+
+    if ($action === 'exportar_excel_encuestas_vendedores') {
+        $enc = _reporteEncuestasBloque($pdo, 'encuesta_formulario_publico_vendedor', $ENCUESTA_VENDEDOR_PREGUNTAS);
+        $rows = array_map(static function(array $r): array {
+            return [
+                $r['id'] ?? '',
+                $r['creado_en'] ?? '',
+                $r['nombre_completo'] ?? '',
+                $r['cargo'] ?? '',
+                $r['puntuacion_1'] ?? '',
+                $r['puntuacion_2'] ?? '',
+                $r['puntuacion_3'] ?? '',
+                $r['puntuacion_4'] ?? '',
+                $r['puntuacion_5'] ?? '',
+                $r['promedio_fila'] ?? '',
+                $r['recomendaciones'] ?? '',
+            ];
+        }, $enc['filas'] ?? []);
+        _outputCsvDownload('reporte_encuestas_vendedores.csv', [
+            'ID', 'Fecha', 'Nombre Completo', 'Cargo', 'P1', 'P2', 'P3', 'P4', 'P5', 'Promedio', 'Recomendaciones'
+        ], $rows);
+        return;
+    }
+
+    if ($action === 'exportar_excel_encuestas_gestores') {
+        $enc = _reporteEncuestasBloque($pdo, 'encuesta_proceso_gestor', $ENCUESTA_GESTOR_PREGUNTAS);
+        $rows = array_map(static function(array $r): array {
+            return [
+                $r['id'] ?? '',
+                $r['creado_en'] ?? '',
+                $r['nombre_completo'] ?? '',
+                $r['cargo'] ?? '',
+                $r['puntuacion_1'] ?? '',
+                $r['puntuacion_2'] ?? '',
+                $r['puntuacion_3'] ?? '',
+                $r['puntuacion_4'] ?? '',
+                $r['puntuacion_5'] ?? '',
+                $r['promedio_fila'] ?? '',
+                $r['recomendaciones'] ?? '',
+            ];
+        }, $enc['filas'] ?? []);
+        _outputCsvDownload('reporte_encuestas_gestores.csv', [
+            'ID', 'Fecha', 'Nombre Completo', 'Cargo', 'P1', 'P2', 'P3', 'P4', 'P5', 'Promedio', 'Recomendaciones'
+        ], $rows);
+        return;
+    }
+}
+
+function _outputCsvDownload(string $fileName, array $headers, array $rows): void {
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="' . $fileName . '"');
+    $fp = fopen('php://output', 'w');
+    if ($fp === false) {
+        return;
+    }
+    fwrite($fp, "\xEF\xBB\xBF");
+    fputcsv($fp, $headers, ';');
+    foreach ($rows as $row) {
+        $safe = [];
+        foreach ($row as $value) {
+            if (is_bool($value)) {
+                $safe[] = $value ? '1' : '0';
+            } elseif ($value === null) {
+                $safe[] = '';
+            } else {
+                $safe[] = (string) $value;
+            }
+        }
+        fputcsv($fp, $safe, ';');
+    }
+    fclose($fp);
 }
 
 function exportarTodosReportesExcel() {

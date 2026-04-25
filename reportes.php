@@ -60,9 +60,14 @@ $titulosReporte = ['usuarios' => 'Rep. Usuarios', 'tiempo' => 'Rep. Tiempo', 'ba
                     <div class="reportes-header">
                         <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
                             <h2 class="mb-1"><i class="fas fa-chart-bar me-2"></i><?php echo htmlspecialchars($titulosReporte[$submenu]); ?></h2>
-                            <a href="api/reportes.php?action=exportar_todos_excel" class="btn btn-light btn-sm">
-                                <i class="fas fa-file-excel me-1"></i>Exportar todos a Excel
-                            </a>
+                            <div class="d-flex flex-wrap gap-2">
+                                <a href="api/reportes.php?action=exportar_excel_usuarios" class="btn btn-light btn-sm"><i class="fas fa-file-excel me-1"></i>Usuarios</a>
+                                <a href="api/reportes.php?action=exportar_excel_tiempo" class="btn btn-light btn-sm"><i class="fas fa-file-excel me-1"></i>Tiempo</a>
+                                <a href="api/reportes.php?action=exportar_excel_banco" class="btn btn-light btn-sm"><i class="fas fa-file-excel me-1"></i>Banco</a>
+                                <a href="api/reportes.php?action=exportar_excel_correos" class="btn btn-light btn-sm"><i class="fas fa-file-excel me-1"></i>Correos</a>
+                                <a href="api/reportes.php?action=exportar_excel_encuestas_vendedores" class="btn btn-light btn-sm"><i class="fas fa-file-excel me-1"></i>Enc. Vendedores</a>
+                                <a href="api/reportes.php?action=exportar_excel_encuestas_gestores" class="btn btn-light btn-sm"><i class="fas fa-file-excel me-1"></i>Enc. Gestores</a>
+                            </div>
                         </div>
                         <p class="mb-0 opacity-90"><?php
                             if ($submenu === 'usuarios') echo 'Total de solicitudes por usuario y estado';
