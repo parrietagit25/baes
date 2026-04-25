@@ -20,6 +20,15 @@ if (!in_array($submenu, ['usuarios', 'tiempo', 'banco', 'emails', 'encuestas'], 
 }
 $estadosCol = ['Nueva', 'En Revisión Banco', 'Aprobada', 'Rechazada', 'Completada', 'Desistimiento'];
 $titulosReporte = ['usuarios' => 'Rep. Usuarios', 'tiempo' => 'Rep. Tiempo', 'banco' => 'Rep. Banco', 'emails' => 'Rep. Correos', 'encuestas' => 'Rep. Encuestas'];
+$exportActionPorSubmenu = [
+    'usuarios' => ['action' => 'exportar_excel_usuarios', 'label' => 'Descargar Rep. Usuarios'],
+    'tiempo' => ['action' => 'exportar_excel_tiempo', 'label' => 'Descargar Rep. Tiempo'],
+    'banco' => ['action' => 'exportar_excel_banco', 'label' => 'Descargar Rep. Banco'],
+    'emails' => ['action' => 'exportar_excel_correos', 'label' => 'Descargar Rep. Correos'],
+    // En encuestas se prioriza vendedores; se deja botón adicional dentro del panel para gestores.
+    'encuestas' => ['action' => 'exportar_excel_encuestas_vendedores', 'label' => 'Descargar Enc. Vendedores'],
+];
+$exportActual = $exportActionPorSubmenu[$submenu] ?? null;
 ?>
 
 <!DOCTYPE html>
@@ -60,14 +69,11 @@ $titulosReporte = ['usuarios' => 'Rep. Usuarios', 'tiempo' => 'Rep. Tiempo', 'ba
                     <div class="reportes-header">
                         <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
                             <h2 class="mb-1"><i class="fas fa-chart-bar me-2"></i><?php echo htmlspecialchars($titulosReporte[$submenu]); ?></h2>
-                            <div class="d-flex flex-wrap gap-2">
-                                <a href="api/reportes.php?action=exportar_excel_usuarios" class="btn btn-light btn-sm"><i class="fas fa-file-excel me-1"></i>Usuarios</a>
-                                <a href="api/reportes.php?action=exportar_excel_tiempo" class="btn btn-light btn-sm"><i class="fas fa-file-excel me-1"></i>Tiempo</a>
-                                <a href="api/reportes.php?action=exportar_excel_banco" class="btn btn-light btn-sm"><i class="fas fa-file-excel me-1"></i>Banco</a>
-                                <a href="api/reportes.php?action=exportar_excel_correos" class="btn btn-light btn-sm"><i class="fas fa-file-excel me-1"></i>Correos</a>
-                                <a href="api/reportes.php?action=exportar_excel_encuestas_vendedores" class="btn btn-light btn-sm"><i class="fas fa-file-excel me-1"></i>Enc. Vendedores</a>
-                                <a href="api/reportes.php?action=exportar_excel_encuestas_gestores" class="btn btn-light btn-sm"><i class="fas fa-file-excel me-1"></i>Enc. Gestores</a>
-                            </div>
+                            <?php if ($exportActual): ?>
+                            <a href="api/reportes.php?action=<?php echo urlencode($exportActual['action']); ?>" class="btn btn-light btn-sm">
+                                <i class="fas fa-file-excel me-1"></i><?php echo htmlspecialchars($exportActual['label']); ?>
+                            </a>
+                            <?php endif; ?>
                         </div>
                         <p class="mb-0 opacity-90"><?php
                             if ($submenu === 'usuarios') echo 'Total de solicitudes por usuario y estado';
@@ -152,6 +158,14 @@ $titulosReporte = ['usuarios' => 'Rep. Usuarios', 'tiempo' => 'Rep. Tiempo', 'ba
 
                     <!-- Rep. Encuestas -->
                     <div id="panel-encuestas" class="report-panel" style="display: <?php echo $submenu === 'encuestas' ? 'block' : 'none'; ?>">
+                        <div class="d-flex flex-wrap gap-2 mb-2">
+                            <a href="api/reportes.php?action=exportar_excel_encuestas_vendedores" class="btn btn-outline-primary btn-sm">
+                                <i class="fas fa-file-excel me-1"></i>Descargar Enc. Vendedores
+                            </a>
+                            <a href="api/reportes.php?action=exportar_excel_encuestas_gestores" class="btn btn-outline-primary btn-sm">
+                                <i class="fas fa-file-excel me-1"></i>Descargar Enc. Gestores
+                            </a>
+                        </div>
                         <div id="encuestas-contenido" class="py-3 text-muted text-center">Cargando encuestas…</div>
                     </div>
 
