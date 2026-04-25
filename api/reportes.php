@@ -91,7 +91,7 @@ function exportarReporteCsv(string $action): void {
                 $r['total'] ?? 0,
             ];
         }, _dataReporteUsuarios($pdo));
-        _outputCsvDownload('reporte_usuarios.csv', [
+        _outputXlsxDownload('reporte_usuarios.xlsx', 'Rep Usuarios', [
             'Usuario ID', 'Nombre', 'Email', 'Nueva', 'En Revision Banco', 'Aprobada', 'Rechazada', 'Completada', 'Desistimiento', 'Total'
         ], $rows);
         return;
@@ -110,7 +110,7 @@ function exportarReporteCsv(string $action): void {
                 $r['horas_en_estado_actual'] ?? '',
             ];
         }, _dataReporteTiempo($pdo));
-        _outputCsvDownload('reporte_tiempo.csv', [
+        _outputXlsxDownload('reporte_tiempo.xlsx', 'Rep Tiempo', [
             'Solicitud ID', 'Cliente', 'Cedula', 'Estado', 'Fecha Creacion', 'Fecha Actualizacion', 'Dias Estado Actual', 'Horas Estado Actual'
         ], $rows);
         return;
@@ -131,7 +131,7 @@ function exportarReporteCsv(string $action): void {
                 $r['horas_respuesta'] ?? '',
             ];
         }, _dataReporteBanco($pdo));
-        _outputCsvDownload('reporte_banco.csv', [
+        _outputXlsxDownload('reporte_banco.xlsx', 'Rep Banco', [
             'Solicitud ID', 'Cliente', 'Cedula', 'Estado Solicitud', 'Banco', 'Fecha Asignacion', 'Fecha Respuesta', 'Pendiente', 'Dias Respuesta', 'Horas Respuesta'
         ], $rows);
         return;
@@ -152,7 +152,7 @@ function exportarReporteCsv(string $action): void {
                 $r['fecha_envio'] ?? '',
             ];
         }, _dataReporteEmails($pdo));
-        _outputCsvDownload('reporte_correos.csv', [
+        _outputXlsxDownload('reporte_correos.xlsx', 'Rep Correos', [
             'ID', 'Solicitud ID', 'Cliente', 'Destinatario', 'Tipo Envio', 'Estado', 'Provider', 'Provider Message ID', 'Mensaje', 'Fecha Envio'
         ], $rows);
         return;
@@ -175,7 +175,7 @@ function exportarReporteCsv(string $action): void {
                 $r['recomendaciones'] ?? '',
             ];
         }, $enc['filas'] ?? []);
-        _outputCsvDownload('reporte_encuestas_vendedores.csv', [
+        _outputXlsxDownload('reporte_encuestas_vendedores.xlsx', 'Enc Vendedores', [
             'ID', 'Fecha', 'Nombre Completo', 'Cargo', 'P1', 'P2', 'P3', 'P4', 'P5', 'Promedio', 'Recomendaciones'
         ], $rows);
         return;
@@ -198,36 +198,195 @@ function exportarReporteCsv(string $action): void {
                 $r['recomendaciones'] ?? '',
             ];
         }, $enc['filas'] ?? []);
-        _outputCsvDownload('reporte_encuestas_gestores.csv', [
+        _outputXlsxDownload('reporte_encuestas_gestores.xlsx', 'Enc Gestores', [
             'ID', 'Fecha', 'Nombre Completo', 'Cargo', 'P1', 'P2', 'P3', 'P4', 'P5', 'Promedio', 'Recomendaciones'
         ], $rows);
         return;
     }
 }
 
-function _outputCsvDownload(string $fileName, array $headers, array $rows): void {
-    header('Content-Type: text/csv; charset=utf-8');
-    header('Content-Disposition: attachment; filename="' . $fileName . '"');
-    $fp = fopen('php://output', 'w');
-    if ($fp === false) {
+function _outputXlsxDownload(string $fileName, string $sheetName, array $headers, array $rows): void {
+    $tmp = tempnam(sys_get_temp_dir(), 'xlsx_');
+    if ($tmp === false) {
+        http_response_code(500);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => false, 'message' => 'No se pudo crear archivo temporal XLSX']);
         return;
     }
-    fwrite($fp, "\xEF\xBB\xBF");
-    fputcsv($fp, $headers, ';');
-    foreach ($rows as $row) {
-        $safe = [];
-        foreach ($row as $value) {
-            if (is_bool($value)) {
-                $safe[] = $value ? '1' : '0';
-            } elseif ($value === null) {
-                $safe[] = '';
-            } else {
-                $safe[] = (string) $value;
-            }
-        }
-        fputcsv($fp, $safe, ';');
+    $xlsxPath = $tmp . '.xlsx';
+    @rename($tmp, $xlsxPath);
+
+    $zip = new ZipArchive();
+    if ($zip->open($xlsxPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+        @unlink($xlsxPath);
+        http_response_code(500);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => false, 'message' => 'No se pudo generar XLSX']);
+        return;
     }
-    fclose($fp);
+
+    $allRows = array_merge([$headers], $rows);
+    $sheetXml = _xlsxBuildSheetXml($allRows);
+    $safeSheetName = _xlsxSafeSheetName($sheetName);
+
+    $zip->addFromString('[Content_Types].xml', _xlsxContentTypesXml());
+    $zip->addFromString('_rels/.rels', _xlsxRootRelsXml());
+    $zip->addFromString('docProps/app.xml', _xlsxAppXml());
+    $zip->addFromString('docProps/core.xml', _xlsxCoreXml());
+    $zip->addFromString('xl/workbook.xml', _xlsxWorkbookXml($safeSheetName));
+    $zip->addFromString('xl/_rels/workbook.xml.rels', _xlsxWorkbookRelsXml());
+    $zip->addFromString('xl/styles.xml', _xlsxStylesXml());
+    $zip->addFromString('xl/worksheets/sheet1.xml', $sheetXml);
+    $zip->close();
+
+    header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    header('Content-Disposition: attachment; filename="' . $fileName . '"');
+    header('Content-Length: ' . (string) filesize($xlsxPath));
+    readfile($xlsxPath);
+    @unlink($xlsxPath);
+}
+
+function _xlsxSafeSheetName(string $name): string {
+    $n = preg_replace('/[\\\\\\/*?:\\[\\]]/', ' ', $name) ?? 'Hoja1';
+    $n = trim($n);
+    if ($n === '') {
+        $n = 'Hoja1';
+    }
+    if (function_exists('mb_substr')) {
+        $n = mb_substr($n, 0, 31);
+    } else {
+        $n = substr($n, 0, 31);
+    }
+    return $n;
+}
+
+function _xlsxEsc(string $text): string {
+    return htmlspecialchars($text, ENT_XML1 | ENT_QUOTES, 'UTF-8');
+}
+
+function _xlsxColLetter(int $col): string {
+    $letter = '';
+    while ($col > 0) {
+        $mod = ($col - 1) % 26;
+        $letter = chr(65 + $mod) . $letter;
+        $col = intdiv($col - 1, 26);
+    }
+    return $letter;
+}
+
+function _xlsxBuildSheetXml(array $rows): string {
+    $xmlRows = '';
+    $rowNum = 1;
+    foreach ($rows as $row) {
+        $xmlCells = '';
+        $colNum = 1;
+        foreach ($row as $value) {
+            $cellRef = _xlsxColLetter($colNum) . $rowNum;
+            $style = ($rowNum === 1) ? ' s="1"' : '';
+            if ($value === null) {
+                $value = '';
+            }
+            if (is_bool($value)) {
+                $value = $value ? '1' : '0';
+            }
+            if (is_int($value) || is_float($value) || (is_string($value) && preg_match('/^-?\d+(\.\d+)?$/', trim($value)))) {
+                $num = is_string($value) ? str_replace(',', '.', trim($value)) : (string) $value;
+                $xmlCells .= '<c r="' . $cellRef . '"' . $style . '><v>' . _xlsxEsc((string) $num) . '</v></c>';
+            } else {
+                $xmlCells .= '<c r="' . $cellRef . '" t="inlineStr"' . $style . '><is><t xml:space="preserve">' . _xlsxEsc((string) $value) . '</t></is></c>';
+            }
+            $colNum++;
+        }
+        $xmlRows .= '<row r="' . $rowNum . '">' . $xmlCells . '</row>';
+        $rowNum++;
+    }
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+        . 'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+        . '<sheetData>' . $xmlRows . '</sheetData>'
+        . '</worksheet>';
+}
+
+function _xlsxContentTypesXml(): string {
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        . '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+        . '<Default Extension="xml" ContentType="application/xml"/>'
+        . '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+        . '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+        . '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'
+        . '<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>'
+        . '<Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>'
+        . '</Types>';
+}
+
+function _xlsxRootRelsXml(): string {
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        . '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'
+        . '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>'
+        . '<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>'
+        . '</Relationships>';
+}
+
+function _xlsxAppXml(): string {
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" '
+        . 'xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">'
+        . '<Application>Motus</Application>'
+        . '</Properties>';
+}
+
+function _xlsxCoreXml(): string {
+    $now = gmdate('Y-m-d\TH:i:s\Z');
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" '
+        . 'xmlns:dc="http://purl.org/dc/elements/1.1/" '
+        . 'xmlns:dcterms="http://purl.org/dc/terms/" '
+        . 'xmlns:dcmitype="http://purl.org/dc/dcmitype/" '
+        . 'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">'
+        . '<dc:creator>Motus</dc:creator>'
+        . '<cp:lastModifiedBy>Motus</cp:lastModifiedBy>'
+        . '<dcterms:created xsi:type="dcterms:W3CDTF">' . $now . '</dcterms:created>'
+        . '<dcterms:modified xsi:type="dcterms:W3CDTF">' . $now . '</dcterms:modified>'
+        . '</cp:coreProperties>';
+}
+
+function _xlsxWorkbookXml(string $sheetName): string {
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+        . 'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+        . '<sheets><sheet name="' . _xlsxEsc($sheetName) . '" sheetId="1" r:id="rId1"/></sheets>'
+        . '</workbook>';
+}
+
+function _xlsxWorkbookRelsXml(): string {
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        . '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'
+        . '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'
+        . '</Relationships>';
+}
+
+function _xlsxStylesXml(): string {
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+        . '<fonts count="2">'
+        . '<font><sz val="11"/><name val="Calibri"/><family val="2"/></font>'
+        . '<font><b/><sz val="11"/><name val="Calibri"/><family val="2"/></font>'
+        . '</fonts>'
+        . '<fills count="2">'
+        . '<fill><patternFill patternType="none"/></fill>'
+        . '<fill><patternFill patternType="gray125"/></fill>'
+        . '</fills>'
+        . '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>'
+        . '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
+        . '<cellXfs count="2">'
+        . '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
+        . '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>'
+        . '</cellXfs>'
+        . '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
+        . '</styleSheet>';
 }
 
 function exportarTodosReportesExcel() {
