@@ -822,14 +822,19 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
                     const f = String(r.fecha_creacion || '');
                     const fDate = f.length >= 10 ? f.slice(0, 10) : '';
                     const contacto = [r.celular_cliente || '', r.cliente_correo || ''].filter(Boolean).join('<br>');
-                    const disp = [r.platform || '', r.viewport || '', r.timezone || ''].filter(Boolean).join(' | ');
+                    const dispBase = (r.device_label || '').trim();
+                    const disp = [dispBase, r.platform || '', r.viewport || '', r.timezone || ''].filter(Boolean).join(' | ');
+                    const durSeg = (r.telemetria_duracion_segundos != null && !isNaN(Number(r.telemetria_duracion_segundos)))
+                        ? Number(r.telemetria_duracion_segundos)
+                        : null;
+                    const durTxt = durSeg == null ? '—' : (durSeg + ' seg / ' + (durSeg / 60).toFixed(2).replace(/\.00$/, '') + ' min');
                     html += '<tr>'
                         + '<td class="text-nowrap" data-date="' + escapeHtml(fDate) + '">' + escapeHtml(f) + '</td>'
                         + '<td>' + escapeHtml(r.cliente_nombre || '') + '</td>'
                         + '<td>' + escapeHtml(r.cliente_id || '') + '</td>'
                         + '<td>' + (contacto ? '<small>' + contacto + '</small>' : '—') + '</td>'
                         + '<td class="text-nowrap">' + escapeHtml(r.ip || '') + '</td>'
-                        + '<td class="text-end fw-bold">' + (r.telemetria_duracion_segundos != null ? r.telemetria_duracion_segundos + ' seg' : '—') + '</td>'
+                        + '<td class="text-end fw-bold">' + durTxt + '</td>'
                         + '<td class="text-end">' + (r.paso0_seg != null ? r.paso0_seg : 0) + '</td>'
                         + '<td class="text-end">' + (r.paso1_seg != null ? r.paso1_seg : 0) + '</td>'
                         + '<td class="text-end">' + (r.paso2_seg != null ? r.paso2_seg : 0) + '</td>'

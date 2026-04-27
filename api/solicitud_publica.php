@@ -193,6 +193,45 @@ function normalizeDateTimeToSql($v) {
     }
 }
 
+/**
+ * Obtiene IP real considerando proxies/reverse proxy.
+ */
+function solPub_get_client_ip(): ?string {
+    $candidates = [
+        $_SERVER['HTTP_CF_CONNECTING_IP'] ?? '',
+        $_SERVER['HTTP_X_REAL_IP'] ?? '',
+        $_SERVER['HTTP_X_FORWARDED_FOR'] ?? '',
+        $_SERVER['HTTP_CLIENT_IP'] ?? '',
+        $_SERVER['REMOTE_ADDR'] ?? '',
+    ];
+    foreach ($candidates as $raw) {
+        if (!is_string($raw) || trim($raw) === '') {
+            continue;
+        }
+        $parts = array_map('trim', explode(',', $raw));
+        foreach ($parts as $ip) {
+            if ($ip === '') {
+                continue;
+            }
+            if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+                return $ip;
+            }
+        }
+    }
+    foreach ($candidates as $raw) {
+        if (!is_string($raw) || trim($raw) === '') {
+            continue;
+        }
+        $parts = array_map('trim', explode(',', $raw));
+        foreach ($parts as $ip) {
+            if ($ip !== '' && filter_var($ip, FILTER_VALIDATE_IP)) {
+                return $ip;
+            }
+        }
+    }
+    return null;
+}
+
 /** Columna de tamaño en adjuntos_solicitud (nombre puede variar por instalación). */
 function solPub_adjuntos_tamano_column(PDO $pdo): ?string {
     static $col = '__unset__';
@@ -708,6 +747,7 @@ if (!empty($_telemetria)) {
 }
 
 $finRegistroInsertId = 0;
+$_clientIp = solPub_get_client_ip();
 if ($pdoReg) {
     try {
         $v = function($key, $trim = true) use ($input) {
@@ -767,7 +807,7 @@ if ($pdoReg) {
             )
         ");
         $stmtReg->execute([
-            $token ?: null, $_SERVER['REMOTE_ADDR'] ?? null, $emailVendedorFr, $idVendedorFr,
+            $token ?: null, $_clientIp, $emailVendedorFr, $idVendedorFr,
             $v('cliente_nombre'), $v('cliente_estado_civil'), $v('cliente_sexo'), $v('cliente_id'), $vDate('cliente_nacimiento'), $vInt('cliente_edad'),
             $v('cliente_nacionalidad'), $vInt('cliente_dependientes'), $v('cliente_correo'), $vNum('cliente_peso'), $vNum('cliente_estatura'),
             $v('vivienda'), $vNum('vivienda_monto'), $v('prov_dist_corr'), $v('tel_residencia'), $v('barriada_calle_casa'), $v('calle'), $v('celular_cliente'),

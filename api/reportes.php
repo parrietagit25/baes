@@ -746,9 +746,70 @@ function _dataReporteTelemetria(PDO $pdo): array {
         $r['timezone'] = (string)($dev['timezone'] ?? '');
         $r['viewport'] = (string)($dev['viewport'] ?? '');
         $r['screen'] = (string)($dev['screen'] ?? '');
+        $ua = (string)($dev['user_agent'] ?? '');
+        $info = _telemetriaDeviceInfoFromUa($ua);
+        $r['device_os'] = $info['os'];
+        $r['device_brand'] = $info['brand'];
+        $r['device_model'] = $info['model'];
+        $r['device_label'] = trim(implode(' ', array_filter([$r['device_os'], $r['device_brand'], $r['device_model']])));
+        if ($r['device_label'] === '') {
+            $r['device_label'] = trim((string)($r['platform'] ?? ''));
+        }
     }
     unset($r);
     return $rows;
+}
+
+/**
+ * Detección básica de OS/marca/modelo desde user-agent.
+ * Sin librerías externas para mantener compatibilidad.
+ *
+ * @return array{os:string,brand:string,model:string}
+ */
+function _telemetriaDeviceInfoFromUa(string $ua): array {
+    $ua = trim($ua);
+    if ($ua === '') {
+        return ['os' => '', 'brand' => '', 'model' => ''];
+    }
+    $os = '';
+    if (stripos($ua, 'iPhone') !== false) {
+        $os = 'iPhone (iOS)';
+    } elseif (stripos($ua, 'iPad') !== false) {
+        $os = 'iPad (iOS)';
+    } elseif (stripos($ua, 'Android') !== false) {
+        $os = 'Android';
+    } elseif (stripos($ua, 'Windows') !== false) {
+        $os = 'Windows';
+    } elseif (stripos($ua, 'Mac OS X') !== false || stripos($ua, 'Macintosh') !== false) {
+        $os = 'macOS';
+    } elseif (stripos($ua, 'Linux') !== false) {
+        $os = 'Linux';
+    }
+
+    $brand = '';
+    $model = '';
+    if ($os === 'iPhone (iOS)' || $os === 'iPad (iOS)') {
+        $brand = 'Apple';
+        $model = $os === 'iPad (iOS)' ? 'iPad' : 'iPhone';
+        return ['os' => $os, 'brand' => $brand, 'model' => $model];
+    }
+    if ($os === 'Android') {
+        if (preg_match('/Android\s+[0-9\.]+;\s*([^;\)]+)/i', $ua, $m)) {
+            $rawModel = trim((string)$m[1]);
+            $model = preg_replace('/\s+Build.*$/i', '', $rawModel) ?? $rawModel;
+        }
+        $uaUp = strtoupper($ua);
+        if (strpos($uaUp, 'SAMSUNG') !== false || strpos($uaUp, 'SM-') !== false) $brand = 'Samsung';
+        elseif (strpos($uaUp, 'HUAWEI') !== false || strpos($uaUp, 'HONOR') !== false) $brand = 'Huawei/Honor';
+        elseif (strpos($uaUp, 'XIAOMI') !== false || strpos($uaUp, 'REDMI') !== false || strpos($uaUp, 'MI ') !== false) $brand = 'Xiaomi';
+        elseif (strpos($uaUp, 'MOTOROLA') !== false || strpos($uaUp, 'MOTO') !== false) $brand = 'Motorola';
+        elseif (strpos($uaUp, 'ONEPLUS') !== false) $brand = 'OnePlus';
+        elseif (strpos($uaUp, 'PIXEL') !== false || strpos($uaUp, 'GOOGLE') !== false) $brand = 'Google';
+        elseif (strpos($uaUp, 'OPPO') !== false) $brand = 'OPPO';
+        elseif (strpos($uaUp, 'VIVO') !== false) $brand = 'Vivo';
+    }
+
+    return ['os' => $os, 'brand' => $brand, 'model' => $model];
 }
 
 /**
