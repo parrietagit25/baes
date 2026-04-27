@@ -639,7 +639,7 @@ function enviarResumenSolicitudBanco($solicitudId, $usuarioBancoId) {
 
 /**
  * Envía un único correo de resumen para todos los bancos asignados usando CCO.
- * Incluye en CCO: usuarios banco asignados, vendedor de la solicitud y correo Pipedrive.
+ * Incluye en CCO: usuarios banco asignados. En copia (CC), solo vendedor cuando exista.
  * Las respuestas del correo se dirigen al gestor asignado (Reply-To), cuando exista.
  */
 function enviarResumenSolicitudBancoTodosUnCorreo($solicitudId) {
@@ -683,7 +683,6 @@ function enviarResumenSolicitudBancoTodosUnCorreo($solicitudId) {
         }
 
         $emailVendedor = '';
-        $emailPipe = '';
         $vendedorId = isset($solicitud['vendedor_id']) ? (int) $solicitud['vendedor_id'] : 0;
         if ($vendedorId > 0) {
             $stmtVend = $pdo->prepare('SELECT email FROM usuarios WHERE id = ? LIMIT 1');
@@ -694,13 +693,6 @@ function enviarResumenSolicitudBancoTodosUnCorreo($solicitudId) {
                 if ($emailVendedor !== '' && filter_var($emailVendedor, FILTER_VALIDATE_EMAIL)) {
                     $cc[] = $emailVendedor;
                 }
-            }
-        }
-
-        if (!empty($solicitud['email_pipedrive'])) {
-            $emailPipe = trim((string) $solicitud['email_pipedrive']);
-            if ($emailPipe !== '' && filter_var($emailPipe, FILTER_VALIDATE_EMAIL)) {
-                $cc[] = $emailPipe;
             }
         }
 
@@ -793,9 +785,6 @@ function enviarResumenSolicitudBancoTodosUnCorreo($solicitudId) {
         if ($vendedorId > 0 && !empty($emailVendedor) && filter_var($emailVendedor, FILTER_VALIDATE_EMAIL)) {
             $logsPendientes[] = ['uid' => null, 'email' => $emailVendedor];
         }
-        if (!empty($emailPipe) && filter_var($emailPipe, FILTER_VALIDATE_EMAIL)) {
-            $logsPendientes[] = ['uid' => null, 'email' => $emailPipe];
-        }
 
         $resultado = $emailService->enviarCorreo(
             $toPrincipal,
@@ -835,6 +824,95 @@ function enviarResumenSolicitudBancoTodosUnCorreo($solicitudId) {
     } catch (Throwable $e) {
         error_log("Error enviarResumenSolicitudBancoTodosUnCorreo: " . $e->getMessage());
         return ['success' => false, 'message' => 'Error al enviar el correo'];
+    }
+}
+
+/**
+ * Envía un resumen directo al correo de Pipedrive de la solicitud.
+ * No envía copias (CC/CCO). Solo destinatario Pipe.
+ */
+function enviarResumenSolicitudPipedriveDirecto($solicitudId) {
+    global $pdo;
+
+    try {
+        $stmt = $pdo->prepare("SELECT * FROM solicitudes_credito WHERE id = ?");
+        $stmt->execute([(int) $solicitudId]);
+        $solicitud = $stmt->fetch();
+        if (!$solicitud) {
+            return ['success' => false, 'message' => 'Solicitud no encontrada'];
+        }
+        if (isset($solicitud['ao_auto'])) {
+            $solicitud['año_auto'] = $solicitud['ao_auto'];
+        }
+
+        $emailPipe = trim((string) ($solicitud['email_pipedrive'] ?? ''));
+        if ($emailPipe === '' || !filter_var($emailPipe, FILTER_VALIDATE_EMAIL)) {
+            return ['success' => false, 'message' => 'No hay correo de PipeDrive registrado en la solicitud'];
+        }
+
+        $stmt = $pdo->prepare("SELECT * FROM vehiculos_solicitud WHERE solicitud_id = ? ORDER BY id");
+        $stmt->execute([(int) $solicitudId]);
+        $vehiculos = $stmt->fetchAll();
+
+        $stmt = $pdo->prepare("
+            SELECT e.*, u.nombre as banco_nombre, u.apellido as banco_apellido
+            FROM evaluaciones_banco e
+            INNER JOIN usuarios_banco_solicitudes ubs ON e.usuario_banco_id = ubs.id
+            INNER JOIN usuarios u ON ubs.usuario_banco_id = u.id
+            WHERE e.solicitud_id = ?
+            ORDER BY e.fecha_evaluacion DESC
+        ");
+        $stmt->execute([(int) $solicitudId]);
+        $evaluaciones = $stmt->fetchAll();
+
+        $stmt = $pdo->prepare("
+            SELECT nombre_original, tipo_archivo, ruta_archivo
+            FROM adjuntos_solicitud
+            WHERE solicitud_id = ?
+            ORDER BY fecha_subida DESC
+        ");
+        $stmt->execute([(int) $solicitudId]);
+        $adjuntos = $stmt->fetchAll();
+
+        $cfg = file_exists(__DIR__ . '/../config/email.php') ? require __DIR__ . '/../config/email.php' : [];
+        $app_url = (function_exists('getenv') && getenv('APP_URL')) ? getenv('APP_URL') : '';
+        if ($app_url === '' || $app_url === false) {
+            $app_url = $cfg['app_url'] ?? '';
+        }
+        $mostrarEnlaceMotus = !empty($cfg['mail_show_app_link_in_emails']);
+
+        $html = construirResumenSolicitudHtml(
+            $solicitud,
+            $vehiculos,
+            $evaluaciones,
+            $adjuntos,
+            'PipeDrive',
+            $app_url,
+            $mostrarEnlaceMotus
+        );
+
+        $archivosAdjuntos = adjuntosArchivosParaCorreoResumen($adjuntos);
+        $emailService = new EmailService();
+
+        $resultado = $emailService->enviarCorreo(
+            $emailPipe,
+            asuntoResumenSolicitudBancoMail($solicitud),
+            $html,
+            '',
+            strip_tags(preg_replace('/<br\s*\/?>/i', "\n", $html)),
+            $archivosAdjuntos,
+            [],
+            []
+        );
+
+        if (!empty($resultado['success'])) {
+            return ['success' => true, 'message' => 'Resumen enviado correctamente a PipeDrive'];
+        }
+
+        return ['success' => false, 'message' => $resultado['message'] ?? 'No se pudo enviar a PipeDrive'];
+    } catch (Throwable $e) {
+        error_log("Error enviarResumenSolicitudPipedriveDirecto: " . $e->getMessage());
+        return ['success' => false, 'message' => 'Error al enviar correo a PipeDrive'];
     }
 }
 

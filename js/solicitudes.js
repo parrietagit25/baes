@@ -1903,11 +1903,13 @@ function mostrarUsuariosAsignados(usuarios) {
         tbody.html('<tr><td colspan="7" class="text-center text-muted">No hay usuarios asignados</td></tr>');
         window._listaUsuariosBancoTab = [];
         $('#btnEnviarResumenTodos').prop('disabled', true);
+        $('#btnEnviarPipedrive').prop('disabled', !solicitudActualId);
         return;
     }
 
     window._listaUsuariosBancoTab = usuarios;
     $('#btnEnviarResumenTodos').prop('disabled', false);
+    $('#btnEnviarPipedrive').prop('disabled', !solicitudActualId);
 
     usuarios.forEach(usuario => {
         const estadoClass = usuario.estado === 'activo' ? 'success' : 'secondary';
@@ -2012,6 +2014,29 @@ $(document).on('click', '#btnEnviarResumenTodos', function(e) {
 });
 
 /**
+ * Abrir modal de envío directo a PipeDrive (sin copias)
+ */
+$(document).on('click', '#btnEnviarPipedrive', function(e) {
+    e.preventDefault();
+    if (!solicitudActualId) return;
+    var emailPipe = String($('#email_pipedrive').val() || '').trim();
+    var modal = $('#modalEnviarPipedrive');
+    modal.data('solicitud-id', solicitudActualId);
+    if (emailPipe && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailPipe)) {
+        $('#textoEnviarPipedriveConfirm').html(
+            '¿Desea enviar el resumen de la solicitud al correo de PipeDrive <strong>' + escapeHtml(emailPipe) + '</strong>?'
+        );
+        $('#btnConfirmarEnviarPipedrive').prop('disabled', false);
+    } else {
+        $('#textoEnviarPipedriveConfirm').html(
+            'No hay correo de PipeDrive registrado en esta solicitud. Registre un correo en el campo <strong>Email PipeDrive</strong> y guarde la solicitud para poder enviar.'
+        );
+        $('#btnConfirmarEnviarPipedrive').prop('disabled', true);
+    }
+    modal.modal('show');
+});
+
+/**
  * Confirmar envío de resumen por correo
  */
 function confirmarEnviarResumenBanco() {
@@ -2090,6 +2115,42 @@ function confirmarEnviarResumenBancoTodos() {
             } catch (e) {}
             mostrarAlerta(msg, 'danger');
             alert('No se pudo completar el envío: ' + msg);
+        }
+    });
+}
+
+/**
+ * Confirmar envío de resumen directo a PipeDrive
+ */
+function confirmarEnviarResumenPipedrive() {
+    var modal = $('#modalEnviarPipedrive');
+    var solicitudId = modal.data('solicitud-id');
+    if (!solicitudId) return;
+    modal.modal('hide');
+    $.ajax({
+        url: 'api/enviar_resumen_pipedrive.php',
+        type: 'POST',
+        data: { solicitud_id: solicitudId },
+        dataType: 'json',
+        success: function(res) {
+            if (res.success) {
+                var okMsg = res.message || 'Resumen enviado correctamente a PipeDrive';
+                mostrarAlerta(okMsg, 'success');
+                alert('Confirmación: ' + okMsg);
+            } else {
+                var failMsg = res.message || 'No se pudo enviar a PipeDrive';
+                mostrarAlerta(failMsg, 'warning');
+                alert('No se pudo enviar a PipeDrive: ' + failMsg);
+            }
+        },
+        error: function(xhr) {
+            var msg = 'Error al enviar a PipeDrive';
+            try {
+                var d = JSON.parse(xhr.responseText || '{}');
+                if (d.message) msg = d.message;
+            } catch (e) {}
+            mostrarAlerta(msg, 'danger');
+            alert('No se pudo enviar a PipeDrive: ' + msg);
         }
     });
 }
@@ -2225,6 +2286,7 @@ function limpiarFormularioUsuario() {
  */
 function inicializarUsuariosBanco(solicitudId) {
     solicitudActualId = solicitudId;
+    $('#btnEnviarPipedrive').prop('disabled', !solicitudId);
     if (solicitudId) {
         cargarUsuariosAsignados(solicitudId);
         cargarMensajes(solicitudId);
