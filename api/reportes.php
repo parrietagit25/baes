@@ -21,6 +21,7 @@ if ($action === 'exportar_todos_excel') {
 }
 if (in_array($action, [
     'exportar_excel_usuarios',
+    'exportar_excel_vendedores',
     'exportar_excel_tiempo',
     'exportar_excel_banco',
     'exportar_excel_correos',
@@ -38,8 +39,14 @@ switch ($action) {
     case 'reporte_usuarios':
         reporteUsuarios();
         break;
+    case 'reporte_vendedores':
+        reporteVendedores();
+        break;
     case 'solicitudes_usuario_estado':
         solicitudesPorUsuarioEstado();
+        break;
+    case 'solicitudes_vendedor_estado':
+        solicitudesPorVendedorEstado();
         break;
     case 'reporte_tiempo':
         reporteTiempo();
@@ -64,6 +71,7 @@ switch ($action) {
         echo json_encode(['success' => false, 'message' => 'Acción ya ejecutada']);
         break;
     case 'exportar_excel_usuarios':
+    case 'exportar_excel_vendedores':
     case 'exportar_excel_tiempo':
     case 'exportar_excel_banco':
     case 'exportar_excel_correos':
@@ -98,6 +106,27 @@ function exportarReporteCsv(string $action): void {
         }, _dataReporteUsuarios($pdo));
         _outputXlsxDownload('reporte_usuarios.xlsx', 'Rep Usuarios', [
             'Usuario ID', 'Nombre', 'Email', 'Nueva', 'En Revision Banco', 'Aprobada', 'Rechazada', 'Completada', 'Desistimiento', 'Total'
+        ], $rows);
+        return;
+    }
+
+    if ($action === 'exportar_excel_vendedores') {
+        $rows = array_map(static function(array $r): array {
+            return [
+                $r['vendedor_id'] ?? '',
+                $r['nombre'] ?? '',
+                $r['email'] ?? '',
+                $r['Nueva'] ?? 0,
+                $r['En Revisión Banco'] ?? 0,
+                $r['Aprobada'] ?? 0,
+                $r['Rechazada'] ?? 0,
+                $r['Completada'] ?? 0,
+                $r['Desistimiento'] ?? 0,
+                $r['total'] ?? 0,
+            ];
+        }, _dataReporteVendedores($pdo));
+        _outputXlsxDownload('reporte_vendedores.xlsx', 'Rep Vendedores', [
+            'Vendedor ID', 'Nombre', 'Email', 'Nueva', 'En Revision Banco', 'Aprobada', 'Rechazada', 'Completada', 'Desistimiento', 'Total'
         ], $rows);
         return;
     }
@@ -644,6 +673,46 @@ function _dataReporteUsuarios(PDO $pdo): array {
     return array_values($porUsuario);
 }
 
+function _dataReporteVendedores(PDO $pdo): array {
+    $sql = "
+        SELECT
+            ev.id AS vendedor_id,
+            ev.nombre,
+            ev.email,
+            s.estado,
+            COUNT(s.id) AS total
+        FROM ejecutivos_ventas ev
+        LEFT JOIN solicitudes_credito s ON s.ejecutivo_ventas_id = ev.id
+        WHERE COALESCE(ev.activo, 1) = 1
+        GROUP BY ev.id, ev.nombre, ev.email, s.estado
+        ORDER BY ev.nombre, s.estado
+    ";
+    $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+    $porVendedor = [];
+    foreach ($rows as $r) {
+        $id = $r['vendedor_id'];
+        if (!isset($porVendedor[$id])) {
+            $porVendedor[$id] = [
+                'vendedor_id' => $id,
+                'nombre' => trim((string)($r['nombre'] ?? '')),
+                'email' => $r['email'] ?? '',
+                'Nueva' => 0,
+                'En Revisión Banco' => 0,
+                'Aprobada' => 0,
+                'Rechazada' => 0,
+                'Completada' => 0,
+                'Desistimiento' => 0,
+                'total' => 0,
+            ];
+        }
+        if (!empty($r['estado'])) {
+            $porVendedor[$id][$r['estado']] = (int) $r['total'];
+            $porVendedor[$id]['total'] += (int) $r['total'];
+        }
+    }
+    return array_values($porVendedor);
+}
+
 function _dataReporteTiempo(PDO $pdo): array {
     $rows = $pdo->query("
         SELECT s.id, s.nombre_cliente, s.cedula, s.estado, s.fecha_creacion, s.fecha_actualizacion
@@ -971,6 +1040,19 @@ function reporteUsuarios() {
 }
 
 /**
+ * Total de solicitudes por vendedor (ejecutivo de ventas) y por estado
+ */
+function reporteVendedores() {
+    global $pdo;
+    try {
+        echo json_encode(['success' => true, 'data' => _dataReporteVendedores($pdo)]);
+    } catch (PDOException $e) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Error de base de datos']);
+    }
+}
+
+/**
  * Listado de solicitudes por gestor y estado (para el modal)
  */
 function solicitudesPorUsuarioEstado() {
@@ -991,6 +1073,35 @@ function solicitudesPorUsuarioEstado() {
             ORDER BY s.fecha_actualizacion DESC
         ");
         $stmt->execute([$usuarioId, $estado]);
+        $solicitudes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        echo json_encode(['success' => true, 'data' => $solicitudes]);
+    } catch (PDOException $e) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Error de base de datos']);
+    }
+}
+
+/**
+ * Listado de solicitudes por vendedor y estado (para el modal)
+ */
+function solicitudesPorVendedorEstado() {
+    global $pdo;
+    $vendedorId = (int)($_GET['vendedor_id'] ?? 0);
+    $estado = trim($_GET['estado'] ?? '');
+
+    if (!$vendedorId || !$estado) {
+        echo json_encode(['success' => false, 'message' => 'vendedor_id y estado requeridos']);
+        return;
+    }
+
+    try {
+        $stmt = $pdo->prepare("
+            SELECT s.id, s.nombre_cliente, s.cedula, s.estado, s.fecha_creacion, s.fecha_actualizacion
+            FROM solicitudes_credito s
+            WHERE s.ejecutivo_ventas_id = ? AND s.estado = ?
+            ORDER BY s.fecha_creacion DESC
+        ");
+        $stmt->execute([$vendedorId, $estado]);
         $solicitudes = $stmt->fetchAll(PDO::FETCH_ASSOC);
         echo json_encode(['success' => true, 'data' => $solicitudes]);
     } catch (PDOException $e) {

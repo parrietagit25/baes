@@ -15,13 +15,14 @@ if (!in_array('ROLE_ADMIN', $_SESSION['user_roles'])) {
 }
 
 $submenu = $_GET['submenu'] ?? 'usuarios';
-if (!in_array($submenu, ['usuarios', 'tiempo', 'banco', 'emails', 'encuestas', 'telemetria'], true)) {
+if (!in_array($submenu, ['usuarios', 'vendedores', 'tiempo', 'banco', 'emails', 'encuestas', 'telemetria'], true)) {
     $submenu = 'usuarios';
 }
 $estadosCol = ['Nueva', 'En Revisión Banco', 'Aprobada', 'Rechazada', 'Completada', 'Desistimiento'];
-$titulosReporte = ['usuarios' => 'Rep. Usuarios', 'tiempo' => 'Rep. Tiempo', 'banco' => 'Rep. Banco', 'emails' => 'Rep. Correos', 'encuestas' => 'Rep. Encuestas', 'telemetria' => 'Rep. Telemetría'];
+$titulosReporte = ['usuarios' => 'Rep. Usuarios', 'vendedores' => 'Rep. Vendedores', 'tiempo' => 'Rep. Tiempo', 'banco' => 'Rep. Banco', 'emails' => 'Rep. Correos', 'encuestas' => 'Rep. Encuestas', 'telemetria' => 'Rep. Telemetría'];
 $exportActionPorSubmenu = [
     'usuarios' => ['action' => 'exportar_excel_usuarios', 'label' => 'Descargar Rep. Usuarios'],
+    'vendedores' => ['action' => 'exportar_excel_vendedores', 'label' => 'Descargar Rep. Vendedores'],
     'tiempo' => ['action' => 'exportar_excel_tiempo', 'label' => 'Descargar Rep. Tiempo'],
     'banco' => ['action' => 'exportar_excel_banco', 'label' => 'Descargar Rep. Banco'],
     'emails' => ['action' => 'exportar_excel_correos', 'label' => 'Descargar Rep. Correos'],
@@ -78,6 +79,7 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
                         </div>
                         <p class="mb-0 opacity-90"><?php
                             if ($submenu === 'usuarios') echo 'Total de solicitudes por usuario y estado';
+                            elseif ($submenu === 'vendedores') echo 'Total de solicitudes por vendedor y estado';
                             elseif ($submenu === 'tiempo') echo 'Tiempo entre cambios de estado por solicitud';
                             elseif ($submenu === 'banco') echo 'Tiempo que tardan los bancos en dar respuesta a las solicitudes asignadas';
                             elseif ($submenu === 'encuestas') echo 'Promedios, totales y detalle de respuestas a las encuestas públicas (vendedores y gestores)';
@@ -115,6 +117,48 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
                                         <thead class="table-light">
                                             <tr>
                                                 <th>Usuario</th>
+                                                <?php foreach ($estadosCol as $e): ?>
+                                                    <th class="text-center"><?php echo htmlspecialchars($e); ?></th>
+                                                <?php endforeach; ?>
+                                                <th class="text-center">Total</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Rep. Vendedores -->
+                    <div id="panel-vendedores" class="report-panel" style="display: <?php echo $submenu === 'vendedores' ? 'block' : 'none'; ?>">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title mb-3">Total de solicitudes por vendedor y estado</h5>
+                                <div class="row g-2 mb-3">
+                                    <div class="col-md-5">
+                                        <input type="text" id="filtroVendedoresTexto" class="form-control form-control-sm" placeholder="Filtrar por nombre o email...">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <select id="filtroVendedoresEstado" class="form-select form-select-sm">
+                                            <option value="">Todos los estados</option>
+                                            <?php foreach ($estadosCol as $e): ?>
+                                            <option value="<?php echo htmlspecialchars($e); ?>"><?php echo htmlspecialchars($e); ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <input type="number" min="0" id="filtroVendedoresMinTotal" class="form-control form-control-sm" placeholder="Total mín.">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <button type="button" class="btn btn-primary btn-sm w-100" id="btnFiltrarVendedores"><i class="fas fa-filter me-1"></i>Filtrar</button>
+                                    </div>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-bordered table-reportes" id="tabla-vendedores">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Vendedor</th>
                                                 <?php foreach ($estadosCol as $e): ?>
                                                     <th class="text-center"><?php echo htmlspecialchars($e); ?></th>
                                                 <?php endforeach; ?>
@@ -405,6 +449,8 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
 
     if (submenu === 'usuarios') {
         loadReporteUsuarios();
+    } else if (submenu === 'vendedores') {
+        loadReporteVendedores();
     } else if (submenu === 'tiempo') {
         loadReporteTiempo();
     } else if (submenu === 'banco') {
@@ -446,12 +492,62 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
             .catch(() => { document.querySelector('#tabla-usuarios tbody').innerHTML = '<tr><td colspan="8" class="text-center text-danger">Error al cargar</td></tr>'; });
     }
 
+    function loadReporteVendedores() {
+        fetch('api/reportes.php?action=reporte_vendedores')
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) { document.querySelector('#tabla-vendedores tbody').innerHTML = '<tr><td colspan="8" class="text-center text-muted">Sin datos</td></tr>'; return; }
+                const estados = ['Nueva', 'En Revisión Banco', 'Aprobada', 'Rechazada', 'Completada', 'Desistimiento'];
+                let html = '';
+                data.data.forEach(row => {
+                    html += '<tr><td>' + escapeHtml(row.nombre || '') + '<br><small class="text-muted">' + escapeHtml(row.email || '') + '</small></td>';
+                    estados.forEach(est => {
+                        const n = row[est] != null ? row[est] : 0;
+                        html += '<td class="text-center"><span class="total-click-vendedor" data-vendedor-id="' + row.vendedor_id + '" data-estado="' + escapeHtml(est) + '" data-vendedor-nombre="' + escapeHtml(row.nombre || '') + '">' + n + '</span></td>';
+                    });
+                    html += '<td class="text-center fw-bold">' + (row.total || 0) + '</td></tr>';
+                });
+                if (!html) html = '<tr><td colspan="8" class="text-center text-muted">Sin datos</td></tr>';
+                document.querySelector('#tabla-vendedores tbody').innerHTML = html;
+                document.querySelectorAll('.total-click-vendedor').forEach(el => {
+                    el.addEventListener('click', function() {
+                        const vendedorId = this.getAttribute('data-vendedor-id');
+                        const estado = this.getAttribute('data-estado');
+                        const vendedorNombre = this.getAttribute('data-vendedor-nombre');
+                        abrirModalSolicitudesVendedor(vendedorId, estado, vendedorNombre);
+                    });
+                });
+            })
+            .catch(() => { document.querySelector('#tabla-vendedores tbody').innerHTML = '<tr><td colspan="8" class="text-center text-danger">Error al cargar</td></tr>'; });
+    }
+
     function abrirModalSolicitudes(usuarioId, estado, usuarioNombre) {
         document.getElementById('modalSolicitudesTitulo').textContent = 'Usuario: ' + usuarioNombre + ' — Estado: ' + estado;
         document.getElementById('modalSolicitudesBody').innerHTML = '<tr><td colspan="6" class="text-center">Cargando…</td></tr>';
         const modal = new bootstrap.Modal(document.getElementById('modalSolicitudesUsuario'));
         modal.show();
         fetch('api/reportes.php?action=solicitudes_usuario_estado&usuario_id=' + encodeURIComponent(usuarioId) + '&estado=' + encodeURIComponent(estado))
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) {
+                    document.getElementById('modalSolicitudesBody').innerHTML = '<tr><td colspan="6" class="text-center text-muted">Sin solicitudes</td></tr>';
+                    return;
+                }
+                let html = '';
+                data.data.forEach(s => {
+                    html += '<tr><td>' + s.id + '</td><td>' + escapeHtml(s.nombre_cliente || '') + '</td><td>' + escapeHtml(s.cedula || '') + '</td><td>' + escapeHtml(s.estado || '') + '</td><td>' + (s.fecha_creacion || '') + '</td><td>' + (s.fecha_actualizacion || '') + '</td></tr>';
+                });
+                if (!html) html = '<tr><td colspan="6" class="text-center text-muted">Sin solicitudes</td></tr>';
+                document.getElementById('modalSolicitudesBody').innerHTML = html;
+            });
+    }
+
+    function abrirModalSolicitudesVendedor(vendedorId, estado, vendedorNombre) {
+        document.getElementById('modalSolicitudesTitulo').textContent = 'Vendedor: ' + vendedorNombre + ' — Estado: ' + estado;
+        document.getElementById('modalSolicitudesBody').innerHTML = '<tr><td colspan="6" class="text-center">Cargando…</td></tr>';
+        const modal = new bootstrap.Modal(document.getElementById('modalSolicitudesUsuario'));
+        modal.show();
+        fetch('api/reportes.php?action=solicitudes_vendedor_estado&vendedor_id=' + encodeURIComponent(vendedorId) + '&estado=' + encodeURIComponent(estado))
             .then(r => r.json())
             .then(data => {
                 if (!data.success) {
@@ -595,6 +691,10 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
     if (btnFiltrarUsuarios) {
         btnFiltrarUsuarios.addEventListener('click', aplicarFiltroUsuarios);
     }
+    const btnFiltrarVendedores = document.getElementById('btnFiltrarVendedores');
+    if (btnFiltrarVendedores) {
+        btnFiltrarVendedores.addEventListener('click', aplicarFiltroVendedores);
+    }
     const btnFiltrarTiempo = document.getElementById('btnFiltrarTiempo');
     if (btnFiltrarTiempo) {
         btnFiltrarTiempo.addEventListener('click', aplicarFiltroTiempo);
@@ -623,6 +723,30 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
         const minRaw = ((document.getElementById('filtroUsuariosMinTotal') || {}).value || '').trim();
         const minTotal = minRaw === '' ? null : parseInt(minRaw, 10);
         const filas = document.querySelectorAll('#tabla-usuarios tbody tr');
+        const mapEstado = { 'Nueva': 1, 'En Revisión Banco': 2, 'Aprobada': 3, 'Rechazada': 4, 'Completada': 5, 'Desistimiento': 6 };
+        filas.forEach(tr => {
+            if (tr.querySelector('td[colspan]')) return;
+            const celdas = tr.querySelectorAll('td');
+            const ref = (celdas[0]?.innerText || '').toLowerCase();
+            const total = parseInt((celdas[7]?.innerText || '0').replace(/[^\d]/g, ''), 10) || 0;
+            let visible = true;
+            if (txt && ref.indexOf(txt) === -1) visible = false;
+            if (estado && mapEstado[estado] != null) {
+                const idx = mapEstado[estado];
+                const valEstado = parseInt((celdas[idx]?.innerText || '0').replace(/[^\d]/g, ''), 10) || 0;
+                if (valEstado <= 0) visible = false;
+            }
+            if (minTotal !== null && !isNaN(minTotal) && total < minTotal) visible = false;
+            tr.style.display = visible ? '' : 'none';
+        });
+    }
+
+    function aplicarFiltroVendedores() {
+        const txt = ((document.getElementById('filtroVendedoresTexto') || {}).value || '').toLowerCase().trim();
+        const estado = ((document.getElementById('filtroVendedoresEstado') || {}).value || '').trim();
+        const minRaw = ((document.getElementById('filtroVendedoresMinTotal') || {}).value || '').trim();
+        const minTotal = minRaw === '' ? null : parseInt(minRaw, 10);
+        const filas = document.querySelectorAll('#tabla-vendedores tbody tr');
         const mapEstado = { 'Nueva': 1, 'En Revisión Banco': 2, 'Aprobada': 3, 'Rechazada': 4, 'Completada': 5, 'Desistimiento': 6 };
         filas.forEach(tr => {
             if (tr.querySelector('td[colspan]')) return;
