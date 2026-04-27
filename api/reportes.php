@@ -220,6 +220,8 @@ function exportarReporteCsv(string $action): void {
                 $r['celular_cliente'] ?? '',
                 $r['cliente_correo'] ?? '',
                 $r['ip'] ?? '',
+                $r['geo_country'] ?? '',
+                $r['geo_city'] ?? '',
                 $r['telemetria_session_id'] ?? '',
                 $r['telemetria_started_at'] ?? '',
                 $r['telemetria_submitted_at'] ?? '',
@@ -236,7 +238,7 @@ function exportarReporteCsv(string $action): void {
             ];
         }, $rowsData);
         _outputXlsxDownload('reporte_telemetria.xlsx', 'Rep Telemetria', [
-            'ID', 'Fecha Registro', 'Cliente', 'Cedula', 'Celular', 'Email', 'IP',
+            'ID', 'Fecha Registro', 'Cliente', 'Cedula', 'Celular', 'Email', 'IP', 'Pais', 'Ciudad',
             'Sesion', 'Inicio', 'Fin', 'Duracion Seg',
             'Paso A Seg', 'Paso B Seg', 'Paso C Seg', 'Paso D Seg', 'Paso E Seg',
             'Plataforma', 'Timezone', 'Viewport', 'Pantalla'
@@ -733,6 +735,8 @@ function _dataReporteTelemetria(PDO $pdo): array {
         LIMIT 5000
     ";
     $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+    $lookupCount = 0;
+    $lookupMax = 150; // limitar llamadas externas por request
     foreach ($rows as &$r) {
         $steps = json_decode((string)($r['telemetria_paso_tiempos_json'] ?? ''), true);
         if (!is_array($steps)) $steps = [];
@@ -755,9 +759,104 @@ function _dataReporteTelemetria(PDO $pdo): array {
         if ($r['device_label'] === '') {
             $r['device_label'] = trim((string)($r['platform'] ?? ''));
         }
+
+        $r['geo_country'] = '';
+        $r['geo_city'] = '';
+        $ip = trim((string)($r['ip'] ?? ''));
+        if ($ip !== '' && _isPublicIpForGeo($ip)) {
+            $geo = _geoLookupByIpCached($ip, $lookupCount < $lookupMax);
+            if (!empty($geo['country'])) {
+                $r['geo_country'] = (string)$geo['country'];
+            }
+            if (!empty($geo['city'])) {
+                $r['geo_city'] = (string)$geo['city'];
+            }
+            if (!empty($geo['from_lookup'])) {
+                $lookupCount++;
+            }
+        }
     }
     unset($r);
     return $rows;
+}
+
+function _isPublicIpForGeo(string $ip): bool {
+    return (bool) filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE);
+}
+
+function _geoCacheFilePath(): string {
+    return rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'motus_geo_ip_cache.json';
+}
+
+function _geoCacheLoad(): array {
+    static $cache = null;
+    if (is_array($cache)) {
+        return $cache;
+    }
+    $cache = [];
+    $path = _geoCacheFilePath();
+    if (!is_file($path)) {
+        return $cache;
+    }
+    $raw = @file_get_contents($path);
+    if (!is_string($raw) || trim($raw) === '') {
+        return $cache;
+    }
+    $decoded = json_decode($raw, true);
+    if (is_array($decoded)) {
+        $cache = $decoded;
+    }
+    return $cache;
+}
+
+function _geoCacheSave(array $cache): void {
+    $path = _geoCacheFilePath();
+    @file_put_contents($path, json_encode($cache, JSON_UNESCAPED_UNICODE), LOCK_EX);
+}
+
+/**
+ * @return array{country:string,city:string,from_lookup?:bool}
+ */
+function _geoLookupByIpCached(string $ip, bool $allowLookup): array {
+    $cache = _geoCacheLoad();
+    $key = trim($ip);
+    if ($key === '') {
+        return ['country' => '', 'city' => ''];
+    }
+    $now = time();
+    $ttl = 7 * 24 * 3600; // 7 días
+    if (isset($cache[$key]) && is_array($cache[$key])) {
+        $row = $cache[$key];
+        $ts = isset($row['ts']) ? (int)$row['ts'] : 0;
+        if ($ts > 0 && ($now - $ts) <= $ttl) {
+            return [
+                'country' => (string)($row['country'] ?? ''),
+                'city' => (string)($row['city'] ?? ''),
+            ];
+        }
+    }
+    if (!$allowLookup) {
+        return ['country' => '', 'city' => ''];
+    }
+
+    $url = 'https://ipwho.is/' . rawurlencode($key);
+    $ctx = stream_context_create([
+        'http' => ['timeout' => 2, 'ignore_errors' => true],
+        'ssl' => ['verify_peer' => true, 'verify_peer_name' => true],
+    ]);
+    $raw = @file_get_contents($url, false, $ctx);
+    if (!is_string($raw) || trim($raw) === '') {
+        return ['country' => '', 'city' => '', 'from_lookup' => true];
+    }
+    $d = json_decode($raw, true);
+    if (!is_array($d) || empty($d['success'])) {
+        return ['country' => '', 'city' => '', 'from_lookup' => true];
+    }
+    $country = trim((string)($d['country'] ?? ''));
+    $city = trim((string)($d['city'] ?? ''));
+    $cache[$key] = ['country' => $country, 'city' => $city, 'ts' => $now];
+    _geoCacheSave($cache);
+    return ['country' => $country, 'city' => $city, 'from_lookup' => true];
 }
 
 /**

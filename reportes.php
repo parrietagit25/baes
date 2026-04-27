@@ -270,6 +270,7 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
                                                 <th>Cédula</th>
                                                 <th>Contacto</th>
                                                 <th>IP</th>
+                                                <th>Ubicación IP</th>
                                                 <th>Duración total</th>
                                                 <th>Paso A</th>
                                                 <th>Paso B</th>
@@ -796,12 +797,12 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
     function loadReporteTelemetria() {
         const tbody = document.querySelector('#tabla-telemetria tbody');
         if (!tbody) return;
-        tbody.innerHTML = '<tr><td colspan="12" class="text-center text-muted">Cargando…</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="13" class="text-center text-muted">Cargando…</td></tr>';
         fetch('api/reportes.php?action=reporte_telemetria')
             .then(function(r) { return r.json(); })
             .then(function(data) {
                 if (!data.success) {
-                    tbody.innerHTML = '<tr><td colspan="12" class="text-center text-danger">' + escapeHtml(data.message || 'No se pudo cargar telemetría') + '</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="13" class="text-center text-danger">' + escapeHtml(data.message || 'No se pudo cargar telemetría') + '</td></tr>';
                     return;
                 }
                 const res = data.resumen || {};
@@ -814,7 +815,7 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
 
                 const rows = data.data || [];
                 if (!rows.length) {
-                    tbody.innerHTML = '<tr><td colspan="12" class="text-center text-muted">Sin datos de telemetría</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="13" class="text-center text-muted">Sin datos de telemetría</td></tr>';
                     return;
                 }
                 let html = '';
@@ -828,12 +829,14 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
                         ? Number(r.telemetria_duracion_segundos)
                         : null;
                     const durTxt = durSeg == null ? '—' : (durSeg + ' seg / ' + (durSeg / 60).toFixed(2).replace(/\.00$/, '') + ' min');
+                    const geoTxt = [r.geo_city || '', r.geo_country || ''].filter(Boolean).join(', ');
                     html += '<tr>'
                         + '<td class="text-nowrap" data-date="' + escapeHtml(fDate) + '">' + escapeHtml(f) + '</td>'
                         + '<td>' + escapeHtml(r.cliente_nombre || '') + '</td>'
                         + '<td>' + escapeHtml(r.cliente_id || '') + '</td>'
                         + '<td>' + (contacto ? '<small>' + contacto + '</small>' : '—') + '</td>'
                         + '<td class="text-nowrap">' + escapeHtml(r.ip || '') + '</td>'
+                        + '<td class="text-nowrap"><small>' + escapeHtml(geoTxt || '—') + '</small></td>'
                         + '<td class="text-end fw-bold">' + durTxt + '</td>'
                         + '<td class="text-end">' + (r.paso0_seg != null ? r.paso0_seg : 0) + '</td>'
                         + '<td class="text-end">' + (r.paso1_seg != null ? r.paso1_seg : 0) + '</td>'
@@ -847,7 +850,7 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
                 aplicarFiltroTelemetria();
             })
             .catch(function() {
-                tbody.innerHTML = '<tr><td colspan="12" class="text-center text-danger">Error de red o servidor</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="13" class="text-center text-danger">Error de red o servidor</td></tr>';
             });
     }
 })();
