@@ -135,8 +135,22 @@ SET @sql := IF(
 PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
 
 SET @sql := IF(
+  (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='solicitudes_credito' AND COLUMN_NAME='ejecutivo_ventas_id')=0,
+  'ALTER TABLE solicitudes_credito ADD COLUMN ejecutivo_ventas_id INT NULL AFTER banco_id',
+  'SELECT "ok ejecutivo_ventas_id"'
+);
+PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
+
+SET @sql := IF(
+  (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='solicitudes_credito' AND INDEX_NAME='idx_ejecutivo_ventas_id')=0,
+  'ALTER TABLE solicitudes_credito ADD KEY idx_ejecutivo_ventas_id (ejecutivo_ventas_id)',
+  'SELECT "ok idx_ejecutivo_ventas_id"'
+);
+PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
+
+SET @sql := IF(
   (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='solicitudes_credito' AND COLUMN_NAME='financiamiento_registro_id')=0,
-  'ALTER TABLE solicitudes_credito ADD COLUMN financiamiento_registro_id INT NULL DEFAULT NULL COMMENT ''ID en financiamiento_registros'' AFTER ejecutivo_ventas_id',
+  'ALTER TABLE solicitudes_credito ADD COLUMN financiamiento_registro_id INT NULL DEFAULT NULL COMMENT ''ID en financiamiento_registros''',
   'SELECT "ok financiamiento_registro_id"'
 );
 PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
