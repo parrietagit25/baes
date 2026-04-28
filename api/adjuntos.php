@@ -98,12 +98,43 @@ function _tamano_col(PDO $pdo): ?string {
     }
 }
 
+/**
+ * Detecta si existe la columna texto_extraido en adjuntos_solicitud.
+ */
+function _tiene_texto_extraido(PDO $pdo): bool {
+    static $has = null;
+    if ($has !== null) {
+        return $has;
+    }
+    try {
+        $dbName = $pdo->query("SELECT DATABASE()")->fetchColumn();
+        if (!$dbName) {
+            $has = false;
+            return false;
+        }
+        $stmt = $pdo->prepare("
+            SELECT COUNT(*)
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = ?
+              AND TABLE_NAME = 'adjuntos_solicitud'
+              AND COLUMN_NAME = 'texto_extraido'
+        ");
+        $stmt->execute([$dbName]);
+        $has = ((int)$stmt->fetchColumn()) > 0;
+    } catch (Throwable $e) {
+        error_log('Detect columna texto_extraido falló: ' . $e->getMessage());
+        $has = false;
+    }
+    return $has;
+}
+
 function obtenerAdjuntos($solicitudId) {
     global $pdo;
     
     try {
         $tamCol = _tamano_col($pdo);
         $tamSelect = $tamCol ? "a.`$tamCol` AS `tamaño_archivo`" : "0 AS `tamaño_archivo`";
+        $textoSelect = _tiene_texto_extraido($pdo) ? "a.texto_extraido" : "NULL AS texto_extraido";
         $stmt = $pdo->prepare("
             SELECT
                 a.id,
@@ -115,7 +146,7 @@ function obtenerAdjuntos($solicitudId) {
                 a.tipo_archivo,
                 $tamSelect,
                 a.descripcion,
-                a.texto_extraido,
+                $textoSelect,
                 a.fecha_subida,
                 u.nombre,
                 u.apellido
@@ -140,6 +171,7 @@ function obtenerAdjunto($id) {
     try {
         $tamCol = _tamano_col($pdo);
         $tamSelect = $tamCol ? "a.`$tamCol` AS `tamaño_archivo`" : "0 AS `tamaño_archivo`";
+        $textoSelect = _tiene_texto_extraido($pdo) ? "a.texto_extraido" : "NULL AS texto_extraido";
         $stmt = $pdo->prepare("
             SELECT
                 a.id,
@@ -151,7 +183,7 @@ function obtenerAdjunto($id) {
                 a.tipo_archivo,
                 $tamSelect,
                 a.descripcion,
-                a.texto_extraido,
+                $textoSelect,
                 a.fecha_subida,
                 u.nombre,
                 u.apellido
@@ -320,8 +352,10 @@ function subirAdjunto() {
                             if (strlen($textoExtraido) > $maxLen) {
                                 $textoExtraido = substr($textoExtraido, 0, $maxLen);
                             }
-                            $up = $pdo->prepare("UPDATE adjuntos_solicitud SET texto_extraido = ? WHERE id = ?");
-                            $up->execute([$textoExtraido, $adjuntoId]);
+                            if (_tiene_texto_extraido($pdo)) {
+                                $up = $pdo->prepare("UPDATE adjuntos_solicitud SET texto_extraido = ? WHERE id = ?");
+                                $up->execute([$textoExtraido, $adjuntoId]);
+                            }
                         }
                     }
                 } catch (Throwable $e) {
@@ -416,6 +450,7 @@ function descargarAdjunto($id) {
         // Obtener información del adjunto
         $tamCol = _tamano_col($pdo);
         $tamSelect = $tamCol ? "`$tamCol` AS `tamaño_archivo`" : "0 AS `tamaño_archivo`";
+        $textoSelect = _tiene_texto_extraido($pdo) ? "texto_extraido" : "NULL AS texto_extraido";
         $stmt = $pdo->prepare("
             SELECT
                 id,
@@ -427,7 +462,7 @@ function descargarAdjunto($id) {
                 tipo_archivo,
                 $tamSelect,
                 descripcion,
-                texto_extraido,
+                $textoSelect,
                 fecha_subida
             FROM adjuntos_solicitud
             WHERE id = ?
