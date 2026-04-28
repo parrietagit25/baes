@@ -168,27 +168,12 @@ function sol_fin_fr_select_cols(PDO $pdo, string $alias = 'fr'): string {
  * Evita IN(SELECT … UNION …) (puede fallar o comportarse distinto según versión MySQL/MariaDB).
  */
 function sol_fin_sql_adjuntos_count(PDO $pdo, string $frIdRef): string {
-    $condiciones = [];
-    $tieneScFinReg = sol_fin_sc_tiene_financiamiento_registro_id($pdo);
-    $tieneFrSolCred = sol_fin_fr_tiene_solicitud_credito_id($pdo);
-
-    if ($tieneScFinReg) {
-        $condiciones[] = "a.solicitud_id IN (SELECT sc.id FROM solicitudes_credito sc WHERE sc.financiamiento_registro_id = {$frIdRef})";
-    }
-
-    if ($tieneFrSolCred) {
-        $condiciones[] = "a.solicitud_id = (SELECT frc.solicitud_credito_id FROM financiamiento_registros frc WHERE frc.id = {$frIdRef} AND frc.solicitud_credito_id IS NOT NULL)";
-    }
-
-    if (!$condiciones) {
+    // Regla estricta: Sol Financiamiento solo cuenta adjuntos del propio registro público.
+    // Evita mezclar adjuntos históricos de solicitudes_credito del mismo vendedor/cliente.
+    if (!sol_fin_tiene_tabla_adjuntos_fin_reg($pdo)) {
         return "0";
     }
-
-    $expr = "(SELECT COUNT(*) FROM adjuntos_solicitud a WHERE " . implode(' OR ', $condiciones) . ")";
-    if (sol_fin_tiene_tabla_adjuntos_fin_reg($pdo)) {
-        $expr .= " + (SELECT COUNT(*) FROM adjuntos_financiamiento_registros afr WHERE afr.financiamiento_registro_id = {$frIdRef})";
-    }
-    return $expr;
+    return "(SELECT COUNT(*) FROM adjuntos_financiamiento_registros afr WHERE afr.financiamiento_registro_id = {$frIdRef})";
 }
 
 function sol_fin_adjuntar_cero_adjuntos(array $rows): array {
@@ -216,59 +201,29 @@ function sol_fin_obtener_adjuntos_por_registro(PDO $pdo, int $frId): array {
         return [];
     }
 
-    $orConds = [];
-    $params = [];
-    $tieneScFinReg = sol_fin_sc_tiene_financiamiento_registro_id($pdo);
-    $tieneFrSolCred = sol_fin_fr_tiene_solicitud_credito_id($pdo);
+    // Regla estricta: listar solo adjuntos del registro público actual.
+    if (!sol_fin_tiene_tabla_adjuntos_fin_reg($pdo)) {
+        return [];
+    }
 
-    if ($tieneScFinReg) {
-        $orConds[] = "s.id IN (SELECT sc.id FROM solicitudes_credito sc WHERE sc.financiamiento_registro_id = ?)";
-        $params[] = $frId;
-    }
-    if ($tieneFrSolCred && !empty($fr['solicitud_credito_id'])) {
-        $orConds[] = "s.id = ?";
-        $params[] = (int)$fr['solicitud_credito_id'];
-    }
     $rows = [];
-    if ($orConds) {
-        $sql = "
+    try {
+        $st2 = $pdo->prepare("
             SELECT
-                a.id,
-                a.solicitud_id,
-                a.nombre_original,
-                a.ruta_archivo,
-                a.tipo_archivo,
-                a.fecha_subida
-            FROM adjuntos_solicitud a
-            INNER JOIN solicitudes_credito s ON s.id = a.solicitud_id
-            WHERE " . implode(' OR ', $orConds) . "
-            ORDER BY a.fecha_subida DESC, a.id DESC
-        ";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($params);
-        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-    }
-
-    if (sol_fin_tiene_tabla_adjuntos_fin_reg($pdo)) {
-        try {
-            $st2 = $pdo->prepare("
-                SELECT
-                    id,
-                    NULL AS solicitud_id,
-                    nombre_original,
-                    ruta_archivo,
-                    tipo_archivo,
-                    fecha_subida
-                FROM adjuntos_financiamiento_registros
-                WHERE financiamiento_registro_id = ?
-                ORDER BY fecha_subida DESC, id DESC
-            ");
-            $st2->execute([$frId]);
-            $rows2 = $st2->fetchAll(PDO::FETCH_ASSOC) ?: [];
-            $rows = array_merge($rows, $rows2);
-        } catch (Throwable $e) {
-            error_log('sol_fin_obtener_adjuntos_por_registro adjuntos_fin_reg: ' . $e->getMessage());
-        }
+                id,
+                NULL AS solicitud_id,
+                nombre_original,
+                ruta_archivo,
+                tipo_archivo,
+                fecha_subida
+            FROM adjuntos_financiamiento_registros
+            WHERE financiamiento_registro_id = ?
+            ORDER BY fecha_subida DESC, id DESC
+        ");
+        $st2->execute([$frId]);
+        $rows = $st2->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    } catch (Throwable $e) {
+        error_log('sol_fin_obtener_adjuntos_por_registro adjuntos_fin_reg: ' . $e->getMessage());
     }
 
     usort($rows, static function($a, $b) {
