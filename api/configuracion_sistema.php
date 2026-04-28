@@ -30,19 +30,45 @@ function interpretar_chatbot_habilitado(?string $valorDb): bool
     return !in_array($v, ['0', 'false', 'no', 'off', 'disabled', ''], true);
 }
 
+function interpretar_mantenimiento_activo(?string $valorDb): bool
+{
+    if ($valorDb === null) {
+        return false;
+    }
+    $v = strtolower(trim($valorDb));
+    return in_array($v, ['1', 'true', 'si', 'sí', 'yes', 'on', 'enabled'], true);
+}
+
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
 if ($method === 'GET') {
     try {
-        $stmt = $pdo->prepare('SELECT valor FROM configuracion_sistema WHERE clave = ? LIMIT 1');
-        $stmt->execute(['chatbot_habilitado']);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        $valorDb = ($row && array_key_exists('valor', $row)) ? $row['valor'] : null;
-        $enabled = interpretar_chatbot_habilitado($valorDb);
-        echo json_encode(['success' => true, 'data' => ['chatbot_habilitado' => $enabled]]);
+        $stmt = $pdo->prepare("SELECT clave, valor FROM configuracion_sistema WHERE clave IN ('chatbot_habilitado', 'mantenimiento_activo')");
+        $stmt->execute();
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $map = [];
+        foreach ($rows as $r) {
+            if (!isset($r['clave'])) {
+                continue;
+            }
+            $map[(string) $r['clave']] = isset($r['valor']) ? (string) $r['valor'] : null;
+        }
+        echo json_encode([
+            'success' => true,
+            'data' => [
+                'chatbot_habilitado' => interpretar_chatbot_habilitado($map['chatbot_habilitado'] ?? null),
+                'mantenimiento_activo' => interpretar_mantenimiento_activo($map['mantenimiento_activo'] ?? null),
+            ]
+        ]);
     } catch (PDOException $e) {
         error_log('configuracion_sistema GET: ' . $e->getMessage());
-        echo json_encode(['success' => true, 'data' => ['chatbot_habilitado' => true]]);
+        echo json_encode([
+            'success' => true,
+            'data' => [
+                'chatbot_habilitado' => true,
+                'mantenimiento_activo' => false,
+            ]
+        ]);
     }
     exit;
 }
@@ -52,23 +78,37 @@ if ($method === 'POST') {
     if (!is_array($raw)) {
         $raw = $_POST;
     }
-    if (!array_key_exists('chatbot_habilitado', $raw)) {
-        echo json_encode(['success' => false, 'message' => 'Falta el campo chatbot_habilitado']);
+    $camposValidos = ['chatbot_habilitado', 'mantenimiento_activo'];
+    $camposRecibidos = array_intersect($camposValidos, array_keys($raw));
+    if (count($camposRecibidos) === 0) {
+        echo json_encode(['success' => false, 'message' => 'Falta al menos uno de los campos: chatbot_habilitado o mantenimiento_activo']);
         exit;
     }
-    $hab = $raw['chatbot_habilitado'];
-    $activo = ($hab === true || $hab === 1 || $hab === '1' || $hab === 'true' || $hab === 'on' || $hab === 'yes');
-    $val = $activo ? '1' : '0';
     try {
-        $stmt = $pdo->prepare(
-            'INSERT INTO configuracion_sistema (clave, valor) VALUES (?, ?)
-             ON DUPLICATE KEY UPDATE valor = VALUES(valor)'
-        );
-        $stmt->execute(['chatbot_habilitado', $val]);
+        $stmt = $pdo->prepare('INSERT INTO configuracion_sistema (clave, valor) VALUES (?, ?) ON DUPLICATE KEY UPDATE valor = VALUES(valor)');
+        $responseData = [];
+        $mensajes = [];
+
+        if (array_key_exists('chatbot_habilitado', $raw)) {
+            $hab = $raw['chatbot_habilitado'];
+            $activo = ($hab === true || $hab === 1 || $hab === '1' || $hab === 'true' || $hab === 'on' || $hab === 'yes');
+            $stmt->execute(['chatbot_habilitado', $activo ? '1' : '0']);
+            $responseData['chatbot_habilitado'] = $activo;
+            $mensajes[] = $activo ? 'Asistente de IA habilitado.' : 'Asistente de IA deshabilitado.';
+        }
+
+        if (array_key_exists('mantenimiento_activo', $raw)) {
+            $man = $raw['mantenimiento_activo'];
+            $mantenimientoActivo = ($man === true || $man === 1 || $man === '1' || $man === 'true' || $man === 'on' || $man === 'yes');
+            $stmt->execute(['mantenimiento_activo', $mantenimientoActivo ? '1' : '0']);
+            $responseData['mantenimiento_activo'] = $mantenimientoActivo;
+            $mensajes[] = $mantenimientoActivo ? 'Modo mantenimiento activado.' : 'Modo mantenimiento desactivado.';
+        }
+
         echo json_encode([
             'success' => true,
-            'message' => $activo ? 'Asistente de IA habilitado.' : 'Asistente de IA deshabilitado.',
-            'data' => ['chatbot_habilitado' => $activo],
+            'message' => implode(' ', $mensajes),
+            'data' => $responseData,
         ]);
     } catch (PDOException $e) {
         error_log('configuracion_sistema POST: ' . $e->getMessage());

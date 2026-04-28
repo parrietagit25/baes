@@ -2,6 +2,16 @@
 /**
  * Validación de acceso por roles
  */
+require_once __DIR__ . '/configuracion_sistema_helper.php';
+
+if (motus_mantenimiento_activo()) {
+    $userRolesMantenimiento = $_SESSION['user_roles'] ?? [];
+    $esAdminMantenimiento = in_array('ROLE_ADMIN', $userRolesMantenimiento, true);
+    if (!$esAdminMantenimiento) {
+        motus_emitir_mantenimiento_html();
+        exit();
+    }
+}
 
 // Verificar si el usuario está logueado
 if (!isset($_SESSION['user_id'])) {

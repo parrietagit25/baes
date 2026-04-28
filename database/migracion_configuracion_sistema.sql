@@ -8,3 +8,6 @@ CREATE TABLE IF NOT EXISTS `configuracion_sistema` (
 
 INSERT INTO `configuracion_sistema` (`clave`, `valor`) VALUES ('chatbot_habilitado', '1')
 ON DUPLICATE KEY UPDATE `clave` = `clave`;
+
+INSERT INTO `configuracion_sistema` (`clave`, `valor`) VALUES ('mantenimiento_activo', '0')
+ON DUPLICATE KEY UPDATE `clave` = `clave`;

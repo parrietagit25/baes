@@ -10,6 +10,7 @@ require_once __DIR__ . '/includes/validar_acceso.php';
 require_once __DIR__ . '/includes/configuracion_sistema_helper.php';
 
 $chatbotActual = motus_chatbot_habilitado();
+$mantenimientoActual = motus_mantenimiento_activo();
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -45,6 +46,26 @@ $chatbotActual = motus_chatbot_habilitado();
 
                 <div class="card mb-4">
                     <div class="card-body">
+                        <h5 class="card-title"><i class="fas fa-tools me-2 text-warning"></i>Modo mantenimiento</h5>
+                        <p class="card-text text-muted small">
+                            Bloquea el acceso al sistema para usuarios no administradores y también al formulario público.
+                            Se mostrará un mensaje indicando que el sistema está en actualización.
+                        </p>
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" role="switch" id="switchMantenimientoActivo" <?php echo $mantenimientoActual ? 'checked' : ''; ?> style="width: 3rem; height: 1.5rem;">
+                            <label class="form-check-label ms-2" for="switchMantenimientoActivo" id="labelMantenimientoEstado">
+                                <?php echo $mantenimientoActual ? 'Mantenimiento activado' : 'Mantenimiento desactivado'; ?>
+                            </label>
+                        </div>
+                        <button type="button" class="btn btn-warning" id="btnGuardarMantenimiento">
+                            <i class="fas fa-save me-1"></i>Guardar mantenimiento
+                        </button>
+                        <span class="ms-2 small text-muted" id="msgGuardarMantenimiento"></span>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-body">
                         <h5 class="card-title"><i class="fas fa-robot me-2 text-info"></i>Asistente de IA (chat)</h5>
                         <p class="card-text text-muted small">
                             Controla la burbuja de chat y las llamadas por voz del asistente en todas las pantallas del panel.
@@ -70,6 +91,36 @@ $chatbotActual = motus_chatbot_habilitado();
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script>
 (function () {
+    var $swMant = $('#switchMantenimientoActivo');
+    var $lblMant = $('#labelMantenimientoEstado');
+    $swMant.on('change', function () {
+        $lblMant.text($swMant.is(':checked') ? 'Mantenimiento activado' : 'Mantenimiento desactivado');
+    });
+    $('#btnGuardarMantenimiento').on('click', function () {
+        var $msg = $('#msgGuardarMantenimiento');
+        $msg.removeClass('text-danger text-success').text('Guardando…');
+        $.ajax({
+            url: 'api/configuracion_sistema.php',
+            type: 'POST',
+            contentType: 'application/json; charset=UTF-8',
+            data: JSON.stringify({ mantenimiento_activo: $swMant.is(':checked') }),
+            dataType: 'json'
+        }).done(function (r) {
+            if (r.success) {
+                $msg.removeClass('text-danger').addClass('text-success').text(r.message || 'Guardado.');
+            } else {
+                $msg.removeClass('text-success').addClass('text-danger').text(r.message || 'Error');
+            }
+        }).fail(function (xhr) {
+            var m = 'Error de conexión';
+            try {
+                var j = JSON.parse(xhr.responseText);
+                if (j.message) m = j.message;
+            } catch (e) { /* ignore */ }
+            $msg.removeClass('text-success').addClass('text-danger').text(m);
+        });
+    });
+
     var $sw = $('#switchChatbotHabilitado');
     var $lbl = $('#labelChatbotEstado');
     $sw.on('change', function () {

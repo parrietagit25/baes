@@ -3,8 +3,14 @@
  * Encuesta pública: formulario público (vendedores). No requiere inicio de sesión.
  */
 require_once __DIR__ . '/config/database.php';
+require_once __DIR__ . '/includes/configuracion_sistema_helper.php';
 require_once __DIR__ . '/includes/encuestas_satisfaccion_data.php';
 require_once __DIR__ . '/includes/encuestas_satisfaccion_guardar.php';
+
+if (motus_mantenimiento_activo()) {
+    motus_emitir_mantenimiento_html();
+    exit();
+}
 
 $mensajeExito = false;
 $error = null;

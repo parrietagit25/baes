@@ -1,5 +1,11 @@
 <?php
 session_start();
+require_once __DIR__ . '/includes/configuracion_sistema_helper.php';
+
+if (motus_mantenimiento_activo()) {
+    motus_emitir_mantenimiento_html();
+    exit();
+}
 
 // Verificar si el usuario ya está logueado
 if (isset($_SESSION['user_id'])) {

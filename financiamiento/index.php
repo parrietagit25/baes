@@ -4,6 +4,13 @@
  * Acceso sin login. Si se accede con ?e=EMAIL_CODIFICADO, al enviar se envía por correo el PDF a ese email.
  */
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/../includes/configuracion_sistema_helper.php';
+
+if (motus_mantenimiento_activo()) {
+    motus_emitir_mantenimiento_html();
+    exit();
+}
+
 $tokenLink = isset($_GET['e']) ? trim($_GET['e']) : '';
 $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== '' ? FINANCIAMIENTO_API_URL : '';
 ?>
