@@ -20,6 +20,56 @@ function getApiUrl(): string {
     return $scheme . '://' . $host . $base . '/api/solicitud_publica.php';
 }
 
+/**
+ * Candidatos para llamar la API evitando Cloudflare cuando sea posible.
+ *
+ * @return string[]
+ */
+function getApiUrlCandidates(?string $selected = null): array {
+    $out = [];
+    $baseSelected = trim((string)$selected);
+    if ($baseSelected !== '') {
+        $out[] = $baseSelected;
+    } else {
+        $out[] = getApiUrl();
+    }
+
+    $scriptName = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? '/financiamiento/debug_adjuntos_publico.php');
+    $dir = rtrim(dirname($scriptName), '/');
+    $base = preg_replace('#/financiamiento$#', '', $dir) ?: '';
+    $path = $base . '/api/solicitud_publica.php';
+
+    $loopbacks = [
+        'http://127.0.0.1' . $path,
+        'http://localhost' . $path,
+    ];
+    $serverAddr = trim((string)($_SERVER['SERVER_ADDR'] ?? ''));
+    if ($serverAddr !== '' && filter_var($serverAddr, FILTER_VALIDATE_IP)) {
+        $loopbacks[] = 'http://' . $serverAddr . $path;
+    }
+    foreach ($loopbacks as $u) {
+        $out[] = $u;
+    }
+
+    $uniq = [];
+    $final = [];
+    foreach ($out as $u) {
+        $k = strtolower(trim($u));
+        if ($k === '' || isset($uniq[$k])) continue;
+        $uniq[$k] = true;
+        $final[] = trim($u);
+    }
+    return $final;
+}
+
+function looksLikeCloudflareChallenge(string $body): bool {
+    $b = strtolower($body);
+    return strpos($b, 'just a moment') !== false
+        || strpos($b, 'challenges.cloudflare.com') !== false
+        || strpos($b, '__cf_chl') !== false
+        || strpos($b, 'enable javascript and cookies to continue') !== false;
+}
+
 function normalizeUploadRows(string $field): array {
     if (!isset($_FILES[$field]) || !is_array($_FILES[$field])) {
         return [];
@@ -218,41 +268,67 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $apiErr = null;
     $apiJson = null;
     $sentFileNames = [];
+    $apiTriedUrls = [];
+    $apiFinalUrl = $apiUrl;
 
     if (function_exists('curl_init')) {
-        $postFields = [
-            'payload' => json_encode($payload, JSON_UNESCAPED_UNICODE),
-        ];
-        foreach ($uploadRows as $idx => $row) {
-            if ($row['error'] !== UPLOAD_ERR_OK || !is_file($row['tmp_name'])) {
-                continue;
+        $apiCandidates = getApiUrlCandidates($apiUrl);
+        foreach ($apiCandidates as $tryUrl) {
+            $apiTriedUrls[] = $tryUrl;
+            $postFields = [
+                'payload' => json_encode($payload, JSON_UNESCAPED_UNICODE),
+            ];
+            foreach ($uploadRows as $idx => $row) {
+                if ($row['error'] !== UPLOAD_ERR_OK || !is_file($row['tmp_name'])) {
+                    continue;
+                }
+                $postFields['adjuntos_extra[' . $idx . ']'] = curl_file_create(
+                    $row['tmp_name'],
+                    $row['type'] ?: 'application/octet-stream',
+                    $row['name'] ?: ('debug_' . $idx)
+                );
+                $sentFileNames[] = $row['name'];
             }
-            $postFields['adjuntos_extra[' . $idx . ']'] = curl_file_create(
-                $row['tmp_name'],
-                $row['type'] ?: 'application/octet-stream',
-                $row['name'] ?: ('debug_' . $idx)
-            );
-            $sentFileNames[] = $row['name'];
-        }
 
-        $ch = curl_init();
-        curl_setopt_array($ch, [
-            CURLOPT_URL => $apiUrl,
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => $postFields,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_HEADER => false,
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_TIMEOUT => 60,
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_SSL_VERIFYHOST => 0,
-        ]);
-        $apiRaw = (string)curl_exec($ch);
-        $apiHttpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        if ($apiRaw === '' && curl_errno($ch)) {
-            $apiErr = 'cURL error #' . curl_errno($ch) . ': ' . curl_error($ch);
+            $ua = trim((string)($_SERVER['HTTP_USER_AGENT'] ?? 'DebugAdjuntos/1.0'));
+            $cookie = trim((string)($_SERVER['HTTP_COOKIE'] ?? ''));
+            $headers = [
+                'Accept: application/json, text/plain, */*',
+                'User-Agent: ' . ($ua !== '' ? $ua : 'DebugAdjuntos/1.0'),
+            ];
+            if ($cookie !== '') {
+                $headers[] = 'Cookie: ' . $cookie;
+            }
+
+            $ch = curl_init();
+            curl_setopt_array($ch, [
+                CURLOPT_URL => $tryUrl,
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => $postFields,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_HEADER => false,
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_TIMEOUT => 60,
+                CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_SSL_VERIFYHOST => 0,
+                CURLOPT_HTTPHEADER => $headers,
+            ]);
+            $apiRaw = (string)curl_exec($ch);
+            $apiHttpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $apiFinalUrl = $tryUrl;
+            if ($apiRaw === '' && curl_errno($ch)) {
+                $apiErr = 'cURL error #' . curl_errno($ch) . ': ' . curl_error($ch);
+            } else {
+                $apiErr = null;
+            }
+            curl_close($ch);
+
+            $blockedByCf = ($apiHttpCode === 403 && looksLikeCloudflareChallenge($apiRaw));
+            $okHttp = ($apiHttpCode >= 200 && $apiHttpCode < 300);
+            if ($okHttp || !$blockedByCf) {
+                break;
+            }
         }
-        curl_close($ch);
     } else {
         $apiErr = 'cURL no disponible en PHP.';
     }
@@ -273,6 +349,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'cliente_correo' => $payload['cliente_correo'],
         ],
         'diag' => $diag,
+        'api_tried_urls' => $apiTriedUrls,
+        'api_final_url' => $apiFinalUrl,
         'sent_files' => $sentFileNames,
         'api_http_code' => $apiHttpCode,
         'api_error' => $apiErr,
