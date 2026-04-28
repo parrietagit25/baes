@@ -139,6 +139,8 @@ function sol_fin_fr_select_cols(PDO $pdo, string $alias = 'fr'): string {
     $cols = [
         'id',
         'fecha_creacion',
+        'nombre_gestor',
+        'email_vendedor',
         'cliente_nombre',
         'cliente_id',
         'cliente_correo',
@@ -177,22 +179,6 @@ function sol_fin_sql_adjuntos_count(PDO $pdo, string $frIdRef): string {
     if ($tieneFrSolCred) {
         $condiciones[] = "a.solicitud_id = (SELECT frc.solicitud_credito_id FROM financiamiento_registros frc WHERE frc.id = {$frIdRef} AND frc.solicitud_credito_id IS NOT NULL)";
     }
-
-    // Heurística de respaldo para instalaciones sin columnas de vínculo o con datos históricos.
-    // No depende del marcador en comentarios (puede truncarse en algunas instalaciones).
-    $condiciones[] = "a.solicitud_id IN (
-        SELECT sc.id
-        FROM solicitudes_credito sc
-        LEFT JOIN financiamiento_registros frx ON frx.id = {$frIdRef}
-        WHERE frx.cliente_id IS NOT NULL AND frx.cliente_id <> ''
-          AND REPLACE(REPLACE(UPPER(COALESCE(sc.cedula,'')),'-',''),' ','') =
-              REPLACE(REPLACE(UPPER(COALESCE(frx.cliente_id,'')),'-',''),' ','')
-          AND (
-                frx.fecha_creacion IS NULL
-                OR sc.fecha_creacion IS NULL
-                OR ABS(TIMESTAMPDIFF(DAY, sc.fecha_creacion, frx.fecha_creacion)) <= 30
-          )
-    )";
 
     if (!$condiciones) {
         return "0";
@@ -243,28 +229,6 @@ function sol_fin_obtener_adjuntos_por_registro(PDO $pdo, int $frId): array {
         $orConds[] = "s.id = ?";
         $params[] = (int)$fr['solicitud_credito_id'];
     }
-    if (!empty($fr['cliente_id'])) {
-        $fallback = "
-            s.id IN (
-                SELECT sc2.id
-                FROM solicitudes_credito sc2
-                INNER JOIN financiamiento_registros fr2 ON fr2.id = ?
-                WHERE REPLACE(REPLACE(UPPER(COALESCE(sc2.cedula,'')),'-',''),' ','') =
-                      REPLACE(REPLACE(UPPER(COALESCE(?,'')),'-',''),' ','')
-        ";
-        $params[] = $frId;
-        $params[] = (string)$fr['cliente_id'];
-        $fallback .= "
-                AND (
-                    fr2.fecha_creacion IS NULL
-                    OR sc2.fecha_creacion IS NULL
-                    OR ABS(TIMESTAMPDIFF(DAY, sc2.fecha_creacion, fr2.fecha_creacion)) <= 30
-                )
-        ";
-        $fallback .= ")";
-        $orConds[] = $fallback;
-    }
-
     $rows = [];
     if ($orConds) {
         $sql = "

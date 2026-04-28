@@ -592,7 +592,9 @@ function cargarClientesFinanciamientoSelect() {
             if (isNaN(nAdj) || nAdj < 0) {
                 nAdj = 0;
             }
-            var texto = [item.cliente_nombre, item.cliente_id, item.cliente_correo].filter(Boolean).join(' — ')
+            var vendedor = item.nombre_gestor || item.email_vendedor || '';
+            var cliente = [item.cliente_nombre, item.cliente_id, item.cliente_correo].filter(Boolean).join(' — ');
+            var texto = [vendedor ? ('Vendedor: ' + vendedor) : '', cliente].filter(Boolean).join(' | ')
                 + ' — adjuntos (' + nAdj + ')';
             $sel.append($('<option></option>').val(String(item.id)).text(texto));
         });
