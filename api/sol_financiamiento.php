@@ -103,6 +103,65 @@ function sol_fin_tiene_tabla_adjuntos_fin_reg(PDO $pdo): bool {
 }
 
 /**
+ * Verifica si existe una columna en financiamiento_registros.
+ */
+function sol_fin_fr_tiene_columna(PDO $pdo, string $col): bool {
+    static $cache = [];
+    if (array_key_exists($col, $cache)) {
+        return $cache[$col];
+    }
+    try {
+        $db = $pdo->query('SELECT DATABASE()')->fetchColumn();
+        if (!$db) {
+            $cache[$col] = false;
+            return false;
+        }
+        $s = $pdo->prepare("
+            SELECT COUNT(*)
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = ?
+              AND TABLE_NAME = 'financiamiento_registros'
+              AND COLUMN_NAME = ?
+        ");
+        $s->execute([$db, $col]);
+        $cache[$col] = ((int)$s->fetchColumn()) > 0;
+    } catch (Throwable $e) {
+        $cache[$col] = false;
+    }
+    return $cache[$col];
+}
+
+/**
+ * Devuelve SELECT robusto para columnas esperadas en financiamiento_registros.
+ * Si una columna no existe, devuelve NULL AS columna para evitar 500.
+ */
+function sol_fin_fr_select_cols(PDO $pdo, string $alias = 'fr'): string {
+    $cols = [
+        'id',
+        'fecha_creacion',
+        'cliente_nombre',
+        'cliente_id',
+        'cliente_correo',
+        'celular_cliente',
+        'empresa_nombre',
+        'empresa_salario',
+        'marca_auto',
+        'modelo_auto',
+        'anio_auto',
+        'precio_venta',
+    ];
+    $parts = [];
+    foreach ($cols as $c) {
+        if (sol_fin_fr_tiene_columna($pdo, $c)) {
+            $parts[] = "{$alias}.{$c}";
+        } else {
+            $parts[] = "NULL AS {$c}";
+        }
+    }
+    return implode(", ", $parts);
+}
+
+/**
  * Expresión SQL correlacionada: cantidad de adjuntos vinculados al registro fr.
  * Evita IN(SELECT … UNION …) (puede fallar o comportarse distinto según versión MySQL/MariaDB).
  */
@@ -300,10 +359,11 @@ try {
     if (isset($_GET['busqueda']) && trim((string)$_GET['busqueda']) !== '') {
         $term = '%' . trim($_GET['busqueda']) . '%';
         $rows = [];
+        $frCols = sol_fin_fr_select_cols($pdo, 'fr');
         try {
             $adjCount = sol_fin_sql_adjuntos_count($pdo, 'fr.id');
             $stmt = $pdo->prepare("
-                SELECT fr.id, fr.cliente_nombre, fr.cliente_id, fr.cliente_correo, fr.celular_cliente,
+                SELECT {$frCols},
                        {$adjCount} AS adjuntos_count
                 FROM financiamiento_registros fr
                 WHERE fr.cliente_nombre LIKE ? OR fr.cliente_id LIKE ? OR fr.cliente_correo LIKE ? OR fr.celular_cliente LIKE ?
@@ -315,7 +375,7 @@ try {
         } catch (PDOException $e) {
             error_log('sol_financiamiento busqueda (sin conteo adjuntos): ' . $e->getMessage());
             $stmt = $pdo->prepare("
-                SELECT fr.id, fr.cliente_nombre, fr.cliente_id, fr.cliente_correo, fr.celular_cliente
+                SELECT {$frCols}
                 FROM financiamiento_registros fr
                 WHERE fr.cliente_nombre LIKE ? OR fr.cliente_id LIKE ? OR fr.cliente_correo LIKE ? OR fr.celular_cliente LIKE ?
                 ORDER BY fr.fecha_creacion DESC
@@ -333,12 +393,12 @@ try {
         ? (int) $_GET['solicitud_id'] : 0;
 
     $rows = [];
+    $frCols = sol_fin_fr_select_cols($pdo, 'fr');
     if ($limite > 0) {
         $limiteSql = min($limite, 1000);
         $adjCount = sol_fin_sql_adjuntos_count($pdo, 'fr.id');
         $sqlFiltrado = "
-            SELECT fr.id, fr.fecha_creacion, fr.cliente_nombre, fr.cliente_id, fr.cliente_correo, fr.celular_cliente,
-                   fr.empresa_nombre, fr.empresa_salario, fr.marca_auto, fr.modelo_auto, fr.anio_auto, fr.precio_venta,
+            SELECT {$frCols},
                    {$adjCount} AS adjuntos_count
             FROM financiamiento_registros fr
             WHERE NOT EXISTS (
@@ -360,8 +420,7 @@ try {
             try {
                 $adjCountFb = sol_fin_sql_adjuntos_count($pdo, 'fr.id');
                 $sqlSimple = "
-                    SELECT fr.id, fr.fecha_creacion, fr.cliente_nombre, fr.cliente_id, fr.cliente_correo, fr.celular_cliente,
-                           fr.empresa_nombre, fr.empresa_salario, fr.marca_auto, fr.modelo_auto, fr.anio_auto, fr.precio_venta,
+                    SELECT {$frCols},
                            {$adjCountFb} AS adjuntos_count
                     FROM financiamiento_registros fr
                     ORDER BY fr.fecha_creacion DESC
@@ -372,8 +431,7 @@ try {
             } catch (PDOException $e2) {
                 error_log('sol_financiamiento listado (sin conteo adjuntos): ' . $e2->getMessage());
                 $sqlPlain = "
-                    SELECT fr.id, fr.fecha_creacion, fr.cliente_nombre, fr.cliente_id, fr.cliente_correo, fr.celular_cliente,
-                           fr.empresa_nombre, fr.empresa_salario, fr.marca_auto, fr.modelo_auto, fr.anio_auto, fr.precio_venta
+                    SELECT {$frCols}
                     FROM financiamiento_registros fr
                     ORDER BY fr.fecha_creacion DESC
                     LIMIT {$limiteSql}
@@ -386,8 +444,7 @@ try {
         try {
             $adjCountAll = sol_fin_sql_adjuntos_count($pdo, 'fr.id');
             $sql = "
-                SELECT fr.id, fr.fecha_creacion, fr.cliente_nombre, fr.cliente_id, fr.cliente_correo, fr.celular_cliente,
-                       fr.empresa_nombre, fr.empresa_salario, fr.marca_auto, fr.modelo_auto, fr.anio_auto, fr.precio_venta,
+                SELECT {$frCols},
                        {$adjCountAll} AS adjuntos_count
                 FROM financiamiento_registros fr
                 ORDER BY fr.fecha_creacion DESC
@@ -397,8 +454,7 @@ try {
         } catch (PDOException $e) {
             error_log('sol_financiamiento listado completo (sin conteo adjuntos): ' . $e->getMessage());
             $sql = "
-                SELECT fr.id, fr.fecha_creacion, fr.cliente_nombre, fr.cliente_id, fr.cliente_correo, fr.celular_cliente,
-                       fr.empresa_nombre, fr.empresa_salario, fr.marca_auto, fr.modelo_auto, fr.anio_auto, fr.precio_venta
+                SELECT {$frCols}
                 FROM financiamiento_registros fr
                 ORDER BY fr.fecha_creacion DESC
             ";

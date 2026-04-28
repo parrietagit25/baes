@@ -21,6 +21,24 @@ if (!in_array('ROLE_ADMIN', $_SESSION['user_roles'] ?? [], true)) {
 
 require_once __DIR__ . '/../config/database.php';
 
+function asegurar_tabla_configuracion_sistema(PDO $pdo): void
+{
+    $sqlTabla = "CREATE TABLE IF NOT EXISTS configuracion_sistema (
+        clave varchar(64) NOT NULL,
+        valor text NOT NULL,
+        actualizado_en timestamp NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (clave)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+    $pdo->exec($sqlTabla);
+
+    $stmt = $pdo->prepare(
+        'INSERT INTO configuracion_sistema (clave, valor) VALUES (?, ?)
+         ON DUPLICATE KEY UPDATE clave = clave'
+    );
+    $stmt->execute(['chatbot_habilitado', '1']);
+    $stmt->execute(['mantenimiento_activo', '0']);
+}
+
 function interpretar_chatbot_habilitado(?string $valorDb): bool
 {
     if ($valorDb === null) {
@@ -43,6 +61,7 @@ $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
 if ($method === 'GET') {
     try {
+        asegurar_tabla_configuracion_sistema($pdo);
         $stmt = $pdo->prepare("SELECT clave, valor FROM configuracion_sistema WHERE clave IN ('chatbot_habilitado', 'mantenimiento_activo')");
         $stmt->execute();
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
@@ -85,6 +104,7 @@ if ($method === 'POST') {
         exit;
     }
     try {
+        asegurar_tabla_configuracion_sistema($pdo);
         $stmt = $pdo->prepare('INSERT INTO configuracion_sistema (clave, valor) VALUES (?, ?) ON DUPLICATE KEY UPDATE valor = VALUES(valor)');
         $responseData = [];
         $mensajes = [];
