@@ -279,5 +279,77 @@ function copiarAdjuntosDesdeRegistroFinanciamiento(PDO $pdo, int $finRegistroId,
         $total += copiarAdjuntosEntreSolicitudes($pdo, $oid, $nuevaSolicitudId, $usuarioId);
     }
 
+    // Copiar también adjuntos guardados directamente en el registro de financiamiento (si existe tabla).
+    try {
+        $dbName = $pdo->query('SELECT DATABASE()')->fetchColumn();
+        if ($dbName) {
+            $stTbl = $pdo->prepare("
+                SELECT COUNT(*)
+                FROM INFORMATION_SCHEMA.TABLES
+                WHERE TABLE_SCHEMA = ?
+                  AND TABLE_NAME = 'adjuntos_financiamiento_registros'
+            ");
+            $stTbl->execute([$dbName]);
+            $hasTbl = ((int)$stTbl->fetchColumn()) > 0;
+            if ($hasTbl) {
+                $st = $pdo->prepare("
+                    SELECT nombre_original, ruta_archivo, tipo_archivo, descripcion, fecha_subida
+                    FROM adjuntos_financiamiento_registros
+                    WHERE financiamiento_registro_id = ?
+                    ORDER BY fecha_subida ASC, id ASC
+                ");
+                $st->execute([$finRegistroId]);
+                $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+                if ($rows) {
+                    $root = realpath(__DIR__ . '/..') ?: (__DIR__ . '/..');
+                    $dirRel = 'adjuntos/solicitudes/';
+                    $dirAbs = $root . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $dirRel);
+                    if (!is_dir($dirAbs)) {
+                        @mkdir($dirAbs, 0755, true);
+                    }
+                    $tamCol = adjuntos_solicitud_tamano_columna($pdo);
+                    foreach ($rows as $row) {
+                        $rutaRel = (string)($row['ruta_archivo'] ?? '');
+                        if ($rutaRel === '') continue;
+                        $srcAbs = $root . DIRECTORY_SEPARATOR . str_replace(['/', '\\'], DIRECTORY_SEPARATOR, ltrim($rutaRel, '/\\'));
+                        if (!is_file($srcAbs)) continue;
+                        $nombreOriginal = (string)($row['nombre_original'] ?? 'adjunto');
+                        $ext = pathinfo($nombreOriginal, PATHINFO_EXTENSION);
+                        $ext = $ext !== '' ? ('.' . preg_replace('/[^a-zA-Z0-9]/', '', $ext)) : '';
+                        $nombreArchivo = 'fr_' . uniqid('', true) . '_' . time() . $ext;
+                        $destAbs = rtrim($dirAbs, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $nombreArchivo;
+                        if (!@copy($srcAbs, $destAbs)) continue;
+                        $rutaDb = $dirRel . $nombreArchivo;
+                        $mime = (string)($row['tipo_archivo'] ?? 'application/octet-stream');
+                        $size = (int)(@filesize($destAbs) ?: 0);
+                        $desc = isset($row['descripcion']) && $row['descripcion'] !== '' ? (string)$row['descripcion'] : null;
+                        try {
+                            if ($tamCol) {
+                                $ins = $pdo->prepare("
+                                    INSERT INTO adjuntos_solicitud
+                                    (solicitud_id, usuario_id, nombre_archivo, nombre_original, ruta_archivo, tipo_archivo, `$tamCol`, descripcion)
+                                    VALUES (?,?,?,?,?,?,?,?)
+                                ");
+                                $ins->execute([$nuevaSolicitudId, $usuarioId, $nombreArchivo, $nombreOriginal, $rutaDb, $mime, $size, $desc]);
+                            } else {
+                                $ins = $pdo->prepare("
+                                    INSERT INTO adjuntos_solicitud
+                                    (solicitud_id, usuario_id, nombre_archivo, nombre_original, ruta_archivo, tipo_archivo, descripcion)
+                                    VALUES (?,?,?,?,?,?,?)
+                                ");
+                                $ins->execute([$nuevaSolicitudId, $usuarioId, $nombreArchivo, $nombreOriginal, $rutaDb, $mime, $desc]);
+                            }
+                            $total++;
+                        } catch (Throwable $e) {
+                            @unlink($destAbs);
+                        }
+                    }
+                }
+            }
+        }
+    } catch (Throwable $e) {
+        error_log('copiarAdjuntosDesdeRegistroFinanciamiento (adjuntos_fin_reg): ' . $e->getMessage());
+    }
+
     return $total;
 }

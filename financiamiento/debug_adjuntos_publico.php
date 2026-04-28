@@ -118,6 +118,9 @@ function findAdjuntosByMarker(string $markerCedula): array {
     $res = [
         'ok' => false,
         'error' => null,
+        'adjuntos_financiamiento_registros_table' => 'unknown',
+        'adjuntos_financiamiento_registros' => [],
+        'financiamiento_registros' => [],
         'solicitudes' => [],
         'adjuntos' => [],
     ];
@@ -132,6 +135,44 @@ function findAdjuntosByMarker(string $markerCedula): array {
             $res['error'] = 'No se pudo obtener PDO desde config/database.php';
             return $res;
         }
+        $dbName = $pdo->query('SELECT DATABASE()')->fetchColumn();
+        if ($dbName) {
+            $stTbl = $pdo->prepare("
+                SELECT COUNT(*)
+                FROM INFORMATION_SCHEMA.TABLES
+                WHERE TABLE_SCHEMA = ?
+                  AND TABLE_NAME = 'adjuntos_financiamiento_registros'
+            ");
+            $stTbl->execute([$dbName]);
+            $res['adjuntos_financiamiento_registros_table'] = ((int)$stTbl->fetchColumn() > 0) ? 'exists' : 'missing';
+        }
+
+        $stmtFr = $pdo->prepare("
+            SELECT id, fecha_creacion, cliente_nombre, cliente_id, cliente_correo, solicitud_credito_id
+            FROM financiamiento_registros
+            WHERE REPLACE(REPLACE(UPPER(COALESCE(cliente_id,'')),'-',''),' ','') = REPLACE(REPLACE(UPPER(?),'-',''),' ','')
+            ORDER BY id DESC
+            LIMIT 5
+        ");
+        $stmtFr->execute([$markerCedula]);
+        $res['financiamiento_registros'] = $stmtFr->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        if (!empty($res['financiamiento_registros']) && $res['adjuntos_financiamiento_registros_table'] === 'exists') {
+            $frIds = array_map(static function($r){ return (int)($r['id'] ?? 0); }, $res['financiamiento_registros']);
+            $frIds = array_values(array_filter($frIds, static function($x){ return $x > 0; }));
+            if ($frIds) {
+                $ph = implode(',', array_fill(0, count($frIds), '?'));
+                $stAfr = $pdo->prepare("
+                    SELECT id, financiamiento_registro_id, nombre_original, ruta_archivo, tipo_archivo, fecha_subida
+                    FROM adjuntos_financiamiento_registros
+                    WHERE financiamiento_registro_id IN ($ph)
+                    ORDER BY id DESC
+                    LIMIT 50
+                ");
+                $stAfr->execute($frIds);
+                $res['adjuntos_financiamiento_registros'] = $stAfr->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            }
+        }
+
         $stmt = $pdo->prepare("
             SELECT id, fecha_creacion, nombre_cliente, cedula, email
             FROM solicitudes_credito
@@ -276,6 +317,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (function_exists('curl_init')) {
         $apiCandidates = getApiUrlCandidates($apiUrl);
+        foreach ($uploadRows as $row) {
+            if ((int)($row['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK && !empty($row['name'])) {
+                $sentFileNames[] = (string)$row['name'];
+            }
+        }
         foreach ($apiCandidates as $tryUrl) {
             $apiTriedUrls[] = $tryUrl;
             $postFields = [
@@ -290,7 +336,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $row['type'] ?: 'application/octet-stream',
                     $row['name'] ?: ('debug_' . $idx)
                 );
-                $sentFileNames[] = $row['name'];
             }
 
             $ua = trim((string)($_SERVER['HTTP_USER_AGENT'] ?? 'DebugAdjuntos/1.0'));

@@ -548,6 +548,126 @@ function solPub_materialize_adjuntos_temporales_para_correo(?string $cedulaDataU
 }
 
 /**
+ * Guarda adjuntos del formulario público vinculados al registro de financiamiento.
+ * Se usan para visualización en Sol Financiamiento y para copiar a solicitud de crédito.
+ *
+ * @return string[] rutas absolutas guardadas (útiles para correo)
+ */
+function solPub_guardar_adjuntos_financiamiento_registro(PDO $pdo, int $finRegistroId, ?string $cedulaDataUrl): array {
+    if ($finRegistroId <= 0) {
+        return [];
+    }
+    try {
+        $dbName = $pdo->query('SELECT DATABASE()')->fetchColumn();
+        if (!$dbName) {
+            return [];
+        }
+        $st = $pdo->prepare("
+            SELECT COUNT(*)
+            FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_SCHEMA = ?
+              AND TABLE_NAME = 'adjuntos_financiamiento_registros'
+        ");
+        $st->execute([$dbName]);
+        if ((int)$st->fetchColumn() <= 0) {
+            return [];
+        }
+    } catch (Throwable $e) {
+        return [];
+    }
+
+    $root = realpath(__DIR__ . '/..') ?: (__DIR__ . '/..');
+    $dirRel = 'adjuntos/solicitudes/';
+    $dirAbs = $root . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $dirRel);
+    if (!is_dir($dirAbs)) {
+        @mkdir($dirAbs, 0755, true);
+    }
+
+    $allowed = solPub_allowed_mime_list();
+    $pathsOut = [];
+    $insertRow = function(
+        PDO $pdo,
+        int $finRegistroId,
+        string $nombreArchivo,
+        string $nombreOriginal,
+        string $rutaDb,
+        string $mime,
+        int $size,
+        ?string $descripcion
+    ): void {
+        $stmt = $pdo->prepare("
+            INSERT INTO adjuntos_financiamiento_registros
+            (financiamiento_registro_id, nombre_archivo, nombre_original, ruta_archivo, tipo_archivo, tamano_archivo, descripcion)
+            VALUES (?,?,?,?,?,?,?)
+        ");
+        $stmt->execute([$finRegistroId, $nombreArchivo, $nombreOriginal, $rutaDb, $mime, $size, $descripcion !== '' ? $descripcion : null]);
+    };
+
+    $cedAbs = solPub_save_cedula_from_data_url($cedulaDataUrl, rtrim($dirAbs, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'finreg_' . $finRegistroId . '_cedula_' . uniqid('', true));
+    if ($cedAbs !== null && is_file($cedAbs)) {
+        $cedMime = solPub_finfo_mime($cedAbs);
+        if (in_array($cedMime, $allowed, true)) {
+            $bn = basename($cedAbs);
+            $rutaDb = $dirRel . $bn;
+            $size = (int) (@filesize($cedAbs) ?: 0);
+            try {
+                $insertRow($pdo, $finRegistroId, $bn, 'Identificacion-cedula.' . pathinfo($bn, PATHINFO_EXTENSION), $rutaDb, $cedMime, $size, 'Identificación (formulario público)');
+                $pathsOut[] = $cedAbs;
+            } catch (Throwable $e) {
+                @unlink($cedAbs);
+            }
+        } else {
+            @unlink($cedAbs);
+        }
+    }
+
+    $maxFiles = 15;
+    $n = 0;
+    foreach (solPub_upload_rows_from_request() as $row) {
+        if ($n >= $maxFiles) {
+            break;
+        }
+        if ($row['error'] !== UPLOAD_ERR_OK) {
+            continue;
+        }
+        $size = (int)$row['size'];
+        if ($size <= 0 || $size > 10 * 1024 * 1024) {
+            continue;
+        }
+        $tmp = $row['tmp_name'];
+        if ($tmp === '' || !is_uploaded_file($tmp)) {
+            continue;
+        }
+        $orig = $row['name'] !== '' ? basename($row['name']) : 'adjunto.bin';
+        $orig = preg_replace('/[^A-Za-z0-9._\\- ]/', '_', $orig);
+        if ($orig === '' || strlen($orig) > 200) {
+            $orig = 'adjunto.bin';
+        }
+        $mime = solPub_mime_effective_for_upload(solPub_finfo_mime($tmp), $row['type'], $orig, $allowed);
+        if ($mime === null) {
+            continue;
+        }
+        $ext = pathinfo($orig, PATHINFO_EXTENSION);
+        $ext = $ext !== '' ? ('.' . preg_replace('/[^a-zA-Z0-9]/', '', $ext)) : '';
+        $nombreArchivo = 'finreg_' . $finRegistroId . '_' . uniqid('', true) . $ext;
+        $abs = rtrim($dirAbs, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $nombreArchivo;
+        if (!move_uploaded_file($tmp, $abs)) {
+            continue;
+        }
+        $rutaDb = $dirRel . $nombreArchivo;
+        try {
+            $insertRow($pdo, $finRegistroId, $nombreArchivo, $orig, $rutaDb, $mime, $size, 'Adjunto formulario público');
+            $pathsOut[] = $abs;
+            $n++;
+        } catch (Throwable $e) {
+            @unlink($abs);
+        }
+    }
+
+    return $pathsOut;
+}
+
+/**
  * Guarda adjuntos del formulario público en adjuntos/solicitudes/ y en adjuntos_solicitud.
  *
  * @return string[] rutas absolutas de archivos para adjuntar al correo
@@ -839,9 +959,14 @@ if ($pdoReg) {
 // La relación con solicitud de crédito se hace después, cuando el gestor carga "Sol Financiamiento" en Motus.
 if (($cedulaImagenDataUrl !== null && $cedulaImagenDataUrl !== '') || solPub_upload_rows_from_request() !== []) {
     try {
-        $adjuntosParaCorreo = solPub_materialize_adjuntos_temporales_para_correo($cedulaImagenDataUrl);
-        $adjuntosCorreoSonTemporales = true;
-        logSolPub('adjuntos correo (temp, sin solicitud en BD o sin gestor): ' . count($adjuntosParaCorreo) . ' archivo(s)');
+        if ($finRegistroInsertId > 0 && $pdoReg instanceof PDO) {
+            $adjuntosParaCorreo = solPub_guardar_adjuntos_financiamiento_registro($pdoReg, $finRegistroInsertId, $cedulaImagenDataUrl);
+            logSolPub('adjuntos guardados por financiamiento_registro_id=' . $finRegistroInsertId . ': ' . count($adjuntosParaCorreo) . ' archivo(s)');
+        } else {
+            $adjuntosParaCorreo = solPub_materialize_adjuntos_temporales_para_correo($cedulaImagenDataUrl);
+            $adjuntosCorreoSonTemporales = true;
+            logSolPub('adjuntos correo (temp, sin registro financiamiento): ' . count($adjuntosParaCorreo) . ' archivo(s)');
+        }
     } catch (Throwable $e) {
         logSolPub('adjuntos temp correo: ' . $e->getMessage());
     }
