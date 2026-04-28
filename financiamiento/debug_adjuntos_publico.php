@@ -30,6 +30,9 @@ function getApiUrlCandidates(?string $selected = null): array {
     $baseSelected = trim((string)$selected);
     if ($baseSelected !== '') {
         $out[] = $baseSelected;
+        if (stripos($baseSelected, 'http://') === 0) {
+            $out[] = 'https://' . substr($baseSelected, 7);
+        }
     } else {
         $out[] = getApiUrl();
     }
@@ -304,10 +307,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             curl_setopt_array($ch, [
                 CURLOPT_URL => $tryUrl,
                 CURLOPT_POST => true,
+                CURLOPT_CUSTOMREQUEST => 'POST',
                 CURLOPT_POSTFIELDS => $postFields,
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_HEADER => false,
                 CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_POSTREDIR => 7, // CURL_REDIR_POST_ALL: mantiene POST en redirecciones
+                CURLOPT_MAXREDIRS => 8,
                 CURLOPT_TIMEOUT => 60,
                 CURLOPT_SSL_VERIFYPEER => false,
                 CURLOPT_SSL_VERIFYHOST => 0,
