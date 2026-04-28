@@ -9,8 +9,6 @@ services:
       MYSQL_DATABASE: ${MYSQL_DATABASE:-motus_baes}
       MYSQL_USER: ${MYSQL_USER:-motus_user}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-motus_pass_2024}
-    ports:
-      - "3312:3306"  # Puerto diferente para evitar conflictos
     volumes:
       - motus_db_data:/var/lib/mysql
       - ./database:/docker-entrypoint-initdb.d
