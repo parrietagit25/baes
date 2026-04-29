@@ -72,17 +72,24 @@ try {
     }
     $tmpDir = $baseDir . DIRECTORY_SEPARATOR . 'adjuntos' . DIRECTORY_SEPARATOR . 'tmp_import_pdf';
     if (!is_dir($tmpDir) && !@mkdir($tmpDir, 0755, true) && !is_dir($tmpDir)) {
-        throw new RuntimeException('No se pudo crear el directorio temporal.');
+        $tmpDir = rtrim((string)sys_get_temp_dir(), '\\/') . DIRECTORY_SEPARATOR . 'baes_tmp_import_pdf';
+        if (!is_dir($tmpDir) && !@mkdir($tmpDir, 0755, true) && !is_dir($tmpDir)) {
+            throw new RuntimeException('No se pudo crear directorio temporal para importación.');
+        }
     }
 
-    $token = bin2hex(random_bytes(16));
+    try {
+        $token = bin2hex(random_bytes(16));
+    } catch (Throwable $e) {
+        $token = md5(uniqid((string)mt_rand(), true));
+    }
     $safeName = preg_replace('/[^a-zA-Z0-9._-]/', '_', $nombreOriginal);
     if ($safeName === '' || $safeName === null) $safeName = 'solicitud.pdf';
     $destPdf = $tmpDir . DIRECTORY_SEPARATOR . $token . '.pdf';
     $destMeta = $tmpDir . DIRECTORY_SEPARATOR . $token . '.json';
 
     if (!move_uploaded_file($tmp, $destPdf)) {
-        throw new RuntimeException('No se pudo guardar temporalmente el PDF.');
+        throw new RuntimeException('No se pudo guardar temporalmente el PDF en: ' . $tmpDir);
     }
 
     $texto = OcrHelper::extraerTexto($destPdf, 'application/pdf');
@@ -194,6 +201,10 @@ try {
 } catch (Throwable $e) {
     error_log('importar_solicitud_pdf error: ' . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Error al procesar el PDF.']);
+    echo json_encode([
+        'success' => false,
+        'message' => 'Error al procesar el PDF.',
+        'error_detail' => $e->getMessage()
+    ]);
 }
 

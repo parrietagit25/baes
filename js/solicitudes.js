@@ -192,7 +192,11 @@ $(document).ready(function() {
             success: function(res) {
                 $btn.prop('disabled', false).html(original);
                 if (!res || !res.success) {
-                    mostrarAlerta((res && res.message) ? res.message : 'No se pudo procesar el PDF.', 'danger');
+                    var msgRes = (res && res.message) ? res.message : 'No se pudo procesar el PDF.';
+                    if (res && res.error_detail) {
+                        msgRes += '\n\nDetalle: ' + res.error_detail;
+                    }
+                    mostrarAlerta(msgRes, 'danger');
                     return;
                 }
                 $('#importPdfModal').modal('hide');
@@ -222,6 +226,7 @@ $(document).ready(function() {
                 try {
                     var json = JSON.parse(xhr.responseText || '{}');
                     if (json.message) msg = json.message;
+                    if (json.error_detail) msg += '\n\nDetalle: ' + json.error_detail;
                 } catch (err) {}
                 mostrarAlerta(msg, 'danger');
             }
