@@ -17,22 +17,8 @@ services:
     command: --default-authentication-plugin=mysql_native_password
 
   # Servicio de PHPMyAdmin
-  motus_phpmyadmin:
-    image: phpmyadmin/phpmyadmin
-    container_name: motus_phpmyadmin
-    restart: unless-stopped
-    environment:
-      PMA_HOST: motus_db
-      PMA_PORT: 3306
-      PMA_USER: ${MYSQL_USER:-motus_user}
-      PMA_PASSWORD: ${MYSQL_PASSWORD:-motus_pass_2024}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-motus_root_2024}
-    ports:
-      - "8089:80"  # Puerto diferente para evitar conflictos
-    depends_on:
-      - motus_db
-    networks:
-      - motus_network
+  # No se usa phpmyadmin en este proyecto
+  # antes habia un contenedor de phpmyadmin pero ya no esta ...
 
   # Servicio de PHP/Apache
   motus_php:
