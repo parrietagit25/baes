@@ -5,10 +5,10 @@ services:
     container_name: motus_db
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-motus_root_2024}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-motus_baes}
-      MYSQL_USER: ${MYSQL_USER:-motus_user}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-motus_pass_2024}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     volumes:
       - motus_db_data:/var/lib/mysql
       - ./database:/docker-entrypoint-initdb.d
@@ -39,9 +39,9 @@ services:
     environment:
       - DB_HOST=motus_db
       - DB_PORT=3306
-      - DB_NAME=${MYSQL_DATABASE:-motus_baes}
-      - DB_USER=${MYSQL_USER:-motus_user}
-      - DB_PASS=${MYSQL_PASSWORD:-motus_pass_2024}
+      - DB_NAME=${MYSQL_DATABASE}
+      - DB_USER=${MYSQL_USER}
+      - DB_PASS=${MYSQL_PASSWORD}
       - RESEND_API_KEY=${RESEND_API_KEY:-}
       - RESEND_BASE_URL=${RESEND_BASE_URL:-api.resend.com}
       # Sin default onboarding: si no defines MAIL_* en .env, PHP lee config/email.php + archivo .env (SENDGRID_* legado)
