@@ -11,13 +11,20 @@ RewriteEngine On
     Deny from all
 </Files>
 
+# Bloquear variables de entorno, llaves, respaldos y otros secretos
+<FilesMatch "^(?:\.env|\.env\..*|composer\.(?:json|lock)|package(?:-lock)?\.json|yarn\.lock|.*\.(?:ini|log|sh|bak|old|dist|swp|pem|key))$">
+    Require all denied
+</FilesMatch>
+
+# Bloquear cualquier archivo oculto/directorio oculto (ej: .git, .svn, etc.)
+RewriteRule "(^|/)\." - [F,L]
+
 <Files "*.php">
     Order allow,deny
     Allow from all
 </Files>
 
-# redireccion en .git
-
+# Respaldo específico para .git (además del bloqueo general de dotfiles)
 RedirectMatch 404 /\.git
 
 
