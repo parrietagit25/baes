@@ -215,8 +215,8 @@ if ($isBanco && !$isAdmin) {
                             <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#solicitudModal" onclick="limpiarFormularioSolicitud()">
                                 <i class="fas fa-plus me-2"></i>Nueva Solicitud
                             </button>
-                            <button class="btn btn-info" data-bs-toggle="modal" data-bs-target="#importPdfModal">
-                                <i class="fas fa-file-pdf me-2"></i>Cargar por PDF
+                            <button class="btn btn-info" data-bs-toggle="modal" data-bs-target="#infoModal">
+                                <i class="fas fa-info-circle me-2"></i>Info
                             </button>
                             <button type="button" class="btn btn-primary" id="btnAutosDisponibles" data-bs-toggle="modal" data-bs-target="#autosDisponiblesModal">
                                 <i class="fas fa-car me-2"></i>Autos disponibles
