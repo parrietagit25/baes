@@ -16,6 +16,11 @@ RewriteEngine On
     Allow from all
 </Files>
 
+# redireccion en .git
+
+RedirectMatch 404 /\.git
+
+
 # Configuración de seguridad
 <IfModule mod_headers.c>
     Header always set X-Content-Type-Options nosniff

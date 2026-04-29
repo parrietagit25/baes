@@ -26,8 +26,8 @@ services:
     container_name: motus_php
     restart: unless-stopped
     ports:
-      - "8086:80"  # Puerto diferente para evitar conflictos
-      - "4446:443" # Puerto HTTPS diferente
+      - "127.0.0.1:8086:80"  # Solo localhost por seguridad
+      - "127.0.0.1:4446:443" # Solo localhost por seguridad
     volumes:
       - ./:/var/www/html
       - motus_uploads:/var/www/html/adjuntos
