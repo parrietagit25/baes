@@ -8,7 +8,6 @@ if (!defined('APP_DEBUG')) {
 // Fuera de Docker (XAMPP / Digital Ocean): usar localhost o el host del managed DB
 $isDocker = file_exists('/.dockerenv');
 if ($isDocker) {
-    // Priorizar variables de entorno para evitar credenciales hardcodeadas.
     $host = getenv('DB_HOST') ?: 'motus_db';
     $port = getenv('DB_PORT') ?: '3306';
     $dbname = getenv('DB_NAME') ?: 'motus_baes';
