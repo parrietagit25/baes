@@ -215,8 +215,8 @@ if ($isBanco && !$isAdmin) {
                             <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#solicitudModal" onclick="limpiarFormularioSolicitud()">
                                 <i class="fas fa-plus me-2"></i>Nueva Solicitud
                             </button>
-                            <button class="btn btn-info" data-bs-toggle="modal" data-bs-target="#infoModal">
-                                <i class="fas fa-info-circle me-2"></i>Info
+                            <button class="btn btn-info" data-bs-toggle="modal" data-bs-target="#importPdfModal">
+                                <i class="fas fa-file-pdf me-2"></i>Cargar por PDF
                             </button>
                             <button type="button" class="btn btn-primary" id="btnAutosDisponibles" data-bs-toggle="modal" data-bs-target="#autosDisponiblesModal">
                                 <i class="fas fa-car me-2"></i>Autos disponibles
@@ -502,6 +502,8 @@ if ($isBanco && !$isAdmin) {
                     <div class="modal-body">
                         <input type="hidden" id="solicitud_id" name="id">
                         <input type="hidden" id="financiamiento_registro_id" name="financiamiento_registro_id" value="">
+                        <input type="hidden" id="import_pdf_token" name="import_pdf_token" value="">
+                        <input type="hidden" id="import_pdf_nombre_original" name="import_pdf_nombre_original" value="">
                         
                         <!-- Cargar desde Sol Financiamiento -->
                         <div class="mb-3 p-3 rounded" style="background: #f0f4f8;">
@@ -964,6 +966,57 @@ if ($isBanco && !$isAdmin) {
                               <i class="fas fa-save me-2"></i>Guardar Solicitud
                           </button>
                           <?php endif; ?>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Cargar por PDF -->
+    <div class="modal fade" id="importPdfModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header" style="background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%);">
+                    <h5 class="modal-title text-white">
+                        <i class="fas fa-file-pdf me-2"></i>Cargar solicitud desde PDF
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="importPdfForm" method="POST" action="javascript:void(0);" enctype="multipart/form-data">
+                    <div class="modal-body">
+                        <div class="alert alert-info mb-3">
+                            Sube el PDF recibido por correo. El sistema extrae la información y abre <strong>Nueva Solicitud</strong> prellenada.
+                        </div>
+                        <div class="mb-3">
+                            <label for="import_pdf_archivo" class="form-label">Archivo PDF *</label>
+                            <input type="file" class="form-control" id="import_pdf_archivo" name="archivo_pdf" accept="application/pdf,.pdf" required>
+                            <small class="text-muted">Solo PDF, máximo 10MB.</small>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label for="import_tipo_persona" class="form-label">Tipo de Persona *</label>
+                                <select class="form-select" id="import_tipo_persona" name="tipo_persona" required>
+                                    <option value="">Seleccionar...</option>
+                                    <option value="Natural">Persona Natural</option>
+                                    <option value="Juridica">Persona Jurídica</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="import_perfil_financiero" class="form-label">Perfil Financiero *</label>
+                                <select class="form-select" id="import_perfil_financiero" name="perfil_financiero" required>
+                                    <option value="">Seleccionar...</option>
+                                    <option value="Asalariado">Asalariado</option>
+                                    <option value="Jubilado">Jubilado</option>
+                                    <option value="Independiente">Independiente</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                        <button type="submit" class="btn btn-primary" id="btnImportarPdf">
+                            <i class="fas fa-upload me-2"></i>Cargar y prellenar
+                        </button>
                     </div>
                 </form>
             </div>

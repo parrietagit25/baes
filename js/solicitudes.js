@@ -166,6 +166,69 @@ $(document).ready(function() {
         cargarRegistroFinanciamientoYPrefill(id);
     });
 
+    $('#importPdfModal').on('hidden.bs.modal', function() {
+        var form = $('#importPdfForm')[0];
+        if (form) form.reset();
+        $('#btnImportarPdf').prop('disabled', false).html('<i class="fas fa-upload me-2"></i>Cargar y prellenar');
+    });
+    $(document).on('submit', '#importPdfForm', function(e) {
+        e.preventDefault();
+        var form = this;
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return false;
+        }
+        var fd = new FormData(form);
+        var $btn = $('#btnImportarPdf');
+        var original = $btn.html();
+        $btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Procesando PDF...');
+        $.ajax({
+            url: 'api/importar_solicitud_pdf.php',
+            type: 'POST',
+            data: fd,
+            processData: false,
+            contentType: false,
+            dataType: 'json',
+            success: function(res) {
+                $btn.prop('disabled', false).html(original);
+                if (!res || !res.success) {
+                    mostrarAlerta((res && res.message) ? res.message : 'No se pudo procesar el PDF.', 'danger');
+                    return;
+                }
+                $('#importPdfModal').modal('hide');
+                limpiarFormularioSolicitud();
+                var data = res.data || {};
+                if (data.prefill) {
+                    prefillFormularioDesdeFinanciamiento(data.prefill);
+                }
+                if (data.tipo_persona) {
+                    $('#tipo_persona').val(data.tipo_persona);
+                }
+                if (data.perfil_financiero) {
+                    $('#perfil_financiero').val(data.perfil_financiero);
+                }
+                if (data.token) {
+                    $('#import_pdf_token').val(data.token);
+                }
+                if (data.nombre_original) {
+                    $('#import_pdf_nombre_original').val(data.nombre_original);
+                }
+                $('#solicitudModal').modal('show');
+                mostrarAlerta('PDF cargado. Verifique los datos prellenados y guarde la solicitud.', 'success');
+            },
+            error: function(xhr) {
+                $btn.prop('disabled', false).html(original);
+                var msg = 'Error al procesar el PDF.';
+                try {
+                    var json = JSON.parse(xhr.responseText || '{}');
+                    if (json.message) msg = json.message;
+                } catch (err) {}
+                mostrarAlerta(msg, 'danger');
+            }
+        });
+        return false;
+    });
+
     // Contador de caracteres para comentarios
     $('#comentarios_gestor').on('input', function() {
         const maxLength = 1000;
@@ -500,6 +563,8 @@ function limpiarFormularioSolicitud() {
     $('#solicitudForm')[0].reset();
     $('#solicitudModalLabel').html('<i class="fas fa-file-alt me-2"></i>Nueva Solicitud de Crédito');
     $('#contador_comentarios').text('1000');
+    $('#import_pdf_token').val('');
+    $('#import_pdf_nombre_original').val('');
     
     // Cargar desde Sol Financiamiento (select + Select2)
     destruirClienteFinanciamientoSelect2();

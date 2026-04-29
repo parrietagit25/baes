@@ -46,6 +46,105 @@ function solicitudesTieneColumna(string $nombreColumna): bool {
     return $cache[$nombreColumna];
 }
 
+function adjuntosTamanoColumna(PDO $pdo): ?string {
+    static $col = '__unset__';
+    if ($col !== '__unset__') {
+        return $col ?: null;
+    }
+    $col = null;
+    try {
+        $dbName = $pdo->query('SELECT DATABASE()')->fetchColumn();
+        if (!$dbName) {
+            return null;
+        }
+        $stmt = $pdo->prepare("
+            SELECT COLUMN_NAME
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = ?
+              AND TABLE_NAME = 'adjuntos_solicitud'
+              AND COLUMN_NAME IN ('tamaño_archivo', 'tamano_archivo', 'tamao_archivo')
+            LIMIT 1
+        ");
+        $stmt->execute([$dbName]);
+        $found = $stmt->fetchColumn();
+        $col = $found ?: null;
+    } catch (Throwable $e) {
+        $col = null;
+    }
+    return $col;
+}
+
+function adjuntarPdfImportadoEnSolicitud(PDO $pdo, int $solicitudId, int $usuarioId, ?string $token, ?string $nombreOriginal): bool {
+    $token = trim((string)$token);
+    if ($solicitudId <= 0 || $usuarioId <= 0 || $token === '' || !preg_match('/^[a-f0-9]{32}$/', $token)) {
+        return false;
+    }
+
+    $root = realpath(__DIR__ . '/..');
+    if (!$root) {
+        return false;
+    }
+    $tmpDir = $root . DIRECTORY_SEPARATOR . 'adjuntos' . DIRECTORY_SEPARATOR . 'tmp_import_pdf';
+    $srcPdf = $tmpDir . DIRECTORY_SEPARATOR . $token . '.pdf';
+    $srcMeta = $tmpDir . DIRECTORY_SEPARATOR . $token . '.json';
+    if (!is_file($srcPdf) || !is_file($srcMeta)) {
+        return false;
+    }
+
+    $metaRaw = @file_get_contents($srcMeta);
+    $meta = json_decode((string)$metaRaw, true);
+    if (!is_array($meta) || (int)($meta['user_id'] ?? 0) !== $usuarioId) {
+        return false;
+    }
+
+    $nombreOriginalFinal = trim((string)$nombreOriginal);
+    if ($nombreOriginalFinal === '') {
+        $nombreOriginalFinal = trim((string)($meta['nombre_original'] ?? 'solicitud_importada.pdf'));
+    }
+    if ($nombreOriginalFinal === '') {
+        $nombreOriginalFinal = 'solicitud_importada.pdf';
+    }
+
+    $destDirRel = 'adjuntos/solicitudes/';
+    $destDir = $root . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $destDirRel);
+    if (!is_dir($destDir)) {
+        @mkdir($destDir, 0755, true);
+    }
+
+    $destName = 'import_pdf_' . uniqid('', true) . '_' . time() . '.pdf';
+    $destAbs = rtrim($destDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $destName;
+    if (!@rename($srcPdf, $destAbs)) {
+        if (!@copy($srcPdf, $destAbs)) {
+            return false;
+        }
+        @unlink($srcPdf);
+    }
+
+    $destDbPath = $destDirRel . $destName;
+    $tamCol = adjuntosTamanoColumna($pdo);
+    $tam = (int)(@filesize($destAbs) ?: 0);
+    $desc = 'PDF importado manualmente para recuperación de solicitud.';
+
+    if ($tamCol) {
+        $stmt = $pdo->prepare("
+            INSERT INTO adjuntos_solicitud
+            (solicitud_id, usuario_id, nombre_archivo, nombre_original, ruta_archivo, tipo_archivo, `$tamCol`, descripcion)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        $stmt->execute([$solicitudId, $usuarioId, $destName, $nombreOriginalFinal, $destDbPath, 'application/pdf', $tam, $desc]);
+    } else {
+        $stmt = $pdo->prepare("
+            INSERT INTO adjuntos_solicitud
+            (solicitud_id, usuario_id, nombre_archivo, nombre_original, ruta_archivo, tipo_archivo, descripcion)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ");
+        $stmt->execute([$solicitudId, $usuarioId, $destName, $nombreOriginalFinal, $destDbPath, 'application/pdf', $desc]);
+    }
+
+    @unlink($srcMeta);
+    return true;
+}
+
 switch ($method) {
     case 'GET':
         if (isset($_GET['id'])) {
@@ -335,6 +434,27 @@ function crearSolicitud() {
                 }
             } catch (Throwable $e) {
                 error_log('crearSolicitud copiar adjuntos financiamiento: ' . $e->getMessage());
+            }
+        }
+
+        $importToken = $_POST['import_pdf_token'] ?? null;
+        $importNombre = $_POST['import_pdf_nombre_original'] ?? null;
+        if (!empty($importToken)) {
+            try {
+                $okImportPdf = adjuntarPdfImportadoEnSolicitud($pdo, (int)$solicitudId, (int)$_SESSION['user_id'], $importToken, $importNombre);
+                if ($okImportPdf) {
+                    registrarHistorialSolicitud(
+                        $pdo,
+                        (int)$solicitudId,
+                        (int)$_SESSION['user_id'],
+                        'documento_agregado',
+                        'Se adjuntó PDF importado desde carga manual',
+                        null,
+                        null
+                    );
+                }
+            } catch (Throwable $e) {
+                error_log('crearSolicitud adjuntar PDF importado: ' . $e->getMessage());
             }
         }
         
