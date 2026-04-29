@@ -17,30 +17,35 @@ if (isset($_SESSION['user_id'])) {
 $error = '';
 if ($_POST) {
     require_once 'config/database.php';
-    
-    $email = $_POST['email'];
-    $password = $_POST['password'];
-    
-    $stmt = $pdo->prepare("SELECT id, nombre, apellido, email, password, activo FROM usuarios WHERE email = ?");
-    $stmt->execute([$email]);
-    $user = $stmt->fetch();
-    
-    if ($user && password_verify($password, $user['password']) && $user['activo'] == 1) {
-        $_SESSION['user_id'] = $user['id'];
-        $_SESSION['user_name'] = $user['nombre'] . ' ' . $user['apellido'];
-        $_SESSION['user_email'] = $user['email'];
-        
-        // Obtener roles del usuario
-        $stmt = $pdo->prepare("SELECT r.nombre FROM roles r 
-                              INNER JOIN usuario_roles ur ON r.id = ur.rol_id 
-                              WHERE ur.usuario_id = ?");
-        $stmt->execute([$user['id']]);
-        $_SESSION['user_roles'] = $stmt->fetchAll(PDO::FETCH_COLUMN);
-        
-        header('Location: dashboard.php');
-        exit();
+
+    if (!isset($pdo) || !($pdo instanceof PDO)) {
+        error_log('Login: PDO no inicializado en index.php');
+        $error = 'No se pudo conectar a la base de datos. Intente nuevamente.';
     } else {
-        $error = 'Credenciales inválidas o usuario inactivo';
+        $email = $_POST['email'];
+        $password = $_POST['password'];
+
+        $stmt = $pdo->prepare("SELECT id, nombre, apellido, email, password, activo FROM usuarios WHERE email = ?");
+        $stmt->execute([$email]);
+        $user = $stmt->fetch();
+
+        if ($user && password_verify($password, $user['password']) && $user['activo'] == 1) {
+            $_SESSION['user_id'] = $user['id'];
+            $_SESSION['user_name'] = $user['nombre'] . ' ' . $user['apellido'];
+            $_SESSION['user_email'] = $user['email'];
+
+            // Obtener roles del usuario
+            $stmt = $pdo->prepare("SELECT r.nombre FROM roles r 
+                                  INNER JOIN usuario_roles ur ON r.id = ur.rol_id 
+                                  WHERE ur.usuario_id = ?");
+            $stmt->execute([$user['id']]);
+            $_SESSION['user_roles'] = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+            header('Location: dashboard.php');
+            exit();
+        } else {
+            $error = 'Credenciales inválidas o usuario inactivo';
+        }
     }
 }
 ?>
