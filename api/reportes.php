@@ -1340,11 +1340,23 @@ function reporteTelemetria() {
     try {
         $rows = _dataReporteTelemetria($pdo);
         $total = count($rows);
+        $diasConRegistros = [];
         $dur = 0;
         $durN = 0;
         $sumPasos = [0, 0, 0, 0, 0];
         $sumPasosN = [0, 0, 0, 0, 0];
+        $distDispositivo = [
+            'iPhone' => 0,
+            'Android' => 0,
+            'Otros' => 0,
+        ];
+        $distUbicacion = [];
+        $distResolucion = [];
         foreach ($rows as $r) {
+            $fechaCreacion = (string)($r['fecha_creacion'] ?? '');
+            if (strlen($fechaCreacion) >= 10) {
+                $diasConRegistros[substr($fechaCreacion, 0, 10)] = true;
+            }
             if (isset($r['telemetria_duracion_segundos']) && is_numeric($r['telemetria_duracion_segundos'])) {
                 $dur += (int)$r['telemetria_duracion_segundos'];
                 $durN++;
@@ -1356,19 +1368,72 @@ function reporteTelemetria() {
                     $sumPasosN[$i]++;
                 }
             }
+
+            $os = strtolower(trim((string)($r['device_os'] ?? '')));
+            if (str_contains($os, 'iphone') || str_contains($os, 'ipad') || str_contains($os, 'ios')) {
+                $distDispositivo['iPhone']++;
+            } elseif (str_contains($os, 'android')) {
+                $distDispositivo['Android']++;
+            } else {
+                $distDispositivo['Otros']++;
+            }
+
+            $city = trim((string)($r['geo_city'] ?? ''));
+            $country = trim((string)($r['geo_country'] ?? ''));
+            $ubicacion = trim(implode(', ', array_filter([$city, $country])));
+            if ($ubicacion === '') {
+                $ubicacion = 'Sin ubicación';
+            }
+            if (!isset($distUbicacion[$ubicacion])) {
+                $distUbicacion[$ubicacion] = 0;
+            }
+            $distUbicacion[$ubicacion]++;
+
+            $res = trim((string)($r['viewport'] ?? ''));
+            if ($res === '') {
+                $res = trim((string)($r['screen'] ?? ''));
+            }
+            if ($res === '') {
+                $res = 'Sin resolución';
+            }
+            if (!isset($distResolucion[$res])) {
+                $distResolucion[$res] = 0;
+            }
+            $distResolucion[$res]++;
         }
+
+        arsort($distUbicacion);
+        arsort($distResolucion);
+        $distUbicacionTop = array_slice($distUbicacion, 0, 8, true);
+        $distResolucionTop = array_slice($distResolucion, 0, 8, true);
+
+        $durPromSeg = $durN > 0 ? round($dur / $durN, 2) : null;
+        $pasoPromSeg = [
+            0 => $sumPasosN[0] > 0 ? round($sumPasos[0] / $sumPasosN[0], 2) : null,
+            1 => $sumPasosN[1] > 0 ? round($sumPasos[1] / $sumPasosN[1], 2) : null,
+            2 => $sumPasosN[2] > 0 ? round($sumPasos[2] / $sumPasosN[2], 2) : null,
+            3 => $sumPasosN[3] > 0 ? round($sumPasos[3] / $sumPasosN[3], 2) : null,
+            4 => $sumPasosN[4] > 0 ? round($sumPasos[4] / $sumPasosN[4], 2) : null,
+        ];
+        $pasoPromMin = [];
+        foreach ($pasoPromSeg as $k => $v) {
+            $pasoPromMin[$k] = $v !== null ? round($v / 60, 2) : null;
+        }
+        $diasCount = count($diasConRegistros);
+
         echo json_encode([
             'success' => true,
             'resumen' => [
                 'total_registros' => $total,
-                'duracion_promedio_seg' => $durN > 0 ? round($dur / $durN, 2) : null,
-                'paso_promedio_seg' => [
-                    0 => $sumPasosN[0] > 0 ? round($sumPasos[0] / $sumPasosN[0], 2) : null,
-                    1 => $sumPasosN[1] > 0 ? round($sumPasos[1] / $sumPasosN[1], 2) : null,
-                    2 => $sumPasosN[2] > 0 ? round($sumPasos[2] / $sumPasosN[2], 2) : null,
-                    3 => $sumPasosN[3] > 0 ? round($sumPasos[3] / $sumPasosN[3], 2) : null,
-                    4 => $sumPasosN[4] > 0 ? round($sumPasos[4] / $sumPasosN[4], 2) : null,
-                ],
+                'dias_con_registros' => $diasCount,
+                'promedio_registros_diarios' => $diasCount > 0 ? round($total / $diasCount, 2) : null,
+                'duracion_promedio_seg' => $durPromSeg,
+                'duracion_promedio_min' => $durPromSeg !== null ? round($durPromSeg / 60, 2) : null,
+                'paso_promedio_seg' => $pasoPromSeg,
+                'paso_promedio_min' => $pasoPromMin,
+                'distribucion_dispositivo' => $distDispositivo,
+                'distribucion_ubicacion' => $distUbicacionTop,
+                'distribucion_resolucion' => $distResolucionTop,
             ],
             'data' => $rows
         ]);

@@ -59,6 +59,7 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
         .enc-bloque-title { color: #495057; font-weight: 600; font-size: 1.1rem; margin: 1.5rem 0 1rem; }
         .enc-bloque-title.v { border-left: 4px solid #0d6efd; padding-left: 0.5rem; }
         .enc-bloque-title.g { border-left: 4px solid #6f42c1; padding-left: 0.5rem; }
+        .tel-chart-wrap { min-height: 260px; }
     </style>
 </head>
 <body>
@@ -284,7 +285,35 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
                         <div class="row g-3 mb-3">
                             <div class="col-md-3"><div class="card"><div class="card-body text-center"><div class="text-muted small">Registros</div><div class="h4 mb-0" id="telTotalRegistros">0</div></div></div></div>
                             <div class="col-md-3"><div class="card"><div class="card-body text-center"><div class="text-muted small">Duración promedio</div><div class="h4 mb-0 text-primary" id="telDurProm">—</div></div></div></div>
-                            <div class="col-md-6"><div class="card"><div class="card-body text-center"><div class="text-muted small">Promedio por paso (A/B/C/D/E)</div><div class="h5 mb-0" id="telPasoProm">—</div></div></div></div>
+                            <div class="col-md-3"><div class="card"><div class="card-body text-center"><div class="text-muted small">Promedio de registros diarios</div><div class="h4 mb-0 text-success" id="telPromRegDia">—</div></div></div></div>
+                            <div class="col-md-3"><div class="card"><div class="card-body text-center"><div class="text-muted small">Duración promedio en minutos</div><div class="h4 mb-0 text-info" id="telDurPromMin">—</div></div></div></div>
+                            <div class="col-md-6"><div class="card"><div class="card-body text-center"><div class="text-muted small">Promedio por paso (A/B/C/D/E)</div><div class="h6 mb-1" id="telPasoProm">—</div><div class="h6 mb-0 text-info" id="telPasoPromMin">—</div></div></div></div>
+                        </div>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-4">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h6 class="mb-2">Dispositivo</h6>
+                                        <div class="tel-chart-wrap"><canvas id="telChartDispositivo"></canvas></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h6 class="mb-2">Ubicación</h6>
+                                        <div class="tel-chart-wrap"><canvas id="telChartUbicacion"></canvas></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h6 class="mb-2">Resolución</h6>
+                                        <div class="tel-chart-wrap"><canvas id="telChartResolucion"></canvas></div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="card">
                             <div class="card-body">
@@ -443,9 +472,13 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
     <script>
 (function() {
     const submenu = '<?php echo $submenu; ?>';
+    let telChartDispositivo = null;
+    let telChartUbicacion = null;
+    let telChartResolucion = null;
 
     if (submenu === 'usuarios') {
         loadReporteUsuarios();
@@ -717,6 +750,38 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
         return String(v).replace('.', ',');
     }
 
+    function renderPieChart(canvasId, labels, values) {
+        const el = document.getElementById(canvasId);
+        if (!el || typeof Chart === 'undefined') return null;
+        const filtered = [];
+        for (let i = 0; i < labels.length; i++) {
+            const val = Number(values[i] || 0);
+            if (val > 0) filtered.push({ label: String(labels[i]), value: val });
+        }
+        if (!filtered.length) {
+            filtered.push({ label: 'Sin datos', value: 1 });
+        }
+        return new Chart(el, {
+            type: 'pie',
+            data: {
+                labels: filtered.map(x => x.label),
+                datasets: [{
+                    data: filtered.map(x => x.value),
+                    backgroundColor: [
+                        '#0d6efd', '#20c997', '#ffc107', '#dc3545', '#6610f2', '#fd7e14', '#198754', '#6c757d'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom' }
+                }
+            }
+        });
+    }
+
     function aplicarFiltroUsuarios() {
         const txt = ((document.getElementById('filtroUsuariosTexto') || {}).value || '').toLowerCase().trim();
         const estado = ((document.getElementById('filtroUsuariosEstado') || {}).value || '').trim();
@@ -825,7 +890,7 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
             const c = tr.querySelectorAll('td');
             const ref = ((c[1]?.innerText || '') + ' ' + (c[2]?.innerText || '') + ' ' + (c[3]?.innerText || '') + ' ' + (c[4]?.innerText || '')).toLowerCase();
             const fecha = (c[0]?.getAttribute('data-date') || '');
-            const durTxt = (c[5]?.innerText || '').replace(/[^\d]/g, '');
+            const durTxt = (c[6]?.innerText || '').replace(/[^\d]/g, '');
             const dur = durTxt ? parseInt(durTxt, 10) : 0;
             let visible = true;
             if (txt && ref.indexOf(txt) === -1) visible = false;
@@ -932,10 +997,40 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
                 const res = data.resumen || {};
                 document.getElementById('telTotalRegistros').textContent = String(res.total_registros ?? 0);
                 document.getElementById('telDurProm').textContent = (res.duracion_promedio_seg != null ? String(res.duracion_promedio_seg) + ' seg' : '—');
+                document.getElementById('telPromRegDia').textContent = (res.promedio_registros_diarios != null ? String(res.promedio_registros_diarios) : '—');
+                document.getElementById('telDurPromMin').textContent = (res.duracion_promedio_min != null ? String(res.duracion_promedio_min) + ' min' : '—');
                 const pp = res.paso_promedio_seg || {};
+                const ppm = res.paso_promedio_min || {};
                 document.getElementById('telPasoProm').textContent = ['0','1','2','3','4'].map(function(k){
-                    return (pp[k] != null ? pp[k] : '—');
-                }).join(' / ');
+                    const etiqueta = String.fromCharCode(65 + Number(k));
+                    return etiqueta + ': ' + (pp[k] != null ? pp[k] : '—') + 's';
+                }).join('  |  ');
+                document.getElementById('telPasoPromMin').textContent = ['0','1','2','3','4'].map(function(k){
+                    const etiqueta = String.fromCharCode(65 + Number(k));
+                    return etiqueta + ': ' + (ppm[k] != null ? ppm[k] : '—') + 'm';
+                }).join('  |  ');
+
+                if (telChartDispositivo) telChartDispositivo.destroy();
+                if (telChartUbicacion) telChartUbicacion.destroy();
+                if (telChartResolucion) telChartResolucion.destroy();
+                const distDisp = res.distribucion_dispositivo || {};
+                telChartDispositivo = renderPieChart(
+                    'telChartDispositivo',
+                    Object.keys(distDisp),
+                    Object.values(distDisp)
+                );
+                const distUbi = res.distribucion_ubicacion || {};
+                telChartUbicacion = renderPieChart(
+                    'telChartUbicacion',
+                    Object.keys(distUbi),
+                    Object.values(distUbi)
+                );
+                const distRes = res.distribucion_resolucion || {};
+                telChartResolucion = renderPieChart(
+                    'telChartResolucion',
+                    Object.keys(distRes),
+                    Object.values(distRes)
+                );
 
                 const rows = data.data || [];
                 if (!rows.length) {
