@@ -121,7 +121,7 @@ function incrementarCorreosEnviadosPorAsignacion(PDO $pdo, int $usuariosBancoSol
 
 /**
  * Correos en copia (CC) para el resumen al usuario banco:
- * - vendedor asignado (si tiene email),
+ * - ejecutivo de ventas asignado (si tiene email),
  * - fyi@automarketpan.com,
  * - email Pipedrive (si existe).
  * El destinatario principal sigue siendo el usuario banco (Para).
@@ -132,20 +132,20 @@ function obtenerCopiasResumenSolicitudBanco(PDO $pdo, array $solicitud, string $
     $cc = [];
     $cc[] = 'fyi@automarketpan.com';
 
-    $vendedorId = isset($solicitud['vendedor_id']) ? (int) $solicitud['vendedor_id'] : 0;
-    if ($vendedorId > 0) {
+    $ejecutivoVentasId = isset($solicitud['ejecutivo_ventas_id']) ? (int) $solicitud['ejecutivo_ventas_id'] : 0;
+    if ($ejecutivoVentasId > 0) {
         try {
-            $stmtVend = $pdo->prepare('SELECT email FROM usuarios WHERE id = ? LIMIT 1');
-            $stmtVend->execute([$vendedorId]);
-            $vend = $stmtVend->fetch(PDO::FETCH_ASSOC);
-            if ($vend && !empty($vend['email'])) {
-                $e = trim((string) $vend['email']);
+            $stmtEv = $pdo->prepare('SELECT email FROM ejecutivos_ventas WHERE id = ? LIMIT 1');
+            $stmtEv->execute([$ejecutivoVentasId]);
+            $ev = $stmtEv->fetch(PDO::FETCH_ASSOC);
+            if ($ev && !empty($ev['email'])) {
+                $e = trim((string) $ev['email']);
                 if ($e !== '' && filter_var($e, FILTER_VALIDATE_EMAIL)) {
                     $cc[] = $e;
                 }
             }
         } catch (PDOException $e) {
-            error_log('obtenerCopiasResumenSolicitudBanco vendedor: ' . $e->getMessage());
+            error_log('obtenerCopiasResumenSolicitudBanco ejecutivo_ventas: ' . $e->getMessage());
         }
     }
 
