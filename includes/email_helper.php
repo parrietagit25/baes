@@ -829,7 +829,7 @@ function enviarResumenSolicitudBancoTodosUnCorreo($solicitudId) {
 
 /**
  * Envía un resumen directo al correo de Pipedrive de la solicitud.
- * No envía copias (CC/CCO). Solo destinatario Pipe.
+ * Envía a FYI y pone a Pipedrive en copia (CC).
  */
 function enviarResumenSolicitudPipedriveDirecto($solicitudId) {
     global $pdo;
@@ -893,15 +893,16 @@ function enviarResumenSolicitudPipedriveDirecto($solicitudId) {
 
         $archivosAdjuntos = adjuntosArchivosParaCorreoResumen($adjuntos);
         $emailService = new EmailService();
+        $emailPara = 'fyi@automarketpan.com';
 
         $resultado = $emailService->enviarCorreo(
-            $emailPipe,
+            $emailPara,
             asuntoResumenSolicitudBancoMail($solicitud),
             $html,
             '',
             strip_tags(preg_replace('/<br\s*\/?>/i', "\n", $html)),
             $archivosAdjuntos,
-            [],
+            [$emailPipe],
             []
         );
 
