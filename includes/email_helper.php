@@ -632,7 +632,8 @@ function enviarResumenSolicitudBanco($solicitudId, $usuarioBancoId) {
 
 /**
  * Envía un único correo de resumen para todos los bancos asignados usando CCO.
- * Incluye en CCO: usuarios banco asignados. En copia (CC), solo vendedor cuando exista.
+ * Incluye en CCO: usuarios banco asignados.
+ * En copia (CC): ejecutivo de ventas, fyi, email Pipe y gestor.
  * Las respuestas del correo se dirigen al gestor asignado (Reply-To), cuando exista.
  */
 function enviarResumenSolicitudBancoTodosUnCorreo($solicitudId) {
@@ -675,18 +676,26 @@ function enviarResumenSolicitudBancoTodosUnCorreo($solicitudId) {
             return ['success' => false, 'message' => 'No hay usuarios banco asignados con email válido'];
         }
 
-        $emailVendedor = '';
-        $vendedorId = isset($solicitud['vendedor_id']) ? (int) $solicitud['vendedor_id'] : 0;
-        if ($vendedorId > 0) {
-            $stmtVend = $pdo->prepare('SELECT email FROM usuarios WHERE id = ? LIMIT 1');
-            $stmtVend->execute([$vendedorId]);
-            $vendedor = $stmtVend->fetch(PDO::FETCH_ASSOC);
-            if ($vendedor && !empty($vendedor['email'])) {
-                $emailVendedor = trim((string) $vendedor['email']);
-                if ($emailVendedor !== '' && filter_var($emailVendedor, FILTER_VALIDATE_EMAIL)) {
-                    $cc[] = $emailVendedor;
+        $cc[] = 'fyi@automarketpan.com';
+        $ejecutivoVentasId = isset($solicitud['ejecutivo_ventas_id']) ? (int) $solicitud['ejecutivo_ventas_id'] : 0;
+        if ($ejecutivoVentasId > 0) {
+            try {
+                $stmtEv = $pdo->prepare('SELECT email FROM ejecutivos_ventas WHERE id = ? LIMIT 1');
+                $stmtEv->execute([$ejecutivoVentasId]);
+                $ev = $stmtEv->fetch(PDO::FETCH_ASSOC);
+                if ($ev && !empty($ev['email'])) {
+                    $emailEv = trim((string) $ev['email']);
+                    if ($emailEv !== '' && filter_var($emailEv, FILTER_VALIDATE_EMAIL)) {
+                        $cc[] = $emailEv;
+                    }
                 }
+            } catch (PDOException $e) {
+                error_log('enviarResumenSolicitudBancoTodosUnCorreo ejecutivo_ventas: ' . $e->getMessage());
             }
+        }
+        $emailPipe = trim((string) ($solicitud['email_pipedrive'] ?? ''));
+        if ($emailPipe !== '' && filter_var($emailPipe, FILTER_VALIDATE_EMAIL)) {
+            $cc[] = $emailPipe;
         }
 
         $stmt = $pdo->prepare("SELECT * FROM vehiculos_solicitud WHERE solicitud_id = ? ORDER BY id");
@@ -740,6 +749,7 @@ function enviarResumenSolicitudBancoTodosUnCorreo($solicitudId) {
                 $emailGestor = trim((string) $gestor['email']);
                 if ($emailGestor !== '' && filter_var($emailGestor, FILTER_VALIDATE_EMAIL)) {
                     $replyToGestor = $emailGestor;
+                    $cc[] = $emailGestor;
                 }
             }
         }
@@ -775,8 +785,13 @@ function enviarResumenSolicitudBancoTodosUnCorreo($solicitudId) {
                 }
             }
         }
-        if ($vendedorId > 0 && !empty($emailVendedor) && filter_var($emailVendedor, FILTER_VALIDATE_EMAIL)) {
-            $logsPendientes[] = ['uid' => null, 'email' => $emailVendedor];
+        if (!empty($cc)) {
+            foreach (array_unique($cc) as $ccEmail) {
+                $ccEmail = trim((string)$ccEmail);
+                if ($ccEmail !== '' && filter_var($ccEmail, FILTER_VALIDATE_EMAIL)) {
+                    $logsPendientes[] = ['uid' => null, 'email' => $ccEmail];
+                }
+            }
         }
 
         $resultado = $emailService->enviarCorreo(
