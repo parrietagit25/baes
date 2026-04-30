@@ -222,6 +222,14 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
 
                     <!-- Rep. Banco -->
                     <div id="panel-banco" class="report-panel" style="display: <?php echo $submenu === 'banco' ? 'block' : 'none'; ?>">
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <h6 class="mb-2">Cantidad de solicitudes por banco</h6>
+                                <div style="height: 320px;">
+                                    <canvas id="chartSolicitudesPorBanco"></canvas>
+                                </div>
+                            </div>
+                        </div>
                         <div class="card">
                             <div class="card-body">
                                 <h5 class="card-title mb-3">Tiempo de respuesta del banco por solicitud</h5>
@@ -479,6 +487,7 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
     let telChartDispositivo = null;
     let telChartUbicacion = null;
     let telChartResolucion = null;
+    let bancoSolicitudesChart = null;
 
     if (submenu === 'usuarios') {
         loadReporteUsuarios();
@@ -627,6 +636,7 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
             .then(data => {
                 const tbody = document.querySelector('#tabla-banco tbody');
                 if (!data.success) { tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Sin datos</td></tr>'; return; }
+                const porBanco = {};
                 let html = '';
                 data.data.forEach(row => {
                     let tiempo = '-';
@@ -637,10 +647,46 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
                         else tiempo = (row.horas_respuesta || 0) + ' hora(s)';
                     }
                     const fechaResp = row.fecha_respuesta ? row.fecha_respuesta : '-';
+                    const bancoNombre = (row.banco_nombre && String(row.banco_nombre).trim() !== '') ? String(row.banco_nombre) : 'Sin banco';
+                    porBanco[bancoNombre] = (porBanco[bancoNombre] || 0) + 1;
                     html += '<tr><td>' + row.solicitud_id + '</td><td>' + escapeHtml(row.nombre_cliente || '') + '</td><td>' + escapeHtml(row.banco_nombre || '-') + '</td><td>' + (row.fecha_asignacion || '-') + '</td><td>' + fechaResp + '</td><td>' + tiempo + '</td></tr>';
                 });
                 if (!html) html = '<tr><td colspan="6" class="text-center text-muted">Sin datos</td></tr>';
                 tbody.innerHTML = html;
+
+                if (bancoSolicitudesChart) {
+                    bancoSolicitudesChart.destroy();
+                    bancoSolicitudesChart = null;
+                }
+                const chartEl = document.getElementById('chartSolicitudesPorBanco');
+                if (chartEl && typeof Chart !== 'undefined') {
+                    const labels = Object.keys(porBanco);
+                    const values = Object.values(porBanco);
+                    bancoSolicitudesChart = new Chart(chartEl, {
+                        type: 'bar',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Solicitudes',
+                                data: values,
+                                backgroundColor: '#667eea'
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: { precision: 0 }
+                                }
+                            }
+                        }
+                    });
+                }
             })
             .catch(() => { document.querySelector('#tabla-banco tbody').innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error al cargar</td></tr>'; });
     }
