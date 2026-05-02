@@ -118,6 +118,8 @@ class EmailService {
             foreach ($attachments as $item) {
                 $path = null;
                 $filename = null;
+                $contentId = null;
+                $contentType = null;
                 if (is_string($item)) {
                     $path = $item;
                     $filename = basename($path);
@@ -126,6 +128,12 @@ class EmailService {
                     $filename = (!empty($item['filename']) && is_string($item['filename']))
                         ? $item['filename']
                         : basename($path);
+                    if (!empty($item['content_id']) && is_string($item['content_id'])) {
+                        $contentId = trim($item['content_id']);
+                    }
+                    if (!empty($item['content_type']) && is_string($item['content_type'])) {
+                        $contentType = trim($item['content_type']);
+                    }
                 }
                 if ($path === null || !is_file($path) || !is_readable($path)) {
                     continue;
@@ -134,10 +142,17 @@ class EmailService {
                 if ($content === false) {
                     continue;
                 }
-                $atts[] = [
+                $row = [
                     'filename' => $filename,
                     'content' => base64_encode($content),
                 ];
+                if ($contentId !== null && $contentId !== '') {
+                    $row['content_id'] = $contentId;
+                }
+                if ($contentType !== null && $contentType !== '') {
+                    $row['content_type'] = $contentType;
+                }
+                $atts[] = $row;
             }
             if ($atts !== []) {
                 $params['attachments'] = $atts;

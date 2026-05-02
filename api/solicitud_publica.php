@@ -414,6 +414,57 @@ function solPub_save_cedula_from_data_url(?string $dataUrl, string $absPathNoExt
     return $abs;
 }
 
+/** Content-ID para la imagen de firma en el correo de confirmación al cliente (inline). */
+function solPub_correo_cliente_cid_firma(): string
+{
+    return 'automarket_firma_cid';
+}
+
+function solPub_html_correo_confirmacion_cliente(string $nombreCliente, bool $incluirFirmaCid = true): string
+{
+    $n = trim($nombreCliente) !== '' ? $nombreCliente : 'cliente';
+    $n = htmlspecialchars($n, ENT_QUOTES, 'UTF-8');
+    $cid = htmlspecialchars(solPub_correo_cliente_cid_firma(), ENT_QUOTES, 'UTF-8');
+    $bloqueCordial = '<p>Cordialmente,';
+    if ($incluirFirmaCid) {
+        $bloqueCordial .= '<br><img src="cid:' . $cid . '" alt="" width="280" style="max-width:100%;height:auto;border:0;" />';
+    }
+    $bloqueCordial .= '</p>';
+    return '<div style="font-family:Georgia,\'Times New Roman\',Times,serif;font-size:16px;line-height:1.55;color:#1a1a1a;max-width:640px;">'
+        . '<p>Estimado/a ' . $n . ',</p>'
+        . '<p>Hemos recibido su solicitud de financiamiento. Adjunto encontrará una copia en PDF de formulario y los documentos que envió.</p>'
+        . '<p>A partir de este momento, damos inicio al análisis de su perfil financiero. Este será evaluado por las principales entidades bancarias y financieras del país, con el objetivo de identificar las mejores opciones disponibles para usted.</p>'
+        . '<p>Le estaremos informando oportunamente una vez recibamos las respuestas correspondientes, para que pueda tomar una decisión con total tranquilidad y confianza.</p>'
+        . '<p>Agradecemos la confianza depositada en nosotros.</p>'
+        . $bloqueCordial
+        . '<hr style="border:0;border-top:1px solid #ccc;margin:28px 0;" />'
+        . '<p style="font-size:13px;color:#555;">Este mensaje fue enviado de forma automática. <strong>Por favor no responda a este correo electrónico</strong>; las respuestas a esta dirección no son monitoreadas.</p>'
+        . '</div>';
+}
+
+function solPub_texto_correo_confirmacion_cliente(string $nombreCliente): string
+{
+    $n = trim($nombreCliente) !== '' ? $nombreCliente : 'cliente';
+    $lines = [
+        'Estimado/a ' . $n . ',',
+        '',
+        'Hemos recibido su solicitud de financiamiento. Adjunto encontrará una copia en PDF de formulario y los documentos que envió.',
+        '',
+        'A partir de este momento, damos inicio al análisis de su perfil financiero. Este será evaluado por las principales entidades bancarias y financieras del país, con el objetivo de identificar las mejores opciones disponibles para usted.',
+        '',
+        'Le estaremos informando oportunamente una vez recibamos las respuestas correspondientes, para que pueda tomar una decisión con total tranquilidad y confianza.',
+        '',
+        'Agradecemos la confianza depositada en nosotros.',
+        '',
+        'Cordialmente,',
+        '(La firma aparece en la versión HTML del mensaje.)',
+        '',
+        '---',
+        'Este mensaje fue enviado de forma automática. Por favor no responda a este correo electrónico; las respuestas a esta dirección no son monitoreadas.',
+    ];
+    return implode("\n", $lines);
+}
+
 /**
  * Solo lectura: id de ejecutivos_ventas por email (vendedor ya registrado). No inserta filas.
  */
@@ -1028,35 +1079,70 @@ if ($emailDestinoVendedor !== null || $emailCliente !== null) {
                 ? 'Adjuntos: PDF de la solicitud, identificación y/o otros documentos enviados por el cliente.'
                 : 'Adjunto: PDF con todos los datos y la firma.';
             $cuerpoVendedor = '<p>Se ha recibido una solicitud de financiamiento completada.</p><p><strong>Cliente:</strong> ' . htmlspecialchars($nombre) . '</p><p>' . htmlspecialchars($txtAdj) . '</p>';
-            $asuntoCliente = 'Recibimos su Solicitud de Financiamiento - AutoMarket';
-            $cuerpoCliente = '<p>Estimado/a ' . htmlspecialchars($nombre) . ',</p><p>Hemos recibido correctamente su solicitud de financiamiento. Adjunto encontrará el PDF y los documentos que envió.</p><p>Nos pondremos en contacto a la brevedad.</p><p>— AutoMarket</p>';
+            $asuntoCliente = 'Recibimos su Solicitud de Financiamiento';
+            $firmaPath = __DIR__ . '/../img/firma.jpg';
+            $firmaCorreoOk = is_file($firmaPath) && is_readable($firmaPath);
+            $cuerpoCliente = solPub_html_correo_confirmacion_cliente($nombre, $firmaCorreoOk);
+            $textoCliente = solPub_texto_correo_confirmacion_cliente($nombre);
 
-            $attachments = array_merge([$pdfPath], $adjuntosParaCorreo);
-
-            if ($emailDestinoVendedor !== null) {
-                $result = $emailService->enviarCorreo(
-                    $emailDestinoVendedor,
-                    $asuntoVendedor,
-                    $cuerpoVendedor,
-                    '',
-                    strip_tags($cuerpoVendedor),
-                    $attachments,
-                    ['fyi@automarketpan.com']
-                );
-                $emailEnviado = !empty($result['success']);
+            $attachmentsVendedor = array_merge([$pdfPath], $adjuntosParaCorreo);
+            $attachmentsCliente = $attachmentsVendedor;
+            if ($firmaCorreoOk) {
+                $attachmentsCliente[] = [
+                    'path' => realpath($firmaPath) ?: $firmaPath,
+                    'filename' => 'firma.jpg',
+                    'content_id' => solPub_correo_cliente_cid_firma(),
+                    'content_type' => 'image/jpeg',
+                ];
             }
-            if ($emailCliente !== null && $emailCliente !== $emailDestinoVendedor) {
-                $resultCliente = $emailService->enviarCorreo(
+
+            $mismoCorreo = $emailCliente !== null && $emailDestinoVendedor !== null
+                && strcasecmp(trim($emailCliente), trim($emailDestinoVendedor)) === 0;
+
+            if ($mismoCorreo) {
+                $asuntoUnico = 'MOTUS #' . $numeroSolicitudAsunto . ' · Recibimos su Solicitud de Financiamiento';
+                $resultUnico = $emailService->enviarCorreo(
                     $emailCliente,
-                    $asuntoCliente,
+                    $asuntoUnico,
                     $cuerpoCliente,
                     '',
-                    strip_tags($cuerpoCliente),
-                    $attachments,
-                    ['fyi@automarketpan.com']
+                    $textoCliente,
+                    $attachmentsCliente,
+                    [],
+                    [],
+                    ''
                 );
-                if (!empty($resultCliente['success'])) {
-                    $emailEnviado = true;
+                $emailEnviado = !empty($resultUnico['success']);
+            } else {
+                if ($emailDestinoVendedor !== null) {
+                    $result = $emailService->enviarCorreo(
+                        $emailDestinoVendedor,
+                        $asuntoVendedor,
+                        $cuerpoVendedor,
+                        '',
+                        strip_tags($cuerpoVendedor),
+                        $attachmentsVendedor,
+                        [],
+                        [],
+                        ''
+                    );
+                    $emailEnviado = !empty($result['success']);
+                }
+                if ($emailCliente !== null) {
+                    $resultCliente = $emailService->enviarCorreo(
+                        $emailCliente,
+                        $asuntoCliente,
+                        $cuerpoCliente,
+                        '',
+                        $textoCliente,
+                        $attachmentsCliente,
+                        [],
+                        [],
+                        ''
+                    );
+                    if (!empty($resultCliente['success'])) {
+                        $emailEnviado = true;
+                    }
                 }
             }
             @unlink($pdfPath);
