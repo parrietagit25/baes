@@ -131,6 +131,110 @@ function sol_fin_fr_tiene_columna(PDO $pdo, string $col): bool {
     return $cache[$col];
 }
 
+function sol_fin_parse_post_input(): array {
+    $ct = $_SERVER['CONTENT_TYPE'] ?? '';
+    if (stripos($ct, 'application/json') !== false) {
+        $raw = file_get_contents('php://input');
+        $decoded = json_decode($raw !== false && $raw !== '' ? $raw : '[]', true);
+        return is_array($decoded) ? $decoded : [];
+    }
+    return $_POST;
+}
+
+function sol_fin_tabla_existe(PDO $pdo, string $tableName): bool {
+    static $mem = [];
+    if (isset($mem[$tableName])) {
+        return $mem[$tableName];
+    }
+    try {
+        $db = $pdo->query('SELECT DATABASE()')->fetchColumn();
+        if (!$db) {
+            return $mem[$tableName] = false;
+        }
+        $s = $pdo->prepare('
+            SELECT COUNT(*) FROM information_schema.tables
+            WHERE table_schema = ? AND table_name = ?
+        ');
+        $s->execute([$db, $tableName]);
+        return $mem[$tableName] = ((int) $s->fetchColumn()) > 0;
+    } catch (Throwable $e) {
+        return $mem[$tableName] = false;
+    }
+}
+
+/**
+ * Normaliza valor enviado desde el formulario admin para guardar en financiamiento_registros.
+ *
+ * @param array<string, mixed> $meta
+ * @return mixed|null
+ */
+function sol_fin_normalizar_valor_admin(string $col, $valor, array $meta) {
+    if ($col === 'tiene_conyuge') {
+        if ($valor === '' || $valor === null) {
+            return 0;
+        }
+        if (is_bool($valor)) {
+            return $valor ? 1 : 0;
+        }
+        $s = strtolower(trim((string) $valor));
+        if (in_array($s, ['1', 'true', 'yes', 'sí', 'si', 'on'], true)) {
+            return 1;
+        }
+        return 0;
+    }
+    $textarea = $meta['textarea'] ?? [];
+    if (in_array($col, $textarea, true)) {
+        $t = trim((string) $valor);
+        return $t === '' ? null : $t;
+    }
+    $dates = $meta['date'] ?? [];
+    if (in_array($col, $dates, true)) {
+        $t = trim((string) $valor);
+        if ($t === '') {
+            return null;
+        }
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $t)) {
+            return $t;
+        }
+        if (preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $t)) {
+            $dt = DateTime::createFromFormat('d/m/Y', $t);
+            if ($dt && $dt->format('d/m/Y') === $t) {
+                return $dt->format('Y-m-d');
+            }
+            $dt2 = DateTime::createFromFormat('m/d/Y', $t);
+            if ($dt2 && $dt2->format('m/d/Y') === $t) {
+                return $dt2->format('Y-m-d');
+            }
+        }
+        return $t;
+    }
+    $numbers = $meta['number'] ?? [];
+    if (in_array($col, $numbers, true)) {
+        if ($valor === '' || $valor === null) {
+            return null;
+        }
+        if (!is_numeric($valor)) {
+            return null;
+        }
+        return 0 + $valor;
+    }
+    $t = trim((string) $valor);
+    return $t === '' ? null : $t;
+}
+
+/**
+ * Compara dos valores de celda para detectar cambio (auditoría).
+ */
+function sol_fin_valor_celda_igual($a, $b): bool {
+    if ($a === null && $b === null) {
+        return true;
+    }
+    if ($a === null || $b === null) {
+        return false;
+    }
+    return (string) $a === (string) $b;
+}
+
 /**
  * Devuelve SELECT robusto para columnas esperadas en financiamiento_registros.
  * Si una columna no existe, devuelve NULL AS columna para evitar 500.
@@ -233,13 +337,15 @@ function sol_fin_obtener_adjuntos_por_registro(PDO $pdo, int $frId): array {
 }
 
 try {
-    if ($_SERVER['REQUEST_METHOD'] === 'POST' && (($_POST['action'] ?? '') === 'delete')) {
+    $postIn = ($_SERVER['REQUEST_METHOD'] === 'POST') ? sol_fin_parse_post_input() : [];
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && (($postIn['action'] ?? '') === 'delete')) {
         if (!$isAdmin) {
             http_response_code(403);
             echo json_encode(['success' => false, 'message' => 'Solo el administrador puede borrar registros.']);
             exit;
         }
-        $id = isset($_POST['id']) ? trim((string) $_POST['id']) : '';
+        $id = isset($postIn['id']) ? trim((string) $postIn['id']) : '';
         if ($id === '' || !ctype_digit($id)) {
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'ID inválido.']);
@@ -252,6 +358,206 @@ try {
             exit;
         }
         echo json_encode(['success' => true, 'message' => 'Registro eliminado correctamente.']);
+        exit;
+    }
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && (($postIn['action'] ?? '') === 'update_registro')) {
+        if (!$isAdmin) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Solo el administrador puede editar registros.']);
+            exit;
+        }
+        if (!sol_fin_tabla_existe($pdo, 'financiamiento_registro_auditoria')) {
+            http_response_code(503);
+            echo json_encode(['success' => false, 'message' => 'Falta la tabla de auditoría. Ejecute database/migracion_financiamiento_auditoria_refirma.sql en la base de datos.']);
+            exit;
+        }
+        $id = isset($postIn['id']) ? trim((string) $postIn['id']) : '';
+        if ($id === '' || !ctype_digit($id)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'ID inválido.']);
+            exit;
+        }
+        $datos = $postIn['datos'] ?? null;
+        if (!is_array($datos)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Debe enviar "datos" como objeto JSON.']);
+            exit;
+        }
+        $meta = require __DIR__ . '/../includes/financiamiento_registro_admin_campos.php';
+        $whitelist = array_flip($meta['columnas_editables']);
+        $st = $pdo->prepare('SELECT * FROM financiamiento_registros WHERE id = ?');
+        $st->execute([(int) $id]);
+        $row = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'message' => 'Registro no encontrado.']);
+            exit;
+        }
+        $cambios = [];
+        $sets = [];
+        foreach ($datos as $col => $valor) {
+            if (!is_string($col) || $col === '') {
+                continue;
+            }
+            if (!isset($whitelist[$col])) {
+                continue;
+            }
+            if (!sol_fin_fr_tiene_columna($pdo, $col)) {
+                continue;
+            }
+            $old = array_key_exists($col, $row) ? $row[$col] : null;
+            $nuevo = sol_fin_normalizar_valor_admin($col, $valor, $meta);
+            if (sol_fin_valor_celda_igual($old, $nuevo)) {
+                continue;
+            }
+            $cambios[$col] = ['old' => $old, 'new' => $nuevo];
+            $sets[$col] = $nuevo;
+        }
+        if ($sets === []) {
+            echo json_encode(['success' => true, 'message' => 'No hubo cambios que guardar.', 'cambios' => 0]);
+            exit;
+        }
+        $parts = [];
+        $vals = [];
+        foreach ($sets as $c => $v) {
+            $parts[] = '`' . str_replace('`', '', $c) . '` = ?';
+            $vals[] = $v;
+        }
+        $vals[] = (int) $id;
+        $sql = 'UPDATE financiamiento_registros SET ' . implode(', ', $parts) . ' WHERE id = ?';
+        $pdo->beginTransaction();
+        try {
+            $up = $pdo->prepare($sql);
+            $up->execute($vals);
+            $aud = $pdo->prepare('
+                INSERT INTO financiamiento_registro_auditoria
+                (financiamiento_registro_id, usuario_id, fecha_modificacion, cambios_json)
+                VALUES (?, ?, NOW(), ?)
+            ');
+            $aud->execute([
+                (int) $id,
+                (int) ($_SESSION['user_id'] ?? 0),
+                json_encode($cambios, JSON_UNESCAPED_UNICODE),
+            ]);
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
+        echo json_encode([
+            'success' => true,
+            'message' => 'Registro actualizado. Se registró la auditoría.',
+            'cambios' => count($cambios),
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && (($postIn['action'] ?? '') === 'generar_refirma')) {
+        if (!$isAdmin) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Solo el administrador puede generar enlaces de refirma.']);
+            exit;
+        }
+        if (!sol_fin_tabla_existe($pdo, 'financiamiento_refirma_token')) {
+            http_response_code(503);
+            echo json_encode(['success' => false, 'message' => 'Falta la tabla de tokens. Ejecute database/migracion_financiamiento_auditoria_refirma.sql en la base de datos.']);
+            exit;
+        }
+        $id = isset($postIn['id']) ? trim((string) $postIn['id']) : '';
+        if ($id === '' || !ctype_digit($id)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'ID inválido.']);
+            exit;
+        }
+        $frId = (int) $id;
+        $st = $pdo->prepare('SELECT id, cliente_nombre, cliente_correo, email_vendedor FROM financiamiento_registros WHERE id = ?');
+        $st->execute([$frId]);
+        $fr = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$fr) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'message' => 'Registro no encontrado.']);
+            exit;
+        }
+        $emailCliente = isset($fr['cliente_correo']) ? trim((string) $fr['cliente_correo']) : '';
+        if ($emailCliente === '' || !filter_var($emailCliente, FILTER_VALIDATE_EMAIL)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'El registro no tiene un correo de cliente válido; no se puede enviar el enlace de refirma.']);
+            exit;
+        }
+        $emailVend = isset($fr['email_vendedor']) ? trim((string) $fr['email_vendedor']) : '';
+        $emailVend = ($emailVend !== '' && filter_var($emailVend, FILTER_VALIDATE_EMAIL)) ? $emailVend : null;
+
+        $token = strtolower(bin2hex(random_bytes(32)));
+        $expires = (new DateTimeImmutable('now'))->modify('+30 minutes');
+        $expiresSql = $expires->format('Y-m-d H:i:s');
+
+        $pdo->beginTransaction();
+        try {
+            $inv = $pdo->prepare('
+                UPDATE financiamiento_refirma_token SET used_at = NOW()
+                WHERE financiamiento_registro_id = ? AND used_at IS NULL
+            ');
+            $inv->execute([$frId]);
+            $ins = $pdo->prepare('
+                INSERT INTO financiamiento_refirma_token
+                (financiamiento_registro_id, token, expires_at, created_by_usuario_id)
+                VALUES (?, ?, ?, ?)
+            ');
+            $ins->execute([$frId, $token, $expiresSql, (int) ($_SESSION['user_id'] ?? 0)]);
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
+
+        $emailCfg = require __DIR__ . '/../config/email.php';
+        $baseUrl = rtrim((string) ($emailCfg['app_url'] ?? ''), '/');
+        if ($baseUrl === '') {
+            $baseUrl = '';
+        }
+        $pathRel = '/financiamiento/refirma.php?t=' . rawurlencode($token);
+        $linkAbs = ($baseUrl !== '' ? $baseUrl : '') . $pathRel;
+
+        $nombreCli = trim((string) ($fr['cliente_nombre'] ?? ''));
+        $asunto = 'Enlace para firmar de nuevo su solicitud de financiamiento';
+        $expLeg = $expires->format('d/m/Y H:i');
+        $cuerpoHtml = '<p>Estimado/a ' . htmlspecialchars($nombreCli !== '' ? $nombreCli : 'cliente', ENT_QUOTES, 'UTF-8') . ',</p>'
+            . '<p>Para <strong>volver a firmar</strong> su solicitud de financiamiento, use el siguiente enlace. Solo podrá usarse <strong>una vez</strong> y caduca el <strong>' . htmlspecialchars($expLeg, ENT_QUOTES, 'UTF-8') . '</strong> (30 minutos desde su generación).</p>'
+            . '<p><a href="' . htmlspecialchars($linkAbs, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($linkAbs, ENT_QUOTES, 'UTF-8') . '</a></p>'
+            . '<p>Si no solicitó este correo, puede ignorarlo.</p>'
+            . '<p style="font-size:13px;color:#555;">Este mensaje es automático.</p>';
+        $cuerpoTxt = "Estimado/a {$nombreCli},\n\n"
+            . "Use este enlace para volver a firmar (una sola vez; válido hasta {$expLeg}):\n{$linkAbs}\n";
+
+        require_once __DIR__ . '/../includes/EmailService.php';
+        $mail = new EmailService();
+        $resCliente = $mail->enviarCorreo($emailCliente, $asunto, $cuerpoHtml, '', $cuerpoTxt, [], [], [], '');
+        if ($emailVend !== null && strcasecmp($emailVend, $emailCliente) !== 0) {
+            $cuerpoV = '<p>Se generó un enlace para que el cliente <strong>' . htmlspecialchars($nombreCli, ENT_QUOTES, 'UTF-8') . '</strong> vuelva a firmar la solicitud de financiamiento (registro #' . (int) $frId . ').</p>'
+                . '<p>Enlace (caduca ' . htmlspecialchars($expLeg, ENT_QUOTES, 'UTF-8') . '):<br><a href="' . htmlspecialchars($linkAbs, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($linkAbs, ENT_QUOTES, 'UTF-8') . '</a></p>'
+                . '<p style="font-size:13px;color:#555;">Mensaje automático.</p>';
+            $mail->enviarCorreo($emailVend, $asunto . ' (notificación vendedor)', $cuerpoV, '', strip_tags($cuerpoV), [], [], [], '');
+        }
+        $okC = !empty($resCliente['success']);
+        if (!$okC) {
+            http_response_code(502);
+            echo json_encode([
+                'success' => false,
+                'message' => 'El token se generó pero no se pudo enviar el correo al cliente: ' . ($resCliente['message'] ?? 'error'),
+                'data' => ['expires_at' => $expiresSql, 'link' => $linkAbs],
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        echo json_encode([
+            'success' => true,
+            'message' => 'Enlace generado y enviado al cliente' . ($emailVend && strcasecmp($emailVend, $emailCliente) !== 0 ? ' y al vendedor' : '') . '. Válido 30 minutos.',
+            'data' => ['expires_at' => $expiresSql],
+        ], JSON_UNESCAPED_UNICODE);
         exit;
     }
 

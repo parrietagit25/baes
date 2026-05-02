@@ -8,6 +8,8 @@ if (!isset($_SESSION['user_id'])) {
 require_once 'config/database.php';
 require_once 'includes/validar_acceso.php';
 
+$finCamposAdminMeta = require __DIR__ . '/includes/financiamiento_registro_admin_campos.php';
+
 $userRoles = $_SESSION['user_roles'] ?? [];
 $isAdmin = in_array('ROLE_ADMIN', $userRoles);
 $isGestor = in_array('ROLE_GESTOR', $userRoles);
@@ -111,13 +113,71 @@ $isGestor = in_array('ROLE_GESTOR', $userRoles);
         </div>
     </div>
 
+    <div class="modal fade" id="editarRegistroModal" tabindex="-1">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header" style="background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%);">
+                    <h5 class="modal-title text-white"><i class="fas fa-pen me-2"></i>Editar datos del registro</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small">Solo datos del formulario. La firma y firmantes adicionales no se pueden editar aquí. Cada guardado queda registrado en auditoría.</p>
+                    <div id="editarRegistroAlert" class="alert d-none" role="alert"></div>
+                    <div id="editarRegistroFormWrap"><p class="text-muted">Cargando...</p></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-success" id="btnGuardarEdicionRegistro"><i class="fas fa-save me-1"></i>Guardar cambios</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="refirmaModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header" style="background: linear-gradient(135deg, #b45309 0%, #c2410c 100%);">
+                    <h5 class="modal-title text-white"><i class="fas fa-signature me-2"></i>Refirma</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Se enviará al <strong>cliente</strong> (correo del formulario) y al <strong>vendedor asociado</strong> (si hay correo distinto) un enlace para que el cliente <strong>vuelva a firmar</strong> únicamente.</p>
+                    <p class="mb-0">El enlace <strong>caduca a los 30 minutos</strong> y solo puede usarse <strong>una vez</strong>. Ese tiempo suele ser suficiente para que el cliente complete la firma.</p>
+                    <div id="refirmaAlert" class="alert d-none mt-3" role="alert"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-warning text-dark" id="btnConfirmarRefirma"><i class="fas fa-paper-plane me-1"></i>Enviar enlaces</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
     <script>
+    var FIN_CAMPOS_EDITABLES = <?php echo json_encode(array_map(function ($k) use ($finCamposAdminMeta) {
+        $type = 'text';
+        if (in_array($k, $finCamposAdminMeta['textarea'] ?? [], true)) {
+            $type = 'textarea';
+        } elseif (in_array($k, $finCamposAdminMeta['number'] ?? [], true)) {
+            $type = 'number';
+        } elseif (in_array($k, $finCamposAdminMeta['date'] ?? [], true)) {
+            $type = 'date';
+        }
+        return [
+            'key' => $k,
+            'label' => $finCamposAdminMeta['labels'][$k] ?? $k,
+            'type' => $type,
+        ];
+    }, $finCamposAdminMeta['columnas_editables']), JSON_UNESCAPED_UNICODE); ?>;
+
     $(function() {
         var esAdmin = <?php echo $isAdmin ? 'true' : 'false'; ?>;
+        var editarRegistroId = null;
+        var refirmaRegistroId = null;
 
         function enhanceSignatureForView(imgEl, base64) {
             try {
@@ -180,7 +240,9 @@ $isGestor = in_array('ROLE_GESTOR', $userRoles);
                                '<button type="button" class="btn btn-sm btn-info btn-ver-detalle me-1" data-id="' + row.id + '"><i class="fas fa-eye"></i> Ver detalle</button>' +
                                '<button type="button" class="btn btn-sm btn-primary btn-ver-adjuntos me-1" data-id="' + row.id + '"><i class="fas fa-paperclip"></i> Adjuntos</button>';
                     if (esAdmin) {
-                        html += '<button type="button" class="btn btn-sm btn-danger btn-borrar-registro" data-id="' + row.id + '"><i class="fas fa-trash"></i> Borrar</button>';
+                        html += '<button type="button" class="btn btn-sm btn-secondary btn-editar-registro me-1" data-id="' + row.id + '"><i class="fas fa-pen"></i> Editar</button>' +
+                               '<button type="button" class="btn btn-sm btn-warning text-dark btn-refirma-registro me-1" data-id="' + row.id + '"><i class="fas fa-signature"></i> Refirma</button>' +
+                               '<button type="button" class="btn btn-sm btn-danger btn-borrar-registro" data-id="' + row.id + '"><i class="fas fa-trash"></i> Borrar</button>';
                     }
                     return html;
                 }}
@@ -320,6 +382,116 @@ $isGestor = in_array('ROLE_GESTOR', $userRoles);
                 .fail(function() {
                     $content.html('<p class="text-danger">Error al cargar adjuntos.</p>');
                 });
+        });
+
+        function finEscAttr(s) {
+            return String(s).replace(/"/g, '&quot;');
+        }
+
+        function buildEditarRegistroForm(d) {
+            var html = '<div class="row g-2">';
+            FIN_CAMPOS_EDITABLES.forEach(function(f) {
+                var val = d[f.key];
+                if (val === null || val === undefined) val = '';
+                var safeVal = $('<div>').text(String(val)).html();
+                var id = 'ef_' + f.key;
+                var lab = $('<div>').text(f.label).html();
+                html += '<div class="col-md-6"><label class="form-label small mb-0" for="' + id + '">' + lab + '</label>';
+                if (f.key === 'tiene_conyuge') {
+                    var sel0 = String(val) === '0' || val === 0 || val === false ? ' selected' : '';
+                    var sel1 = String(val) === '1' || val === 1 || val === true ? ' selected' : '';
+                    html += '<select class="form-select form-select-sm" id="' + id + '" name="' + finEscAttr(f.key) + '">' +
+                        '<option value="0"' + sel0 + '>No</option><option value="1"' + sel1 + '>Sí</option></select>';
+                } else if (f.type === 'textarea') {
+                    html += '<textarea class="form-control form-control-sm" id="' + id + '" name="' + finEscAttr(f.key) + '" rows="2">' + safeVal + '</textarea>';
+                } else {
+                    var step = f.type === 'number' ? ' step="any"' : '';
+                    html += '<input type="' + f.type + '" class="form-control form-control-sm" id="' + id + '" name="' + finEscAttr(f.key) + '" value="' + safeVal + '"' + step + '>';
+                }
+                html += '</div>';
+            });
+            html += '</div>';
+            return html;
+        }
+
+        $(document).on('click', '.btn-editar-registro', function() {
+            if (!esAdmin) return;
+            var id = $(this).data('id');
+            editarRegistroId = id;
+            var $wrap = $('#editarRegistroFormWrap');
+            var $al = $('#editarRegistroAlert');
+            $al.addClass('d-none').removeClass('alert-danger alert-success').text('');
+            $wrap.html('<p class="text-muted">Cargando...</p>');
+            $('#editarRegistroModal').modal('show');
+            $.get('api/sol_financiamiento.php?id=' + id)
+                .done(function(res) {
+                    if (!res.success || !res.data) {
+                        $wrap.html('<p class="text-danger">No se pudo cargar el registro.</p>');
+                        return;
+                    }
+                    $wrap.html(buildEditarRegistroForm(res.data));
+                })
+                .fail(function() {
+                    $wrap.html('<p class="text-danger">Error al cargar.</p>');
+                });
+        });
+
+        $('#btnGuardarEdicionRegistro').on('click', function() {
+            if (!esAdmin || !editarRegistroId) return;
+            var datos = {};
+            FIN_CAMPOS_EDITABLES.forEach(function(f) {
+                var $el = $('#ef_' + f.key);
+                if (!$el.length) return;
+                datos[f.key] = $el.val();
+            });
+            var $al = $('#editarRegistroAlert');
+            $al.addClass('d-none');
+            $.ajax({
+                url: 'api/sol_financiamiento.php',
+                method: 'POST',
+                contentType: 'application/json; charset=utf-8',
+                data: JSON.stringify({ action: 'update_registro', id: String(editarRegistroId), datos: datos })
+            }).done(function(res) {
+                if (res && res.success) {
+                    $al.removeClass('d-none alert-danger').addClass('alert-success').text(res.message || 'Guardado.');
+                    table.ajax.reload(null, false);
+                } else {
+                    $al.removeClass('d-none alert-success').addClass('alert-danger').text((res && res.message) ? res.message : 'No se pudo guardar.');
+                }
+            }).fail(function(xhr) {
+                var msg = 'Error al guardar.';
+                if (xhr && xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
+                $al.removeClass('d-none alert-success').addClass('alert-danger').text(msg);
+            });
+        });
+
+        $(document).on('click', '.btn-refirma-registro', function() {
+            if (!esAdmin) return;
+            refirmaRegistroId = $(this).data('id');
+            $('#refirmaAlert').addClass('d-none').removeClass('alert-danger alert-success').text('');
+            $('#refirmaModal').modal('show');
+        });
+
+        $('#btnConfirmarRefirma').on('click', function() {
+            if (!esAdmin || !refirmaRegistroId) return;
+            var $al = $('#refirmaAlert');
+            $al.addClass('d-none');
+            $.ajax({
+                url: 'api/sol_financiamiento.php',
+                method: 'POST',
+                contentType: 'application/json; charset=utf-8',
+                data: JSON.stringify({ action: 'generar_refirma', id: String(refirmaRegistroId) })
+            }).done(function(res) {
+                if (res && res.success) {
+                    $al.removeClass('d-none alert-danger').addClass('alert-success').text(res.message || 'Listo.');
+                } else {
+                    $al.removeClass('d-none alert-success').addClass('alert-danger').text((res && res.message) ? res.message : 'No se pudo generar el enlace.');
+                }
+            }).fail(function(xhr) {
+                var msg = 'Error en la solicitud.';
+                if (xhr && xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
+                $al.removeClass('d-none alert-success').addClass('alert-danger').text(msg);
+            });
         });
     });
     </script>
