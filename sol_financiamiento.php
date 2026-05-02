@@ -63,7 +63,7 @@ $isGestor = in_array('ROLE_GESTOR', $userRoles);
                                         <th>Cédula</th>
                                         <th>Email</th>
                                         <th>Teléfono</th>
-                                        <th>Empresa</th>
+                                        <th>Vendedor</th>
                                         <th>Vehículo</th>
                                         <th></th>
                                     </tr>
@@ -167,7 +167,7 @@ $isGestor = in_array('ROLE_GESTOR', $userRoles);
                 { data: 'cliente_id', defaultContent: '—' },
                 { data: 'cliente_correo', defaultContent: '—' },
                 { data: 'celular_cliente', defaultContent: '—' },
-                { data: 'empresa_nombre', defaultContent: '—' },
+                { data: 'email_vendedor', defaultContent: '—' },
                 { data: null, orderable: false, render: function(row) {
                     var v = [];
                     if (row.marca_auto) v.push(row.marca_auto);
