@@ -28,6 +28,8 @@ if (in_array($action, [
     'exportar_excel_encuestas_vendedores',
     'exportar_excel_encuestas_gestores',
     'exportar_excel_telemetria',
+    'exportar_excel_fin_publica',
+    'exportar_excel_fin_enlazada',
 ], true)) {
     exportarReporteCsv($action);
     exit();
@@ -66,6 +68,12 @@ switch ($action) {
     case 'reporte_telemetria':
         reporteTelemetria();
         break;
+    case 'reporte_fin_publica_demografia':
+        reporteFinPublicaDemografia();
+        break;
+    case 'reporte_fin_publica_enlazada':
+        reporteFinPublicaEnlazada();
+        break;
     case 'exportar_todos_excel':
         // Ya atendido al inicio.
         echo json_encode(['success' => false, 'message' => 'Acción ya ejecutada']);
@@ -78,6 +86,8 @@ switch ($action) {
     case 'exportar_excel_encuestas_vendedores':
     case 'exportar_excel_encuestas_gestores':
     case 'exportar_excel_telemetria':
+    case 'exportar_excel_fin_publica':
+    case 'exportar_excel_fin_enlazada':
         // Ya atendido al inicio.
         echo json_encode(['success' => false, 'message' => 'Acción ya ejecutada']);
         break;
@@ -235,6 +245,30 @@ function exportarReporteCsv(string $action): void {
         _outputXlsxDownload('reporte_encuestas_gestores.xlsx', 'Enc Gestores', [
             'ID', 'Fecha', 'Nombre Completo', 'Cargo', 'P1', 'P2', 'P3', 'P4', 'P5', 'Promedio', 'Recomendaciones'
         ], $rows);
+        return;
+    }
+
+    if ($action === 'exportar_excel_fin_publica') {
+        require_once __DIR__ . '/../includes/reportes_fin_demografia_data.php';
+        $filt = rep_fin_parse_filtros();
+        $rows = rep_fin_filas_export_publica($pdo, $filt);
+        _outputXlsxDownload('reporte_fin_publica_demografia.xlsx', 'Sol Publica', [
+            'ID', 'Fecha', 'Cliente', 'Sexo', 'Genero agrupado', 'Edad calc', 'Rango edad', 'Salario USD', 'Rango salario', 'Perfil estimado', 'Sector estimado',
+        ], $rows);
+        return;
+    }
+
+    if ($action === 'exportar_excel_fin_enlazada') {
+        require_once __DIR__ . '/../includes/reportes_fin_demografia_data.php';
+        $filt = rep_fin_parse_filtros();
+        [$headers, $rows] = rep_fin_filas_export_enlazada($pdo, $filt);
+        if ($headers === []) {
+            _outputXlsxDownload('reporte_fin_enlazada.xlsx', 'Info', [
+                'Mensaje',
+            ], [['Ejecute migracion solicitud_financiamiento_registro_id o no hay columna financiamiento_registro_id.']]);
+            return;
+        }
+        _outputXlsxDownload('reporte_fin_publica_enlazada.xlsx', 'Publica Motus', $headers, $rows);
         return;
     }
 
@@ -1445,6 +1479,30 @@ function reporteTelemetria() {
             ]);
             return;
         }
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Error de base de datos']);
+    }
+}
+
+function reporteFinPublicaDemografia(): void
+{
+    global $pdo;
+    require_once __DIR__ . '/../includes/reportes_fin_demografia_data.php';
+    try {
+        echo json_encode(rep_fin_build_reporte_publica($pdo));
+    } catch (PDOException $e) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Error de base de datos']);
+    }
+}
+
+function reporteFinPublicaEnlazada(): void
+{
+    global $pdo;
+    require_once __DIR__ . '/../includes/reportes_fin_demografia_data.php';
+    try {
+        echo json_encode(rep_fin_build_reporte_enlazada($pdo));
+    } catch (PDOException $e) {
         http_response_code(500);
         echo json_encode(['success' => false, 'message' => 'Error de base de datos']);
     }

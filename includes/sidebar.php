@@ -111,6 +111,12 @@ $isVendedor = in_array('ROLE_VENDEDOR', $_SESSION['user_roles']);
         <a class="nav-link ps-4 py-1 small <?php echo ($report_submenu === 'telemetria') ? 'active' : ''; ?>" href="reportes.php?submenu=telemetria">
             <i class="fas fa-stopwatch me-1"></i> Rep. Telemetría
         </a>
+        <a class="nav-link ps-4 py-1 small <?php echo ($report_submenu === 'fin_publica') ? 'active' : ''; ?>" href="reportes.php?submenu=fin_publica">
+            <i class="fas fa-file-invoice-dollar me-1"></i> Sol. Fin. (público)
+        </a>
+        <a class="nav-link ps-4 py-1 small <?php echo ($report_submenu === 'fin_enlazada') ? 'active' : ''; ?>" href="reportes.php?submenu=fin_enlazada">
+            <i class="fas fa-link me-1"></i> Sol. Fin. + Motus
+        </a>
         <?php endif; ?>
         
         <!-- Cerrar Sesión - Visible para todos -->

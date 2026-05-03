@@ -15,11 +15,23 @@ if (!in_array('ROLE_ADMIN', $_SESSION['user_roles'])) {
 }
 
 $submenu = $_GET['submenu'] ?? 'usuarios';
-if (!in_array($submenu, ['usuarios', 'vendedores', 'tiempo', 'banco', 'emails', 'encuestas', 'telemetria'], true)) {
+if (!in_array($submenu, ['usuarios', 'vendedores', 'tiempo', 'banco', 'emails', 'encuestas', 'telemetria', 'fin_publica', 'fin_enlazada'], true)) {
     $submenu = 'usuarios';
 }
+$finRepDesde = (new DateTimeImmutable('-365 days'))->format('Y-m-d');
+$finRepHasta = (new DateTimeImmutable('today'))->format('Y-m-d');
 $estadosCol = ['Nueva', 'En Revisión Banco', 'Aprobada', 'Rechazada', 'Completada', 'Desistimiento'];
-$titulosReporte = ['usuarios' => 'Rep. Usuarios', 'vendedores' => 'Rep. Vendedores', 'tiempo' => 'Rep. Tiempo', 'banco' => 'Rep. Banco', 'emails' => 'Rep. Correos', 'encuestas' => 'Rep. Encuestas', 'telemetria' => 'Rep. Telemetría'];
+$titulosReporte = [
+    'usuarios' => 'Rep. Usuarios',
+    'vendedores' => 'Rep. Vendedores',
+    'tiempo' => 'Rep. Tiempo',
+    'banco' => 'Rep. Banco',
+    'emails' => 'Rep. Correos',
+    'encuestas' => 'Rep. Encuestas',
+    'telemetria' => 'Rep. Telemetría',
+    'fin_publica' => 'Sol. Financiamiento (público)',
+    'fin_enlazada' => 'Sol. Pública + Motus enlazada',
+];
 $exportActionPorSubmenu = [
     'usuarios' => ['action' => 'exportar_excel_usuarios', 'label' => 'Descargar Rep. Usuarios'],
     'vendedores' => ['action' => 'exportar_excel_vendedores', 'label' => 'Descargar Rep. Vendedores'],
@@ -60,6 +72,7 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
         .enc-bloque-title.v { border-left: 4px solid #0d6efd; padding-left: 0.5rem; }
         .enc-bloque-title.g { border-left: 4px solid #6f42c1; padding-left: 0.5rem; }
         .tel-chart-wrap { min-height: 260px; }
+        .fin-chart-wrap { min-height: 280px; }
     </style>
 </head>
 <body>
@@ -85,6 +98,8 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
                             elseif ($submenu === 'banco') echo 'Tiempo que tardan los bancos en dar respuesta a las solicitudes asignadas';
                             elseif ($submenu === 'encuestas') echo 'Promedios, totales y detalle de respuestas a las encuestas públicas (vendedores y gestores)';
                             elseif ($submenu === 'telemetria') echo 'Tiempos del wizard, inicio/fin, dispositivo, IP y datos de contacto capturados en solicitud pública';
+                            elseif ($submenu === 'fin_publica') echo 'Demografía y perfiles inferidos desde el formulario público de financiamiento (sin solicitud Motus obligatoria)';
+                            elseif ($submenu === 'fin_enlazada') echo 'Mismo análisis del formulario público, limitado a envíos que ya tienen solicitud de crédito Motus vinculada';
                             else echo 'Cantidad de correos enviados/fallidos y detalle de destinatarios';
                         ?></p>
                     </div>
@@ -368,6 +383,190 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
                         </div>
                     </div>
 
+                    <!-- Sol. Financiamiento — solo público -->
+                    <div id="panel-fin-publica" class="report-panel" style="display: <?php echo $submenu === 'fin_publica' ? 'block' : 'none'; ?>">
+                        <div class="alert alert-info small mb-3">
+                            <i class="fas fa-info-circle me-1"></i>
+                            <strong>Metodología:</strong> el perfil laboral y el sector (público/privado) se estiman con reglas sobre el texto del formulario; no sustituyen revisión humana.
+                            <span id="finPubNotaApi" class="d-block mt-1 text-danger small"></span>
+                        </div>
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <div class="row g-2 align-items-end flex-wrap">
+                                    <div class="col-md-2">
+                                        <label class="form-label small mb-0">Desde</label>
+                                        <input type="date" id="finPubDesde" class="form-control form-control-sm" value="<?php echo htmlspecialchars($finRepDesde); ?>">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label small mb-0">Hasta</label>
+                                        <input type="date" id="finPubHasta" class="form-control form-control-sm" value="<?php echo htmlspecialchars($finRepHasta); ?>">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label small mb-0">Género (formulario)</label>
+                                        <div class="d-flex flex-wrap gap-2 small">
+                                            <label class="mb-0"><input type="checkbox" class="form-check-input fin-pub-gen" value="Femenino" checked> F</label>
+                                            <label class="mb-0"><input type="checkbox" class="form-check-input fin-pub-gen" value="Masculino" checked> M</label>
+                                            <label class="mb-0"><input type="checkbox" class="form-check-input fin-pub-gen" value="Otro" checked> Otro</label>
+                                            <label class="mb-0"><input type="checkbox" class="form-check-input fin-pub-gen" value="Sin dato" checked> Sin dato</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label small mb-0">Perfil estimado</label>
+                                        <select id="finPubPerfil" class="form-select form-select-sm">
+                                            <option value="">Todos</option>
+                                            <option value="asalariado">Asalariado</option>
+                                            <option value="independiente">Independiente</option>
+                                            <option value="jubilado">Jubilado</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label small mb-0">Sector (solo asalariado est.)</label>
+                                        <select id="finPubSector" class="form-select form-select-sm">
+                                            <option value="">Todos</option>
+                                            <option value="gobierno">Público estimado</option>
+                                            <option value="privado">Privado estimado</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <button type="button" class="btn btn-primary btn-sm w-100 mt-2 mt-md-0" id="btnFinPubFiltrar"><i class="fas fa-sync me-1"></i>Actualizar</button>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <a href="#" class="btn btn-outline-success btn-sm w-100 mt-1" id="finPubExportXlsx"><i class="fas fa-file-excel me-1"></i>Excel</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-3"><div class="card"><div class="card-body text-center"><div class="text-muted small">Registros (filtrados)</div><div class="h4 mb-0" id="finPubKpiN">0</div></div></div></div>
+                            <div class="col-md-3"><div class="card"><div class="card-body text-center"><div class="text-muted small">Edad promedio</div><div class="h4 mb-0 text-primary" id="finPubKpiEdad">—</div></div></div></div>
+                            <div class="col-md-3"><div class="card"><div class="card-body text-center"><div class="text-muted small">Salario prom. (USD)</div><div class="h4 mb-0 text-success" id="finPubKpiSal">—</div></div></div></div>
+                            <div class="col-md-3"><div class="card"><div class="card-body text-center"><div class="text-muted small">Rango fechas</div><div class="h6 mb-0 text-secondary" id="finPubKpiFechas">—</div></div></div></div>
+                        </div>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-4"><div class="card h-100"><div class="card-body"><h6 class="mb-2">Género</h6><div class="fin-chart-wrap"><canvas id="finPubChartGen"></canvas></div></div></div></div>
+                            <div class="col-md-4"><div class="card h-100"><div class="card-body"><h6 class="mb-2">Rango salario (USD)</h6><div class="fin-chart-wrap"><canvas id="finPubChartSal"></canvas></div></div></div></div>
+                            <div class="col-md-4"><div class="card h-100"><div class="card-body"><h6 class="mb-2">Rango de edad</h6><div class="fin-chart-wrap"><canvas id="finPubChartEdad"></canvas></div></div></div></div>
+                        </div>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-4"><div class="card h-100"><div class="card-body"><h6 class="mb-2">Perfil laboral (estimado)</h6><div class="fin-chart-wrap"><canvas id="finPubChartPerfil"></canvas></div></div></div></div>
+                            <div class="col-md-4"><div class="card h-100"><div class="card-body"><h6 class="mb-2">Sector si asalariado (estimado)</h6><div class="fin-chart-wrap"><canvas id="finPubChartSector"></canvas></div></div></div></div>
+                            <div class="col-md-4"><div class="card h-100"><div class="card-body"><h6 class="mb-2">Salario × género (apilado)</h6><div class="fin-chart-wrap"><canvas id="finPubChartCruce"></canvas></div></div></div></div>
+                        </div>
+                        <div class="card">
+                            <div class="card-body">
+                                <h6 class="mb-2">Muestra reciente</h6>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-bordered table-reportes" id="tabla-fin-pub">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Id</th><th>Fecha</th><th>Cliente</th><th>Género</th><th>Edad</th><th>Rango USD</th><th>Perfil est.</th><th>Sector est.</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sol. Pública + Motus -->
+                    <div id="panel-fin-enlazada" class="report-panel" style="display: <?php echo $submenu === 'fin_enlazada' ? 'block' : 'none'; ?>">
+                        <div class="alert alert-info small mb-3">
+                            <i class="fas fa-link me-1"></i>
+                            Solo filas con <code>solicitudes_credito.financiamiento_registro_id</code> apuntando al registro público.
+                            <span id="finEnlNotaApi" class="d-block mt-1 text-muted"></span>
+                        </div>
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <div class="row g-2 align-items-end flex-wrap">
+                                    <div class="col-md-2">
+                                        <label class="form-label small mb-0">Desde</label>
+                                        <input type="date" id="finEnlDesde" class="form-control form-control-sm" value="<?php echo htmlspecialchars($finRepDesde); ?>">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label small mb-0">Hasta</label>
+                                        <input type="date" id="finEnlHasta" class="form-control form-control-sm" value="<?php echo htmlspecialchars($finRepHasta); ?>">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label small mb-0">Estado solicitud Motus</label>
+                                        <select id="finEnlEstado" class="form-select form-select-sm">
+                                            <option value="">Todos</option>
+                                            <?php foreach ($estadosCol as $e): ?>
+                                            <option value="<?php echo htmlspecialchars($e); ?>"><?php echo htmlspecialchars($e); ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label small mb-0">Género (formulario)</label>
+                                        <div class="d-flex flex-wrap gap-2 small">
+                                            <label class="mb-0"><input type="checkbox" class="form-check-input fin-enl-gen" value="Femenino" checked> F</label>
+                                            <label class="mb-0"><input type="checkbox" class="form-check-input fin-enl-gen" value="Masculino" checked> M</label>
+                                            <label class="mb-0"><input type="checkbox" class="form-check-input fin-enl-gen" value="Otro" checked> Otro</label>
+                                            <label class="mb-0"><input type="checkbox" class="form-check-input fin-enl-gen" value="Sin dato" checked> Sin dato</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label small mb-0">Perfil estimado</label>
+                                        <select id="finEnlPerfil" class="form-select form-select-sm">
+                                            <option value="">Todos</option>
+                                            <option value="asalariado">Asalariado</option>
+                                            <option value="independiente">Independiente</option>
+                                            <option value="jubilado">Jubilado</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label small mb-0">Sector estimado</label>
+                                        <select id="finEnlSector" class="form-select form-select-sm">
+                                            <option value="">Todos</option>
+                                            <option value="gobierno">Público estimado</option>
+                                            <option value="privado">Privado estimado</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <button type="button" class="btn btn-primary btn-sm w-100 mt-2" id="btnFinEnlFiltrar"><i class="fas fa-sync me-1"></i>Actualizar</button>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <a href="#" class="btn btn-outline-success btn-sm w-100 mt-1" id="finEnlExportXlsx"><i class="fas fa-file-excel me-1"></i>Excel</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-3"><div class="card"><div class="card-body text-center"><div class="text-muted small">Parejas público–Motus</div><div class="h4 mb-0" id="finEnlKpiN">0</div></div></div></div>
+                            <div class="col-md-3"><div class="card"><div class="card-body text-center"><div class="text-muted small">Perfil coincide (est. vs Motus)</div><div class="h4 mb-0 text-success" id="finEnlKpiPerfilOk">—</div></div></div></div>
+                            <div class="col-md-3"><div class="card"><div class="card-body text-center"><div class="text-muted small">Género coincide</div><div class="h4 mb-0 text-primary" id="finEnlKpiGenOk">—</div></div></div></div>
+                            <div class="col-md-3"><div class="card"><div class="card-body text-center"><div class="text-muted small">Rango fechas</div><div class="h6 mb-0 text-secondary" id="finEnlKpiFechas">—</div></div></div></div>
+                        </div>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-4"><div class="card h-100"><div class="card-body"><h6 class="mb-2">Estado solicitud Motus</h6><div class="fin-chart-wrap"><canvas id="finEnlChartEstado"></canvas></div></div></div></div>
+                            <div class="col-md-4"><div class="card h-100"><div class="card-body"><h6 class="mb-2">Perfil financiero (Motus)</h6><div class="fin-chart-wrap"><canvas id="finEnlChartPerfilMotus"></canvas></div></div></div></div>
+                            <div class="col-md-4"><div class="card h-100"><div class="card-body"><h6 class="mb-2">Género (formulario público)</h6><div class="fin-chart-wrap"><canvas id="finEnlChartGen"></canvas></div></div></div></div>
+                        </div>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6"><div class="card h-100"><div class="card-body"><h6 class="mb-2">Estado Motus × perfil Motus</h6><div class="fin-chart-wrap"><canvas id="finEnlChartCruce"></canvas></div></div></div></div>
+                            <div class="col-md-6"><div class="card h-100"><div class="card-body"><h6 class="mb-2">Perfil estimado (público)</h6><div class="fin-chart-wrap"><canvas id="finEnlChartPerfilPub"></canvas></div></div></div></div>
+                        </div>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6"><div class="card h-100"><div class="card-body"><h6 class="mb-2">Rango salario (USD) — público</h6><div class="fin-chart-wrap"><canvas id="finEnlChartSal"></canvas></div></div></div></div>
+                            <div class="col-md-6"><div class="card h-100"><div class="card-body"><h6 class="mb-2">Salario × género (apilado)</h6><div class="fin-chart-wrap"><canvas id="finEnlChartCruceSal"></canvas></div></div></div></div>
+                        </div>
+                        <div class="card">
+                            <div class="card-body">
+                                <h6 class="mb-2">Muestra</h6>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-bordered table-reportes" id="tabla-fin-enl">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Id FR</th><th>Fecha</th><th>Cliente</th><th>Id sol.</th><th>Estado</th><th>Perfil pub. est.</th><th>Perfil Motus</th><th>Gén. pub.</th><th>Gén. Motus</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Rep. Correos -->
                     <div id="panel-emails" class="report-panel" style="display: <?php echo $submenu === 'emails' ? 'block' : 'none'; ?>">
                         <div class="row g-3 mb-3">
@@ -488,6 +687,8 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
     let telChartUbicacion = null;
     let telChartResolucion = null;
     let bancoSolicitudesChart = null;
+    const finPubCharts = {};
+    const finEnlCharts = {};
 
     if (submenu === 'usuarios') {
         loadReporteUsuarios();
@@ -503,6 +704,10 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
         loadReporteEncuestas();
     } else if (submenu === 'telemetria') {
         loadReporteTelemetria();
+    } else if (submenu === 'fin_publica') {
+        loadFinPublicaDemografia();
+    } else if (submenu === 'fin_enlazada') {
+        loadFinEnlazadaDemografia();
     }
 
     function loadReporteUsuarios() {
@@ -789,6 +994,300 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
     const btnFiltrarTelemetria = document.getElementById('btnFiltrarTelemetria');
     if (btnFiltrarTelemetria) {
         btnFiltrarTelemetria.addEventListener('click', aplicarFiltroTelemetria);
+    }
+    const btnFinPubFiltrar = document.getElementById('btnFinPubFiltrar');
+    if (btnFinPubFiltrar) btnFinPubFiltrar.addEventListener('click', loadFinPublicaDemografia);
+    const btnFinEnlFiltrar = document.getElementById('btnFinEnlFiltrar');
+    if (btnFinEnlFiltrar) btnFinEnlFiltrar.addEventListener('click', loadFinEnlazadaDemografia);
+
+    function finDestroyCharts(map) {
+        Object.keys(map).forEach(function(k) {
+            if (map[k]) {
+                map[k].destroy();
+                map[k] = null;
+            }
+        });
+    }
+
+    function finCheckedGeneros(selClass) {
+        const out = [];
+        document.querySelectorAll(selClass).forEach(function(cb) {
+            if (cb.checked) out.push(cb.value);
+        });
+        return out;
+    }
+
+    function finPubQueryString() {
+        const p = new URLSearchParams();
+        p.set('desde', (document.getElementById('finPubDesde') || {}).value || '');
+        p.set('hasta', (document.getElementById('finPubHasta') || {}).value || '');
+        const gens = finCheckedGeneros('.fin-pub-gen');
+        if (gens.length && gens.length < 4) p.set('generos', gens.join(','));
+        const perf = (document.getElementById('finPubPerfil') || {}).value || '';
+        if (perf) p.set('perfil', perf);
+        const sec = (document.getElementById('finPubSector') || {}).value || '';
+        if (sec) p.set('sector', sec);
+        return p.toString();
+    }
+
+    function finEnlQueryString() {
+        const p = new URLSearchParams();
+        p.set('desde', (document.getElementById('finEnlDesde') || {}).value || '');
+        p.set('hasta', (document.getElementById('finEnlHasta') || {}).value || '');
+        const gens = finCheckedGeneros('.fin-enl-gen');
+        if (gens.length && gens.length < 4) p.set('generos', gens.join(','));
+        const perf = (document.getElementById('finEnlPerfil') || {}).value || '';
+        if (perf) p.set('perfil', perf);
+        const sec = (document.getElementById('finEnlSector') || {}).value || '';
+        if (sec) p.set('sector', sec);
+        const est = (document.getElementById('finEnlEstado') || {}).value || '';
+        if (est) p.set('estado_sc', est);
+        return p.toString();
+    }
+
+    function finObjToLabelsValues(obj, ordenPref) {
+        const labels = [];
+        const values = [];
+        const keys = ordenPref ? ordenPref.filter(function(k) { return obj && (obj[k] || 0) > 0; }) : Object.keys(obj || {});
+        const rest = Object.keys(obj || {}).filter(function(k) { return keys.indexOf(k) === -1; }).sort();
+        keys.concat(rest).forEach(function(k) {
+            const v = (obj && obj[k]) ? Number(obj[k]) : 0;
+            if (v > 0 || !ordenPref) {
+                labels.push(k);
+                values.push(v);
+            }
+        });
+        return { labels: labels, values: values };
+    }
+
+    function finRenderBarH(canvasId, labels, data, color, store, key) {
+        const el = document.getElementById(canvasId);
+        if (!el || typeof Chart === 'undefined') return;
+        if (store[key]) store[key].destroy();
+        const filteredL = [];
+        const filteredD = [];
+        for (let i = 0; i < labels.length; i++) {
+            const v = Number(data[i] || 0);
+            if (v > 0) {
+                filteredL.push(labels[i]);
+                filteredD.push(v);
+            }
+        }
+        if (!filteredL.length) {
+            filteredL.push('Sin datos');
+            filteredD.push(0);
+        }
+        store[key] = new Chart(el, {
+            type: 'bar',
+            data: {
+                labels: filteredL,
+                datasets: [{ label: 'Cantidad', data: filteredD, backgroundColor: color || '#667eea' }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                indexAxis: 'y',
+                plugins: { legend: { display: false } },
+                scales: { x: { beginAtZero: true } }
+            }
+        });
+    }
+
+    function finRenderStackedBar(canvasId, payload, store, key) {
+        const el = document.getElementById(canvasId);
+        if (!el || typeof Chart === 'undefined') return;
+        if (store[key]) store[key].destroy();
+        const labels = payload.labels || [];
+        const colors = ['#0d6efd', '#20c997', '#ffc107', '#dc3545', '#6610f2', '#fd7e14'];
+        const datasets = (payload.datasets || []).map(function(ds, idx) {
+            return {
+                label: ds.label,
+                data: ds.data,
+                backgroundColor: colors[idx % colors.length]
+            };
+        });
+        store[key] = new Chart(el, {
+            type: 'bar',
+            data: { labels: labels, datasets: datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { stacked: false },
+                    y: { stacked: true, beginAtZero: true }
+                },
+                plugins: { legend: { position: 'bottom' } }
+            }
+        });
+    }
+
+    function finRenderGroupedBar(canvasId, labelsEstado, labelsPerfil, matrix, store, key) {
+        const el = document.getElementById(canvasId);
+        if (!el || typeof Chart === 'undefined') return;
+        if (store[key]) store[key].destroy();
+        const colors = ['#0d6efd', '#198754', '#ffc107'];
+        const datasets = labelsPerfil.map(function(pf, j) {
+            return {
+                label: pf,
+                data: (matrix || []).map(function(row) { return Number(row[j] || 0); }),
+                backgroundColor: colors[j % colors.length]
+            };
+        });
+        store[key] = new Chart(el, {
+            type: 'bar',
+            data: { labels: labelsEstado, datasets: datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { x: { stacked: false }, y: { beginAtZero: true } },
+                plugins: { legend: { position: 'bottom' } }
+            }
+        });
+    }
+
+    function loadFinPublicaDemografia() {
+        const qs = finPubQueryString();
+        const ex = document.getElementById('finPubExportXlsx');
+        if (ex) ex.href = 'api/reportes.php?action=exportar_excel_fin_publica&' + qs;
+        const nota = document.getElementById('finPubNotaApi');
+        if (nota) nota.textContent = '';
+        fetch('api/reportes.php?action=reporte_fin_publica_demografia&' + qs)
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (!data.success) {
+                    if (nota) nota.textContent = data.message || 'No se pudo cargar';
+                    finDestroyCharts(finPubCharts);
+                    return;
+                }
+                if (nota) nota.textContent = '';
+                const st = data.stats || {};
+                document.getElementById('finPubKpiN').textContent = String(st.n != null ? st.n : 0);
+                document.getElementById('finPubKpiEdad').textContent = st.edad_promedio != null ? String(st.edad_promedio) : '—';
+                document.getElementById('finPubKpiSal').textContent = st.salario_promedio_usd != null ? numFmt(st.salario_promedio_usd) : '—';
+                const f = data.filtros || {};
+                document.getElementById('finPubKpiFechas').textContent = (f.fecha_desde || '') + ' → ' + (f.fecha_hasta || '');
+
+                finDestroyCharts(finPubCharts);
+                const og = data.orden_generos || ['Femenino', 'Masculino', 'Otro', 'Sin dato'];
+                const gv = finObjToLabelsValues(data.por_genero, og);
+                finPubCharts.gen = renderPieChart('finPubChartGen', gv.labels, gv.values);
+
+                const os = data.orden_rangos_salario || [];
+                const sv = finObjToLabelsValues(data.por_rango_salario, os);
+                finRenderBarH('finPubChartSal', sv.labels, sv.values, '#198754', finPubCharts, 'sal');
+
+                const oe = data.orden_rangos_edad || [];
+                const ev = finObjToLabelsValues(data.por_rango_edad, oe);
+                finRenderBarH('finPubChartEdad', ev.labels, ev.values, '#6f42c1', finPubCharts, 'edad');
+
+                const pv = finObjToLabelsValues(data.por_perfil_estimado, null);
+                finPubCharts.perfil = renderPieChart('finPubChartPerfil', pv.labels, pv.values);
+
+                const secv = finObjToLabelsValues(data.por_sector_asalariado_estimado, null);
+                finPubCharts.sector = renderPieChart('finPubChartSector', secv.labels, secv.values);
+
+                finRenderStackedBar('finPubChartCruce', data.cruce_salario_genero || { labels: [], datasets: [] }, finPubCharts, 'cruce');
+
+                const tbody = document.querySelector('#tabla-fin-pub tbody');
+                const muestra = data.muestra || [];
+                if (!tbody) return;
+                if (!muestra.length) {
+                    tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">Sin registros con estos filtros</td></tr>';
+                    return;
+                }
+                let html = '';
+                muestra.forEach(function(m) {
+                    html += '<tr><td>' + escapeHtml(String(m.id || '')) + '</td>'
+                        + '<td class="text-nowrap"><small>' + escapeHtml(String(m.fecha_creacion || '')) + '</small></td>'
+                        + '<td>' + escapeHtml(String(m.cliente_nombre || '')) + '</td>'
+                        + '<td>' + escapeHtml(String(m.genero_label || '')) + '</td>'
+                        + '<td>' + escapeHtml(m.edad_calculada != null ? String(m.edad_calculada) : '—') + '</td>'
+                        + '<td><small>' + escapeHtml(String(m.rango_salario_usd || '')) + '</small></td>'
+                        + '<td><small>' + escapeHtml(String(m.perfil_estimado || '')) + '</small></td>'
+                        + '<td><small>' + escapeHtml(String(m.sector_estimado || '')) + '</small></td></tr>';
+                });
+                tbody.innerHTML = html;
+            })
+            .catch(function() {
+                const n2 = document.getElementById('finPubNotaApi');
+                if (n2) n2.textContent = 'Error de red o servidor';
+            });
+    }
+
+    function loadFinEnlazadaDemografia() {
+        const qs = finEnlQueryString();
+        const ex = document.getElementById('finEnlExportXlsx');
+        if (ex) ex.href = 'api/reportes.php?action=exportar_excel_fin_enlazada&' + qs;
+        const nota = document.getElementById('finEnlNotaApi');
+        if (nota) nota.textContent = '';
+        fetch('api/reportes.php?action=reporte_fin_publica_enlazada&' + qs)
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (!data.success) {
+                    if (nota) nota.textContent = data.message || 'No se pudo cargar';
+                    finDestroyCharts(finEnlCharts);
+                    return;
+                }
+                if (nota) nota.textContent = '';
+                const st = data.stats || {};
+                document.getElementById('finEnlKpiN').textContent = String(st.n != null ? st.n : 0);
+                const comp = (data.enlazada && data.enlazada.comparacion) ? data.enlazada.comparacion : {};
+                document.getElementById('finEnlKpiPerfilOk').textContent = String(comp.perfil_coincide != null ? comp.perfil_coincide : '—')
+                    + ' / ' + String(comp.perfil_distinto != null ? comp.perfil_distinto : '—');
+                document.getElementById('finEnlKpiGenOk').textContent = String(comp.genero_coincide != null ? comp.genero_coincide : '—')
+                    + ' / ' + String(comp.genero_distinto != null ? comp.genero_distinto : '—');
+                const f = data.filtros || {};
+                document.getElementById('finEnlKpiFechas').textContent = (f.fecha_desde || '') + ' → ' + (f.fecha_hasta || '');
+
+                finDestroyCharts(finEnlCharts);
+                const enl = data.enlazada || {};
+                const pe = finObjToLabelsValues(enl.por_estado_solicitud, null);
+                finEnlCharts.estado = renderPieChart('finEnlChartEstado', pe.labels, pe.values);
+
+                const pm = finObjToLabelsValues(enl.por_perfil_motus, ['Asalariado', 'Jubilado', 'Independiente']);
+                finEnlCharts.pm = renderPieChart('finEnlChartPerfilMotus', pm.labels, pm.values);
+
+                const og = data.orden_generos || ['Femenino', 'Masculino', 'Otro', 'Sin dato'];
+                const gv = finObjToLabelsValues(data.por_genero, og);
+                finEnlCharts.gen = renderPieChart('finEnlChartGen', gv.labels, gv.values);
+
+                const cr = enl.cruce_estado_perfil_motus || {};
+                finRenderGroupedBar('finEnlChartCruce', cr.labels_estado || [], cr.labels_perfil || [], cr.matrix || [], finEnlCharts, 'cruce');
+
+                const ppub = finObjToLabelsValues(data.por_perfil_estimado, null);
+                finEnlCharts.ppub = renderPieChart('finEnlChartPerfilPub', ppub.labels, ppub.values);
+
+                const os = data.orden_rangos_salario || [];
+                const sv = finObjToLabelsValues(data.por_rango_salario, os);
+                finRenderBarH('finEnlChartSal', sv.labels, sv.values, '#198754', finEnlCharts, 'sal');
+
+                finRenderStackedBar('finEnlChartCruceSal', data.cruce_salario_genero || { labels: [], datasets: [] }, finEnlCharts, 'cruceSal');
+
+                const tbody = document.querySelector('#tabla-fin-enl tbody');
+                const muestra = data.muestra || [];
+                if (!tbody) return;
+                if (!muestra.length) {
+                    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">Sin registros enlazados con estos filtros</td></tr>';
+                    return;
+                }
+                let html = '';
+                muestra.forEach(function(m) {
+                    html += '<tr><td>' + escapeHtml(String(m.id || '')) + '</td>'
+                        + '<td class="text-nowrap"><small>' + escapeHtml(String(m.fecha_creacion || '')) + '</small></td>'
+                        + '<td>' + escapeHtml(String(m.cliente_nombre || '')) + '</td>'
+                        + '<td>' + escapeHtml(String(m.solicitud_id || '')) + '</td>'
+                        + '<td>' + escapeHtml(String(m.solicitud_estado || '')) + '</td>'
+                        + '<td><small>' + escapeHtml(String(m.perfil_estimado || '')) + '</small></td>'
+                        + '<td><small>' + escapeHtml(String(m.perfil_motus || '')) + '</small></td>'
+                        + '<td>' + escapeHtml(String(m.genero_label || '')) + '</td>'
+                        + '<td>' + escapeHtml(String(m.genero_motus || '')) + '</td></tr>';
+                });
+                tbody.innerHTML = html;
+            })
+            .catch(function() {
+                const n2 = document.getElementById('finEnlNotaApi');
+                if (n2) n2.textContent = 'Error de red o servidor';
+            });
     }
 
     function numFmt(v) {
