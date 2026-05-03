@@ -100,6 +100,20 @@ SET @sql := IF(
 PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
 
 SET @sql := IF(
+  (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='financiamiento_registros' AND COLUMN_NAME='telemetria_geo_country')=0,
+  'ALTER TABLE financiamiento_registros ADD COLUMN telemetria_geo_country VARCHAR(120) NULL DEFAULT NULL COMMENT ''Pais por geolocalizacion IP (persistido)'' AFTER telemetria_dispositivo_json',
+  'SELECT "ok telemetria_geo_country"'
+);
+PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
+
+SET @sql := IF(
+  (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='financiamiento_registros' AND COLUMN_NAME='telemetria_geo_city')=0,
+  'ALTER TABLE financiamiento_registros ADD COLUMN telemetria_geo_city VARCHAR(120) NULL DEFAULT NULL COMMENT ''Ciudad por geolocalizacion IP (persistido)'' AFTER telemetria_geo_country',
+  'SELECT "ok telemetria_geo_city"'
+);
+PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
+
+SET @sql := IF(
   (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='financiamiento_registros' AND COLUMN_NAME='email_vendedor')=0,
   'ALTER TABLE financiamiento_registros ADD COLUMN email_vendedor VARCHAR(255) DEFAULT NULL COMMENT ''Correo decodificado del enlace (vendedor)'' AFTER ip',
   'SELECT "ok email_vendedor"'

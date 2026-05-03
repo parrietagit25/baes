@@ -825,21 +825,72 @@ function _dataReporteEmails(PDO $pdo): array {
     }
 }
 
+function _fin_reg_has_telemetria_geo_columns(PDO $pdo): bool
+{
+    static $memo = null;
+    if ($memo !== null) {
+        return $memo;
+    }
+    $memo = false;
+    try {
+        $st = $pdo->prepare(
+            'SELECT COUNT(*) FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?
+               AND COLUMN_NAME IN (?, ?)'
+        );
+        $st->execute(['financiamiento_registros', 'telemetria_geo_country', 'telemetria_geo_city']);
+        $memo = (int) $st->fetchColumn() >= 2;
+    } catch (PDOException $e) {
+        $memo = false;
+    }
+
+    return $memo;
+}
+
+/**
+ * Guarda país/ciudad por IP en el registro solo si aún estaban vacíos (evita pisar datos existentes).
+ */
+function _telemetria_geo_persist_if_empty(PDO $pdo, int $id, string $country, string $city): void
+{
+    if ($id <= 0) {
+        return;
+    }
+    if ($country === '' && $city === '') {
+        return;
+    }
+    try {
+        $st = $pdo->prepare(
+            'UPDATE financiamiento_registros SET telemetria_geo_country = ?, telemetria_geo_city = ?
+             WHERE id = ?
+               AND (telemetria_geo_country IS NULL OR TRIM(telemetria_geo_country) = \'\')
+               AND (telemetria_geo_city IS NULL OR TRIM(telemetria_geo_city) = \'\')'
+        );
+        $st->execute([$country, $city, $id]);
+    } catch (PDOException $e) {
+        // Columna inexistente u otro error: no fallar el reporte
+    }
+}
+
 function _dataReporteTelemetria(PDO $pdo): array {
-    $sql = "
+    $hasGeoCols = _fin_reg_has_telemetria_geo_columns($pdo);
+    $geoSelect = $hasGeoCols ? ', telemetria_geo_country, telemetria_geo_city' : '';
+    $sql = '
         SELECT
             id, fecha_creacion, cliente_nombre, cliente_id, celular_cliente, cliente_correo, ip,
             telemetria_session_id, telemetria_started_at, telemetria_submitted_at, telemetria_duracion_segundos,
             telemetria_paso_tiempos_json, telemetria_dispositivo_json
+            ' . $geoSelect . '
         FROM financiamiento_registros
         WHERE telemetria_session_id IS NOT NULL
-          AND TRIM(telemetria_session_id) <> ''
+          AND TRIM(telemetria_session_id) <> \'\'
         ORDER BY fecha_creacion DESC
         LIMIT 5000
-    ";
+    ';
     $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
     $lookupCount = 0;
-    $lookupMax = 150; // limitar llamadas externas por request
+    $lookupMax = 400; // solo IPs sin dato persistido ni caché archivo; la mayoría vendrán de BD tras primer reporte
+    $geoCache = _geoCacheReadFromFile();
+    $geoResultByIp = [];
     foreach ($rows as &$r) {
         $steps = json_decode((string)($r['telemetria_paso_tiempos_json'] ?? ''), true);
         if (!is_array($steps)) $steps = [];
@@ -865,17 +916,33 @@ function _dataReporteTelemetria(PDO $pdo): array {
 
         $r['geo_country'] = '';
         $r['geo_city'] = '';
-        $ip = trim((string)($r['ip'] ?? ''));
-        if ($ip !== '' && _isPublicIpForGeo($ip)) {
-            $geo = _geoLookupByIpCached($ip, $lookupCount < $lookupMax);
+        $ip = trim((string) ($r['ip'] ?? ''));
+        $dbCountry = $hasGeoCols ? trim((string) ($r['telemetria_geo_country'] ?? '')) : '';
+        $dbCity = $hasGeoCols ? trim((string) ($r['telemetria_geo_city'] ?? '')) : '';
+        $rowHadStoredGeo = ($dbCountry !== '' || $dbCity !== '');
+
+        if ($rowHadStoredGeo) {
+            $r['geo_country'] = $dbCountry;
+            $r['geo_city'] = $dbCity;
+            if ($ip !== '' && _isPublicIpForGeo($ip)) {
+                $geoResultByIp[$ip] = ['country' => $dbCountry, 'city' => $dbCity];
+            }
+        } elseif ($ip !== '' && _isPublicIpForGeo($ip)) {
+            if (!isset($geoResultByIp[$ip])) {
+                $geoResultByIp[$ip] = _geoLookupByIpCached($ip, $lookupCount < $lookupMax, $geoCache);
+                if (!empty($geoResultByIp[$ip]['from_lookup'])) {
+                    $lookupCount++;
+                }
+            }
+            $geo = $geoResultByIp[$ip];
             if (!empty($geo['country'])) {
-                $r['geo_country'] = (string)$geo['country'];
+                $r['geo_country'] = (string) $geo['country'];
             }
             if (!empty($geo['city'])) {
-                $r['geo_city'] = (string)$geo['city'];
+                $r['geo_city'] = (string) $geo['city'];
             }
-            if (!empty($geo['from_lookup'])) {
-                $lookupCount++;
+            if ($hasGeoCols && ($r['geo_country'] !== '' || $r['geo_city'] !== '')) {
+                _telemetria_geo_persist_if_empty($pdo, (int) ($r['id'] ?? 0), $r['geo_country'], $r['geo_city']);
             }
         }
     }
@@ -891,25 +958,22 @@ function _geoCacheFilePath(): string {
     return rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'motus_geo_ip_cache.json';
 }
 
-function _geoCacheLoad(): array {
-    static $cache = null;
-    if (is_array($cache)) {
-        return $cache;
-    }
-    $cache = [];
+/**
+ * Lee la caché en disco (sin static): cada request debe usar un array mutable compartido por referencia
+ * para que las IPs resueltas en esta petición queden visibles en el resto del bucle.
+ */
+function _geoCacheReadFromFile(): array {
     $path = _geoCacheFilePath();
     if (!is_file($path)) {
-        return $cache;
+        return [];
     }
     $raw = @file_get_contents($path);
     if (!is_string($raw) || trim($raw) === '') {
-        return $cache;
+        return [];
     }
     $decoded = json_decode($raw, true);
-    if (is_array($decoded)) {
-        $cache = $decoded;
-    }
-    return $cache;
+
+    return is_array($decoded) ? $decoded : [];
 }
 
 function _geoCacheSave(array $cache): void {
@@ -918,10 +982,10 @@ function _geoCacheSave(array $cache): void {
 }
 
 /**
+ * @param array<string, array<string, mixed>> $cache (por referencia) caché disco + entradas nuevas en esta petición
  * @return array{country:string,city:string,from_lookup?:bool}
  */
-function _geoLookupByIpCached(string $ip, bool $allowLookup): array {
-    $cache = _geoCacheLoad();
+function _geoLookupByIpCached(string $ip, bool $allowLookup, array &$cache): array {
     $key = trim($ip);
     if ($key === '') {
         return ['country' => '', 'city' => ''];
@@ -930,11 +994,11 @@ function _geoLookupByIpCached(string $ip, bool $allowLookup): array {
     $ttl = 7 * 24 * 3600; // 7 días
     if (isset($cache[$key]) && is_array($cache[$key])) {
         $row = $cache[$key];
-        $ts = isset($row['ts']) ? (int)$row['ts'] : 0;
+        $ts = isset($row['ts']) ? (int) $row['ts'] : 0;
         if ($ts > 0 && ($now - $ts) <= $ttl) {
             return [
-                'country' => (string)($row['country'] ?? ''),
-                'city' => (string)($row['city'] ?? ''),
+                'country' => (string) ($row['country'] ?? ''),
+                'city' => (string) ($row['city'] ?? ''),
             ];
         }
     }
@@ -949,16 +1013,17 @@ function _geoLookupByIpCached(string $ip, bool $allowLookup): array {
     ]);
     $raw = @file_get_contents($url, false, $ctx);
     if (!is_string($raw) || trim($raw) === '') {
-        return ['country' => '', 'city' => '', 'from_lookup' => true];
+        return ['country' => '', 'city' => ''];
     }
     $d = json_decode($raw, true);
     if (!is_array($d) || empty($d['success'])) {
-        return ['country' => '', 'city' => '', 'from_lookup' => true];
+        return ['country' => '', 'city' => ''];
     }
-    $country = trim((string)($d['country'] ?? ''));
-    $city = trim((string)($d['city'] ?? ''));
+    $country = trim((string) ($d['country'] ?? ''));
+    $city = trim((string) ($d['city'] ?? ''));
     $cache[$key] = ['country' => $country, 'city' => $city, 'ts' => $now];
     _geoCacheSave($cache);
+
     return ['country' => $country, 'city' => $city, 'from_lookup' => true];
 }
 

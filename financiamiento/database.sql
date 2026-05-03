@@ -116,6 +116,8 @@ CREATE TABLE IF NOT EXISTS financiamiento_registros (
     telemetria_paso_tiempos_json longtext DEFAULT NULL COMMENT 'Duracion por paso del wizard (ms)',
     telemetria_eventos_json longtext DEFAULT NULL COMMENT 'Eventos del wizard (navegacion, errores, envio)',
     telemetria_dispositivo_json longtext DEFAULT NULL COMMENT 'Datos de dispositivo/navegador del cliente',
+    telemetria_geo_country varchar(120) DEFAULT NULL COMMENT 'Pais por geolocalizacion IP (persistido al reportar)',
+    telemetria_geo_city varchar(120) DEFAULT NULL COMMENT 'Ciudad por geolocalizacion IP (persistido al reportar)',
     solicitud_credito_id int(11) DEFAULT NULL COMMENT 'Solicitud Motus creada desde este envío (adjuntos)',
 
     PRIMARY KEY (id),
