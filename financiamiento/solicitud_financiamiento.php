@@ -751,6 +751,87 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
       pointer-events: none;
     }
     .attach-tab-badge.is-on{ display: block; }
+
+    /* Solapa PDF (misma plantilla que el envío al vendedor) */
+    .pdf-dock{
+      position: fixed;
+      top: 148px;
+      right: 0;
+      z-index: 9997;
+      max-width: min(100vw - 8px, 380px);
+      width: fit-content;
+      pointer-events: none;
+    }
+    .pdf-dock-slide{
+      display: flex;
+      flex-direction: row;
+      align-items: flex-start;
+      justify-content: flex-end;
+      filter: drop-shadow(-6px 8px 22px rgba(0,0,0,.22));
+      pointer-events: none;
+    }
+    .pdf-panel{
+      width: min(340px, calc(100vw - 52px));
+      min-width: 0;
+      padding: 14px 16px;
+      border-radius: 14px 0 0 14px;
+      border: 1px solid var(--line);
+      border-right: 0;
+      background: var(--card);
+      color: var(--text);
+      transform: translateX(100%);
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: transform .25s ease, opacity .2s ease, visibility .2s ease;
+    }
+    .pdf-dock.is-open{ pointer-events: auto; }
+    .pdf-dock.is-open .pdf-dock-slide{ pointer-events: auto; }
+    .pdf-dock.is-open .pdf-panel{
+      transform: translateX(0);
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+    .pdf-tab{
+      flex: 0 0 34px;
+      width: 34px;
+      margin: 0;
+      padding: 8px 4px;
+      border: 1px solid var(--line);
+      border-right: 0;
+      border-radius: 12px 0 0 12px;
+      background: linear-gradient(165deg, rgba(220,38,38,.45), rgba(15,27,51,.92));
+      color: var(--text);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: inherit;
+      pointer-events: auto;
+      transition: width .2s ease;
+    }
+    html.theme-light .pdf-tab{
+      background: linear-gradient(165deg, rgba(220,38,38,.4), #f8fafc);
+      color: var(--text);
+    }
+    .pdf-dock.is-open .pdf-tab{
+      width: auto;
+      min-width: 34px;
+      max-width: 160px;
+      padding: 8px 10px;
+    }
+    .pdf-tab-label{
+      display: none;
+      font-size: calc(11px * var(--fs-scale));
+      font-weight: 800;
+      line-height: 1.2;
+      text-align: center;
+      margin-left: 6px;
+    }
+    .pdf-dock.is-open .pdf-tab-label{ display: inline-block; }
+    .pdf-tab-icon svg{ display: block; }
+
     .id-action-row{
       display: flex;
       flex-wrap: wrap;
@@ -1283,7 +1364,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
         <div class="sectionTitle">
           <div>
             <h2>E. Referencias</h2>
-            <p>2 personales (no parientes) y 2 familiares (que no vivan con usted). Para adjuntar PDF u otros documentos use la solapa <strong>Adjuntos</strong> (icono de clip) a la derecha antes de enviar.</p>
+            <p>2 personales (no parientes) y 2 familiares (que no vivan con usted). Para adjuntar PDF u otros documentos use la solapa <strong>Adjuntos</strong> (icono de clip). Para bajar una copia local del mismo PDF que recibe el vendedor, use la solapa <strong>PDF</strong> (icono de documento).</p>
           </div>
         </div>
         <div class="grid">
@@ -1484,6 +1565,28 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
     </div>
   </div>
 
+  <div class="pdf-dock" id="pdfDock" aria-label="Descargar PDF">
+    <div class="pdf-dock-slide">
+      <div class="pdf-panel" role="region" aria-labelledby="pdfPanelTitle">
+        <h2 class="visual-panel-title" id="pdfPanelTitle">Descargar PDF</h2>
+        <p class="visual-panel-hint">Obtenga en su equipo el mismo documento PDF que se envía al vendedor al completar la solicitud, con los datos que lleva hasta ahora en el formulario (borrador local).</p>
+        <p class="hint" style="margin-top:8px">No incluye los archivos de la solapa Adjuntos; sí incluye la firma si ya la dibujó.</p>
+        <button type="button" class="btn w-100 mt-2" id="btnPdfBorrador" style="background:#dc2626;color:#fff;border:0;font-weight:700;padding:10px 14px;border-radius:10px;">
+          <span class="pdf-tab-icon d-inline-flex align-middle me-2" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M10 12h4"/><path d="M10 16h4"/><path d="M8 8h1"/></svg>
+          </span>
+          Descargar PDF
+        </button>
+      </div>
+      <button type="button" class="pdf-tab" id="pdfDockTab" aria-expanded="false" title="Descargar PDF del borrador">
+        <span class="pdf-tab-icon" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M10 12h4"/><path d="M10 16h4"/><path d="M8 8h1"/></svg>
+        </span>
+        <span class="pdf-tab-label">PDF</span>
+      </button>
+    </div>
+  </div>
+
   <div id="idCropperModal" class="d-none" hidden style="display:none;position:fixed;inset:0;z-index:11000;background:rgba(2,6,23,.82);">
     <div style="max-width:960px;margin:4vh auto;background:#111827;border:1px solid rgba(255,255,255,.2);border-radius:14px;overflow:hidden;">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#1f2937;color:#fff;">
@@ -1530,6 +1633,14 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           return window.location.origin + (base === "/" ? "" : base) + "/api/solicitud_publica.php";
         })();
       }
+      var PDF_BORRADOR_URL = (function(){
+        if (API_URL && API_URL.indexOf("solicitud_publica.php") !== -1) {
+          return API_URL.replace("solicitud_publica.php", "financiamiento_pdf_borrador.php");
+        }
+        var path = window.location.pathname;
+        var base = path.replace(/\/financiamiento\/?.*$/, "") || "/";
+        return window.location.origin + (base === "/" ? "" : base) + "/api/financiamiento_pdf_borrador.php";
+      })();
 
       const form = document.getElementById("wizardForm");
       const fieldsets = Array.from(form.querySelectorAll("fieldset"));
@@ -2871,6 +2982,103 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
         });
       }
 
+      function buildPayloadForPdf(){
+        var payload = readFormToObject();
+        delete payload.__meta;
+        if (payload.acepta !== undefined) delete payload.acepta;
+        aplicarCompatibilidadDireccion(payload);
+        if (TOKEN_LINK) payload.token = TOKEN_LINK;
+        if (firmaDataInput && firmaDataInput.value) payload.firma = firmaDataInput.value;
+        var faBlocks = document.querySelectorAll(".firmante-adicional-block");
+        var faList = [];
+        faBlocks.forEach(function(blk){
+          var nomInp = blk.querySelector("input[data-fa-nombre]");
+          var firmaInp = blk.querySelector("input[data-fa-firma]");
+          if (nomInp && firmaInp && nomInp.value && firmaInp.value) faList.push({ nombre: nomInp.value, firma: firmaInp.value });
+        });
+        if (faList.length) payload.firmantes_adicionales = JSON.stringify(faList);
+        Object.keys(payload).forEach(function(k){ if (k.indexOf("fa_nombre_") === 0 || k.indexOf("fa_firma_") === 0) delete payload[k]; });
+        delete payload.imagen_cedula;
+        return payload;
+      }
+
+      function downloadPdfLocal(){
+        var btn = document.getElementById("btnPdfBorrador");
+        if (btn) { btn.disabled = true; }
+        var payload = buildPayloadForPdf();
+        fetch(PDF_BORRADOR_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        }).then(function(r){
+          var ct = (r.headers.get("Content-Type") || "").toLowerCase();
+          if (ct.indexOf("application/pdf") !== -1) {
+            return r.blob().then(function(blob){
+              var url = URL.createObjectURL(blob);
+              var a = document.createElement("a");
+              a.href = url;
+              a.download = "Solicitud_Financiamiento_borrador.pdf";
+              document.body.appendChild(a);
+              a.click();
+              a.remove();
+              URL.revokeObjectURL(url);
+              showToast("PDF descargado.", "ok");
+            });
+          }
+          return r.text().then(function(t){
+            try {
+              var j = JSON.parse(t);
+              showToast((j && j.message) ? j.message : "No se pudo generar el PDF", "err");
+            } catch (e) {
+              showToast("No se pudo generar el PDF", "err");
+            }
+          });
+        }).catch(function(){
+          showToast("Error de conexión al generar el PDF.", "err");
+        }).finally(function(){
+          if (btn) { btn.disabled = false; }
+        });
+      }
+
+      function initPdfDock(){
+        var dock = document.getElementById("pdfDock");
+        var tab = document.getElementById("pdfDockTab");
+        var btnPdf = document.getElementById("btnPdfBorrador");
+        if (!dock || !tab) return;
+        if (btnPdf) btnPdf.addEventListener("click", function(e){ e.stopPropagation(); downloadPdfLocal(); });
+        tab.addEventListener("click", function(e){
+          e.stopPropagation();
+          var open = dock.classList.toggle("is-open");
+          tab.setAttribute("aria-expanded", open ? "true" : "false");
+          if (open){
+            var vd = document.getElementById("visualDock");
+            var idd = document.getElementById("idDock");
+            var ad = document.getElementById("attachDock");
+            var vt = document.getElementById("visualDockTab");
+            var it = document.getElementById("idDockTab");
+            var at = document.getElementById("attachDockTab");
+            if (vd) vd.classList.remove("is-open");
+            if (idd) idd.classList.remove("is-open");
+            if (ad) ad.classList.remove("is-open");
+            if (vt) vt.setAttribute("aria-expanded", "false");
+            if (it) it.setAttribute("aria-expanded", "false");
+            if (at) at.setAttribute("aria-expanded", "false");
+          }
+        });
+        document.addEventListener("click", function(e){
+          if (!dock.contains(e.target)){
+            dock.classList.remove("is-open");
+            tab.setAttribute("aria-expanded", "false");
+          }
+        });
+        dock.addEventListener("keydown", function(e){
+          if (e.key === "Escape"){
+            dock.classList.remove("is-open");
+            tab.setAttribute("aria-expanded", "false");
+          }
+        });
+      }
+
       function initVisualPreferences(){
         var KEY = "financiamiento_visual_prefs";
         var dock = document.getElementById("visualDock");
@@ -2928,12 +3136,16 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           if (open){
             var idd = document.getElementById("idDock");
             var ad = document.getElementById("attachDock");
+            var pd = document.getElementById("pdfDock");
             var it = document.getElementById("idDockTab");
             var at = document.getElementById("attachDockTab");
+            var pt = document.getElementById("pdfDockTab");
             if (idd) idd.classList.remove("is-open");
             if (ad) ad.classList.remove("is-open");
+            if (pd) pd.classList.remove("is-open");
             if (it) it.setAttribute("aria-expanded", "false");
             if (at) at.setAttribute("aria-expanded", "false");
+            if (pt) pt.setAttribute("aria-expanded", "false");
           }
         });
         document.addEventListener("click", function(e){
@@ -2960,9 +3172,13 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           idDockTab.setAttribute("aria-expanded", open ? "true" : "false");
           if (open){
             var ad = document.getElementById("attachDock");
+            var pd = document.getElementById("pdfDock");
             var at = document.getElementById("attachDockTab");
+            var pt = document.getElementById("pdfDockTab");
             if (ad) ad.classList.remove("is-open");
+            if (pd) pd.classList.remove("is-open");
             if (at) at.setAttribute("aria-expanded", "false");
+            if (pt) pt.setAttribute("aria-expanded", "false");
           }
         });
         document.addEventListener("click", function(e){
@@ -2991,12 +3207,16 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           if (open){
             var vd = document.getElementById("visualDock");
             var idd = document.getElementById("idDock");
+            var pd = document.getElementById("pdfDock");
             var vt = document.getElementById("visualDockTab");
             var it = document.getElementById("idDockTab");
+            var pt = document.getElementById("pdfDockTab");
             if (vd) vd.classList.remove("is-open");
             if (idd) idd.classList.remove("is-open");
+            if (pd) pd.classList.remove("is-open");
             if (vt) vt.setAttribute("aria-expanded", "false");
             if (it) it.setAttribute("aria-expanded", "false");
+            if (pt) pt.setAttribute("aria-expanded", "false");
           }
         });
         document.addEventListener("click", function(e){
@@ -3016,6 +3236,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
       initVisualPreferences();
       initIdDock();
       initAttachDock();
+      initPdfDock();
       init();
     })();
   </script>
