@@ -15,7 +15,7 @@ if (!in_array('ROLE_ADMIN', $_SESSION['user_roles'])) {
 }
 
 $submenu = $_GET['submenu'] ?? 'usuarios';
-if (!in_array($submenu, ['usuarios', 'vendedores', 'tiempo', 'banco', 'emails', 'encuestas', 'telemetria', 'fin_publica', 'fin_enlazada'], true)) {
+if (!in_array($submenu, ['usuarios', 'vendedores', 'tiempo', 'banco', 'emails', 'encuestas', 'telemetria', 'fin_publica', 'fin_enlazada', 'vehiculos'], true)) {
     $submenu = 'usuarios';
 }
 $finRepDesde = (new DateTimeImmutable('-365 days'))->format('Y-m-d');
@@ -31,6 +31,7 @@ $titulosReporte = [
     'telemetria' => 'Rep. Telemetría',
     'fin_publica' => 'Sol. Financiamiento (público)',
     'fin_enlazada' => 'Sol. Pública + Motus enlazada',
+    'vehiculos' => 'Rep. Vehículo (crédito)',
 ];
 $exportActionPorSubmenu = [
     'usuarios' => ['action' => 'exportar_excel_usuarios', 'label' => 'Descargar Rep. Usuarios'],
@@ -100,6 +101,7 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
                             elseif ($submenu === 'telemetria') echo 'Tiempos del wizard, inicio/fin, dispositivo, IP y datos de contacto capturados en solicitud pública';
                             elseif ($submenu === 'fin_publica') echo 'Demografía y perfiles inferidos desde el formulario público de financiamiento (sin solicitud Motus obligatoria)';
                             elseif ($submenu === 'fin_enlazada') echo 'Mismo análisis del formulario público, limitado a envíos que ya tienen solicitud de crédito Motus vinculada';
+                            elseif ($submenu === 'vehiculos') echo 'Marcas, precios, modelo, antigüedad, kilometraje, abono e ingresos según solicitudes de crédito';
                             else echo 'Cantidad de correos enviados/fallidos y detalle de destinatarios';
                         ?></p>
                     </div>
@@ -567,6 +569,96 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
                         </div>
                     </div>
 
+                    <!-- Rep. Vehículo (solicitudes crédito) -->
+                    <div id="panel-vehiculos" class="report-panel" style="display: <?php echo $submenu === 'vehiculos' ? 'block' : 'none'; ?>">
+                        <div class="alert alert-info small mb-3">
+                            <i class="fas fa-car me-1"></i>
+                            Datos unificados: si existe <code>vehiculos_solicitud</code>, se usa el primer vehículo (<code>MIN(id)</code>); si no, los campos de cabecera en <code>solicitudes_credito</code>.
+                            <span id="vehNotaApi" class="d-block mt-1 text-muted small"></span>
+                        </div>
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <div class="row g-2 align-items-end flex-wrap">
+                                    <div class="col-md-2">
+                                        <label class="form-label small mb-0">Desde</label>
+                                        <input type="date" id="vehDesde" class="form-control form-control-sm" value="<?php echo htmlspecialchars($finRepDesde); ?>">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label small mb-0">Hasta</label>
+                                        <input type="date" id="vehHasta" class="form-control form-control-sm" value="<?php echo htmlspecialchars($finRepHasta); ?>">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label small mb-0">Estado solicitud</label>
+                                        <select id="vehEstado" class="form-select form-select-sm">
+                                            <option value="">Todos</option>
+                                            <?php foreach ($estadosCol as $e): ?>
+                                            <option value="<?php echo htmlspecialchars($e); ?>"><?php echo htmlspecialchars($e); ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <button type="button" class="btn btn-primary btn-sm w-100 mt-2 mt-md-0" id="btnVehFiltrar"><i class="fas fa-sync me-1"></i>Actualizar</button>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <a href="#" class="btn btn-outline-success btn-sm w-100 mt-1" id="vehExportXlsx"><i class="fas fa-file-excel me-1"></i>Excel</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-3"><div class="card"><div class="card-body text-center"><div class="text-muted small">Solicitudes</div><div class="h4 mb-0" id="vehKpiN">0</div></div></div></div>
+                            <div class="col-md-3"><div class="card"><div class="card-body text-center"><div class="text-muted small">Con marca/modelo</div><div class="h4 mb-0 text-primary" id="vehKpiNv">0</div></div></div></div>
+                            <div class="col-md-3"><div class="card"><div class="card-body text-center"><div class="text-muted small">Precio prom.</div><div class="h4 mb-0 text-success" id="vehKpiPrecio">—</div></div></div></div>
+                            <div class="col-md-3"><div class="card"><div class="card-body text-center"><div class="text-muted small">Ingreso prom.</div><div class="h4 mb-0 text-success" id="vehKpiIngreso">—</div></div></div></div>
+                        </div>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-3"><div class="card"><div class="card-body text-center"><div class="text-muted small">Abono % prom.</div><div class="h4 mb-0" id="vehKpiAbono">—</div></div></div></div>
+                            <div class="col-md-3"><div class="card"><div class="card-body text-center"><div class="text-muted small">Km prom.</div><div class="h4 mb-0" id="vehKpiKm">—</div></div></div></div>
+                            <div class="col-md-3"><div class="card"><div class="card-body text-center"><div class="text-muted small">Edad prom.</div><div class="h4 mb-0" id="vehKpiEdad">—</div></div></div></div>
+                            <div class="col-md-3"><div class="card"><div class="card-body text-center"><div class="text-muted small">Año veh. mediano / ratio precio÷ingreso</div><div class="h6 mb-0 text-secondary" id="vehKpiExtra">—</div></div></div></div>
+                        </div>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6"><div class="card h-100"><div class="card-body"><h6 class="mb-2">Marca (top)</h6><div class="fin-chart-wrap"><canvas id="vehChartMarca"></canvas></div></div></div></div>
+                            <div class="col-md-6"><div class="card h-100"><div class="card-body"><h6 class="mb-2">Modelo (marca / modelo, top)</h6><div class="fin-chart-wrap"><canvas id="vehChartModelo"></canvas></div></div></div></div>
+                        </div>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-4"><div class="card h-100"><div class="card-body"><h6 class="mb-2">Año del vehículo</h6><div class="fin-chart-wrap"><canvas id="vehChartAnio"></canvas></div></div></div></div>
+                            <div class="col-md-4"><div class="card h-100"><div class="card-body"><h6 class="mb-2">Estado solicitud</h6><div class="fin-chart-wrap"><canvas id="vehChartEstado"></canvas></div></div></div></div>
+                            <div class="col-md-4"><div class="card h-100"><div class="card-body"><h6 class="mb-2">Edad del cliente</h6><div class="fin-chart-wrap"><canvas id="vehChartRangoEdad"></canvas></div></div></div></div>
+                        </div>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-4"><div class="card h-100"><div class="card-body"><h6 class="mb-2">Kilometraje</h6><div class="fin-chart-wrap"><canvas id="vehChartKm"></canvas></div></div></div></div>
+                            <div class="col-md-4"><div class="card h-100"><div class="card-body"><h6 class="mb-2">Precio del vehículo</h6><div class="fin-chart-wrap"><canvas id="vehChartRangoPrecio"></canvas></div></div></div></div>
+                            <div class="col-md-4"><div class="card h-100"><div class="card-body"><h6 class="mb-2">Abono %</h6><div class="fin-chart-wrap"><canvas id="vehChartAbono"></canvas></div></div></div></div>
+                        </div>
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <h6 class="mb-2">Precio promedio por marca (con precio &gt; 0)</h6>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-bordered table-reportes" id="tabla-veh-precio-marca">
+                                        <thead class="table-light"><tr><th>Marca</th><th class="text-end">Precio prom.</th></tr></thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-body">
+                                <h6 class="mb-2">Muestra reciente</h6>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-bordered table-reportes" id="tabla-veh-muestra">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Id</th><th>Fecha</th><th>Cliente</th><th>Estado</th><th>Marca</th><th>Modelo</th><th>Año</th><th>Km</th><th>Precio</th><th>Abono %</th><th>Ingreso</th><th>Edad</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Rep. Correos -->
                     <div id="panel-emails" class="report-panel" style="display: <?php echo $submenu === 'emails' ? 'block' : 'none'; ?>">
                         <div class="row g-3 mb-3">
@@ -689,6 +781,7 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
     let bancoSolicitudesChart = null;
     const finPubCharts = {};
     const finEnlCharts = {};
+    const vehCharts = {};
 
     if (submenu === 'usuarios') {
         loadReporteUsuarios();
@@ -708,6 +801,8 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
         loadFinPublicaDemografia();
     } else if (submenu === 'fin_enlazada') {
         loadFinEnlazadaDemografia();
+    } else if (submenu === 'vehiculos') {
+        loadReporteVehiculos();
     }
 
     function loadReporteUsuarios() {
@@ -999,6 +1094,8 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
     if (btnFinPubFiltrar) btnFinPubFiltrar.addEventListener('click', loadFinPublicaDemografia);
     const btnFinEnlFiltrar = document.getElementById('btnFinEnlFiltrar');
     if (btnFinEnlFiltrar) btnFinEnlFiltrar.addEventListener('click', loadFinEnlazadaDemografia);
+    const btnVehFiltrar = document.getElementById('btnVehFiltrar');
+    if (btnVehFiltrar) btnVehFiltrar.addEventListener('click', loadReporteVehiculos);
 
     function finDestroyCharts(map) {
         Object.keys(map).forEach(function(k) {
@@ -1286,6 +1383,162 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
             })
             .catch(function() {
                 const n2 = document.getElementById('finEnlNotaApi');
+                if (n2) n2.textContent = 'Error de red o servidor';
+            });
+    }
+
+    function vehQueryString() {
+        const p = new URLSearchParams();
+        p.set('desde', (document.getElementById('vehDesde') || {}).value || '');
+        p.set('hasta', (document.getElementById('vehHasta') || {}).value || '');
+        const est = (document.getElementById('vehEstado') || {}).value || '';
+        if (est) p.set('estado', est);
+        return p.toString();
+    }
+
+    function vehTopEntries(obj, limit) {
+        const ent = Object.entries(obj || {}).sort(function(a, b) {
+            return Number(b[1]) - Number(a[1]);
+        });
+        const labels = [];
+        const vals = [];
+        const max = limit || 12;
+        for (let i = 0; i < ent.length && i < max; i++) {
+            labels.push(ent[i][0]);
+            vals.push(Number(ent[i][1]));
+        }
+        return { labels: labels, values: vals };
+    }
+
+    function vehRenderBarVertical(canvasId, labels, data, color, store, key) {
+        const el = document.getElementById(canvasId);
+        if (!el || typeof Chart === 'undefined') return;
+        if (store[key]) {
+            store[key].destroy();
+            store[key] = null;
+        }
+        store[key] = new Chart(el, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{ label: 'Cantidad', data: data, backgroundColor: color || '#764ba2' }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true } }
+            }
+        });
+    }
+
+    function loadReporteVehiculos() {
+        const qs = vehQueryString();
+        const ex = document.getElementById('vehExportXlsx');
+        if (ex) ex.href = 'api/reportes.php?action=exportar_excel_vehiculos&' + qs;
+        const nota = document.getElementById('vehNotaApi');
+        if (nota) nota.textContent = '';
+        fetch('api/reportes.php?action=reporte_vehiculos&' + qs)
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (!data.success) {
+                    if (nota) nota.textContent = data.message || 'No se pudo cargar';
+                    finDestroyCharts(vehCharts);
+                    return;
+                }
+                if (nota) {
+                    nota.textContent = data.fuente_vehiculo ? ('Fuente: ' + data.fuente_vehiculo) : '';
+                }
+                const k = data.kpi || {};
+                const se = function(id, t) {
+                    const el = document.getElementById(id);
+                    if (el) el.textContent = t;
+                };
+                se('vehKpiN', String(k.n != null ? k.n : 0));
+                se('vehKpiNv', String(k.n_con_marca_modelo != null ? k.n_con_marca_modelo : 0));
+                se('vehKpiPrecio', k.precio_promedio != null ? numFmt(k.precio_promedio) : '—');
+                se('vehKpiIngreso', k.ingreso_promedio != null ? numFmt(k.ingreso_promedio) : '—');
+                se('vehKpiAbono', k.abono_pct_promedio != null ? numFmt(k.abono_pct_promedio) : '—');
+                se('vehKpiKm', k.km_promedio != null ? numFmt(Math.round(k.km_promedio)) : '—');
+                se('vehKpiEdad', k.edad_promedio != null ? numFmt(k.edad_promedio) : '—');
+                let extra = '';
+                if (k.anio_vehiculo_mediano != null) extra += 'Año ' + k.anio_vehiculo_mediano;
+                if (k.ratio_precio_ingreso_mediano != null) {
+                    if (extra) extra += ' · ';
+                    extra += 'Ratio precio/ingreso ' + numFmt(Math.round(k.ratio_precio_ingreso_mediano * 100) / 100);
+                }
+                se('vehKpiExtra', extra || '—');
+
+                finDestroyCharts(vehCharts);
+                const tm = vehTopEntries(data.por_marca, 12);
+                finRenderBarH('vehChartMarca', tm.labels, tm.values, '#667eea', vehCharts, 'marca');
+
+                const modTop = data.por_modelo_top || [];
+                const mLabels = modTop.map(function(x) { return x.label; });
+                const mVals = modTop.map(function(x) { return x.n; });
+                finRenderBarH('vehChartModelo', mLabels, mVals, '#0d6efd', vehCharts, 'modelo');
+
+                const anioObj = data.por_anio || {};
+                const anioKeys = Object.keys(anioObj).sort(function(a, b) { return Number(a) - Number(b); });
+                const anioVals = anioKeys.map(function(key) { return Number(anioObj[key] || 0); });
+                vehRenderBarVertical('vehChartAnio', anioKeys, anioVals, '#764ba2', vehCharts, 'anio');
+
+                const pe = finObjToLabelsValues(data.por_estado, null);
+                vehCharts.estado = renderPieChart('vehChartEstado', pe.labels, pe.values);
+
+                const re = data.orden_rangos_edad || [];
+                const reV = finObjToLabelsValues(data.por_rango_edad, re);
+                finRenderBarH('vehChartRangoEdad', reV.labels, reV.values, '#6f42c1', vehCharts, 'redad');
+
+                const rko = data.orden_rangos_km || [];
+                const rkV = finObjToLabelsValues(data.por_rango_km, rko);
+                finRenderBarH('vehChartKm', rkV.labels, rkV.values, '#fd7e14', vehCharts, 'km');
+
+                const rpo = data.orden_rangos_precio || [];
+                const rpV = finObjToLabelsValues(data.por_rango_precio, rpo);
+                finRenderBarH('vehChartRangoPrecio', rpV.labels, rpV.values, '#198754', vehCharts, 'rprecio');
+
+                const rao = data.orden_rangos_abono || [];
+                const raV = finObjToLabelsValues(data.por_rango_abono_pct, rao);
+                finRenderBarH('vehChartAbono', raV.labels, raV.values, '#20c997', vehCharts, 'abono');
+
+                const tbPm = document.querySelector('#tabla-veh-precio-marca tbody');
+                if (tbPm) {
+                    const ppm = data.precio_promedio_por_marca || {};
+                    let h = '';
+                    Object.keys(ppm).forEach(function(marca) {
+                        h += '<tr><td>' + escapeHtml(marca) + '</td><td class="text-end">' + numFmt(ppm[marca]) + '</td></tr>';
+                    });
+                    if (!h) h = '<tr><td colspan="2" class="text-center text-muted">Sin datos</td></tr>';
+                    tbPm.innerHTML = h;
+                }
+
+                const tbody = document.querySelector('#tabla-veh-muestra tbody');
+                const muestra = data.muestra || [];
+                if (!tbody) return;
+                if (!muestra.length) {
+                    tbody.innerHTML = '<tr><td colspan="12" class="text-center text-muted">Sin registros con estos filtros</td></tr>';
+                    return;
+                }
+                let html = '';
+                muestra.forEach(function(m) {
+                    html += '<tr><td>' + escapeHtml(String(m.id || '')) + '</td>'
+                        + '<td class="text-nowrap"><small>' + escapeHtml(String(m.fecha_creacion || '')) + '</small></td>'
+                        + '<td>' + escapeHtml(String(m.nombre_cliente || '')) + '</td>'
+                        + '<td>' + escapeHtml(String(m.estado || '')) + '</td>'
+                        + '<td>' + escapeHtml(String(m.marca || '')) + '</td>'
+                        + '<td>' + escapeHtml(String(m.modelo || '')) + '</td>'
+                        + '<td>' + (m.anio != null ? escapeHtml(String(m.anio)) : '—') + '</td>'
+                        + '<td>' + (m.km != null ? escapeHtml(String(m.km)) : '—') + '</td>'
+                        + '<td>' + (m.precio != null ? escapeHtml(String(m.precio)) : '—') + '</td>'
+                        + '<td>' + (m.abono_pct != null ? escapeHtml(String(m.abono_pct)) : '—') + '</td>'
+                        + '<td>' + (m.ingreso != null ? escapeHtml(String(m.ingreso)) : '—') + '</td>'
+                        + '<td>' + (m.edad != null ? escapeHtml(String(m.edad)) : '—') + '</td></tr>';
+                });
+                tbody.innerHTML = html;
+            })
+            .catch(function() {
+                const n2 = document.getElementById('vehNotaApi');
                 if (n2) n2.textContent = 'Error de red o servidor';
             });
     }

@@ -30,6 +30,7 @@ if (in_array($action, [
     'exportar_excel_telemetria',
     'exportar_excel_fin_publica',
     'exportar_excel_fin_enlazada',
+    'exportar_excel_vehiculos',
 ], true)) {
     exportarReporteCsv($action);
     exit();
@@ -74,6 +75,9 @@ switch ($action) {
     case 'reporte_fin_publica_enlazada':
         reporteFinPublicaEnlazada();
         break;
+    case 'reporte_vehiculos':
+        reporteVehiculos();
+        break;
     case 'exportar_todos_excel':
         // Ya atendido al inicio.
         echo json_encode(['success' => false, 'message' => 'Acción ya ejecutada']);
@@ -88,6 +92,7 @@ switch ($action) {
     case 'exportar_excel_telemetria':
     case 'exportar_excel_fin_publica':
     case 'exportar_excel_fin_enlazada':
+    case 'exportar_excel_vehiculos':
         // Ya atendido al inicio.
         echo json_encode(['success' => false, 'message' => 'Acción ya ejecutada']);
         break;
@@ -269,6 +274,31 @@ function exportarReporteCsv(string $action): void {
             return;
         }
         _outputXlsxDownload('reporte_fin_publica_enlazada.xlsx', 'Publica Motus', $headers, $rows);
+        return;
+    }
+
+    if ($action === 'exportar_excel_vehiculos') {
+        require_once __DIR__ . '/../includes/reportes_vehiculos_data.php';
+        $filt = rep_veh_parse_filtros();
+        $rows = rep_veh_filas_export($pdo, $filt);
+        _outputXlsxDownload('reporte_vehiculos_solicitud.xlsx', 'Vehiculos', [
+            'ID',
+            'Fecha creación',
+            'Cliente',
+            'Estado solicitud',
+            'Marca',
+            'Modelo',
+            'Año vehículo',
+            'Kilometraje',
+            'Precio vehículo',
+            'Abono %',
+            'Abono monto',
+            'Ingreso declarado',
+            'Edad',
+            'Perfil financiero',
+            'Género',
+            'Detalle en tabla vehículos',
+        ], $rows);
         return;
     }
 
@@ -1567,6 +1597,18 @@ function reporteFinPublicaEnlazada(): void
     require_once __DIR__ . '/../includes/reportes_fin_demografia_data.php';
     try {
         echo json_encode(rep_fin_build_reporte_enlazada($pdo));
+    } catch (PDOException $e) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Error de base de datos']);
+    }
+}
+
+function reporteVehiculos(): void
+{
+    global $pdo;
+    require_once __DIR__ . '/../includes/reportes_vehiculos_data.php';
+    try {
+        echo json_encode(rep_veh_build_json($pdo), JSON_UNESCAPED_UNICODE);
     } catch (PDOException $e) {
         http_response_code(500);
         echo json_encode(['success' => false, 'message' => 'Error de base de datos']);
