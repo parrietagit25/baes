@@ -16,6 +16,7 @@ $userRoles = $_SESSION['user_roles'] ?? [];
 $puedeAcceder = in_array('ROLE_ADMIN', $userRoles) || in_array('ROLE_GESTOR', $userRoles)
     || in_array('ROLE_BANCO', $userRoles) || in_array('ROLE_VENDEDOR', $userRoles);
 $isAdmin = in_array('ROLE_ADMIN', $userRoles);
+$isGestor = in_array('ROLE_GESTOR', $userRoles);
 if (!$puedeAcceder) {
     http_response_code(403);
     echo json_encode(['success' => false, 'message' => 'Acceso denegado']);
@@ -456,9 +457,9 @@ try {
     }
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && (($postIn['action'] ?? '') === 'generar_refirma')) {
-        if (!$isAdmin) {
+        if (!$isAdmin && !$isGestor) {
             http_response_code(403);
-            echo json_encode(['success' => false, 'message' => 'Solo el administrador puede generar enlaces de refirma.']);
+            echo json_encode(['success' => false, 'message' => 'Solo administrador o gestor pueden generar enlaces de refirma.']);
             exit;
         }
         if (!sol_fin_tabla_existe($pdo, 'financiamiento_refirma_token')) {

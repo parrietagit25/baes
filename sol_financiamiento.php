@@ -13,6 +13,7 @@ $finCamposAdminMeta = require __DIR__ . '/includes/financiamiento_registro_admin
 $userRoles = $_SESSION['user_roles'] ?? [];
 $isAdmin = in_array('ROLE_ADMIN', $userRoles);
 $isGestor = in_array('ROLE_GESTOR', $userRoles);
+$puedeRefirma = $isAdmin || $isGestor;
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -176,6 +177,7 @@ $isGestor = in_array('ROLE_GESTOR', $userRoles);
 
     $(function() {
         var esAdmin = <?php echo $isAdmin ? 'true' : 'false'; ?>;
+        var puedeRefirma = <?php echo $puedeRefirma ? 'true' : 'false'; ?>;
         var editarRegistroId = null;
         var refirmaRegistroId = null;
 
@@ -240,9 +242,13 @@ $isGestor = in_array('ROLE_GESTOR', $userRoles);
                                '<button type="button" class="btn btn-sm btn-info btn-ver-detalle me-1" data-id="' + row.id + '"><i class="fas fa-eye"></i> Ver detalle</button>' +
                                '<button type="button" class="btn btn-sm btn-primary btn-ver-adjuntos me-1" data-id="' + row.id + '"><i class="fas fa-paperclip"></i> Adjuntos</button>';
                     if (esAdmin) {
-                        html += '<button type="button" class="btn btn-sm btn-secondary btn-editar-registro me-1" data-id="' + row.id + '"><i class="fas fa-pen"></i> Editar</button>' +
-                               '<button type="button" class="btn btn-sm btn-warning text-dark btn-refirma-registro me-1" data-id="' + row.id + '"><i class="fas fa-signature"></i> Refirma</button>' +
-                               '<button type="button" class="btn btn-sm btn-danger btn-borrar-registro" data-id="' + row.id + '"><i class="fas fa-trash"></i> Borrar</button>';
+                        html += '<button type="button" class="btn btn-sm btn-secondary btn-editar-registro me-1" data-id="' + row.id + '"><i class="fas fa-pen"></i> Editar</button>';
+                    }
+                    if (puedeRefirma) {
+                        html += '<button type="button" class="btn btn-sm btn-warning text-dark btn-refirma-registro me-1" data-id="' + row.id + '"><i class="fas fa-signature"></i> Refirma</button>';
+                    }
+                    if (esAdmin) {
+                        html += '<button type="button" class="btn btn-sm btn-danger btn-borrar-registro" data-id="' + row.id + '"><i class="fas fa-trash"></i> Borrar</button>';
                     }
                     return html;
                 }}
@@ -466,14 +472,14 @@ $isGestor = in_array('ROLE_GESTOR', $userRoles);
         });
 
         $(document).on('click', '.btn-refirma-registro', function() {
-            if (!esAdmin) return;
+            if (!puedeRefirma) return;
             refirmaRegistroId = $(this).data('id');
             $('#refirmaAlert').addClass('d-none').removeClass('alert-danger alert-success').text('');
             $('#refirmaModal').modal('show');
         });
 
         $('#btnConfirmarRefirma').on('click', function() {
-            if (!esAdmin || !refirmaRegistroId) return;
+            if (!puedeRefirma || !refirmaRegistroId) return;
             var $al = $('#refirmaAlert');
             $al.addClass('d-none');
             $.ajax({
