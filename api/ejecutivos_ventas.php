@@ -37,6 +37,9 @@ switch ($method) {
     case 'PUT':
         actualizar();
         break;
+    case 'DELETE':
+        eliminar();
+        break;
     default:
         http_response_code(405);
         echo json_encode(['success' => false, 'message' => 'Método no permitido']);
@@ -168,5 +171,48 @@ function actualizar(): void
         error_log('ejecutivos_ventas actualizar: ' . $e->getMessage());
         http_response_code(500);
         echo json_encode(['success' => false, 'message' => 'Error al actualizar el registro']);
+    }
+}
+
+function eliminar(): void
+{
+    global $pdo;
+    $id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
+    if ($id <= 0) {
+        parse_str((string) file_get_contents('php://input'), $del);
+        $id = isset($del['id']) ? (int) $del['id'] : (isset($_POST['id']) ? (int) $_POST['id'] : 0);
+    }
+    if ($id <= 0) {
+        echo json_encode(['success' => false, 'message' => 'ID requerido']);
+        return;
+    }
+
+    try {
+        $stmt = $pdo->prepare('SELECT id FROM ejecutivos_ventas WHERE id = ?');
+        $stmt->execute([$id]);
+        if (!$stmt->fetch()) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'message' => 'Registro no encontrado']);
+            return;
+        }
+
+        $stmt = $pdo->prepare('SELECT COUNT(*) FROM solicitudes_credito WHERE ejecutivo_ventas_id = ?');
+        $stmt->execute([$id]);
+        $nSol = (int) $stmt->fetchColumn();
+        if ($nSol > 0) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'No se puede eliminar: tiene ' . $nSol . ' solicitud' . ($nSol !== 1 ? 'es' : '') . ' asociada' . ($nSol !== 1 ? 's' : '') . '. Desactívelo en su lugar.',
+            ]);
+            return;
+        }
+
+        $stmt = $pdo->prepare('DELETE FROM ejecutivos_ventas WHERE id = ?');
+        $stmt->execute([$id]);
+        echo json_encode(['success' => true, 'message' => 'Ejecutivo eliminado correctamente']);
+    } catch (PDOException $e) {
+        error_log('ejecutivos_ventas eliminar: ' . $e->getMessage());
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Error al eliminar el registro']);
     }
 }

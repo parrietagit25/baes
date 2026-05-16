@@ -61,6 +61,11 @@ function cargarEjecutivos() {
             } else {
                 acciones += '<button type="button" class="btn btn-success btn-action" data-action="activate" data-id="' + row.id + '" title="Activar"><i class="fas fa-toggle-on"></i></button>';
             }
+            if (nSol > 0) {
+                acciones += '<button type="button" class="btn btn-danger btn-action" disabled title="No se puede eliminar: tiene solicitudes asociadas"><i class="fas fa-trash"></i></button>';
+            } else {
+                acciones += '<button type="button" class="btn btn-danger btn-action" data-action="delete" data-id="' + row.id + '" title="Eliminar"><i class="fas fa-trash"></i></button>';
+            }
             acciones += '</div>';
             var tr = '<tr>' +
                 '<td>' + row.id + '</td>' +
@@ -226,4 +231,29 @@ $(document).on('click', '[data-action="deactivate"]', function () {
 });
 $(document).on('click', '[data-action="activate"]', function () {
     cambiarActivoEjecutivo($(this).data('id'), true);
+});
+
+function eliminarEjecutivo(id) {
+    if (!confirm('¿Eliminar este ejecutivo de ventas?\n\nEsta acción no se puede deshacer.')) {
+        return;
+    }
+    $.ajax({
+        url: 'api/ejecutivos_ventas.php',
+        type: 'DELETE',
+        data: { id: id },
+        dataType: 'json'
+    }).done(function (r) {
+        if (r.success) {
+            mostrarAlerta(r.message || 'Eliminado', 'success');
+            location.reload();
+        } else {
+            mostrarAlerta(r.message || 'Error', 'danger');
+        }
+    }).fail(function () {
+        mostrarAlerta('Error de conexión', 'danger');
+    });
+}
+
+$(document).on('click', '[data-action="delete"]', function () {
+    eliminarEjecutivo($(this).data('id'));
 });
