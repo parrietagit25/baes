@@ -337,12 +337,12 @@ if ($isBanco && !$isAdmin) {
                                             }
                                         ?>
                                         <tr>
-                                            <td>
+                                            <td data-order="<?php echo (int) $solicitud['id']; ?>">
                                                 <?php if ($isAdmin): ?>
                                                 <a href="javascript:void(0);" class="link-cronologia-solicitud text-primary fw-semibold text-decoration-underline" role="button"
                                                    data-id="<?php echo (int) $solicitud['id']; ?>"
                                                    data-nombre="<?php echo htmlspecialchars($solicitud['nombre_cliente'] ?? '', ENT_QUOTES, 'UTF-8'); ?>"
-                                                   title="Ver cronología de la solicitud">#<?php echo (int) $solicitud['id']; ?></a>
+                                                   title="Ver cronología de la solicitud"><?php echo (int) $solicitud['id']; ?></a>
                                                 <?php else: ?>
                                                 <?php echo (int) $solicitud['id']; ?>
                                                 <?php endif; ?>

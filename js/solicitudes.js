@@ -349,7 +349,8 @@ function inicializarDataTable() {
             pageLength: 10,
             lengthMenu: [[5, 10, 25, 50], [5, 10, 25, 50]],
             columnDefs: [
-                { orderable: false, targets: [ultimaColumna] } // Columna de acciones no ordenable (última columna)
+                { type: 'num', targets: 0 },
+                { orderable: false, targets: [ultimaColumna] }
             ],
             autoWidth: false,
             processing: true,
@@ -404,7 +405,7 @@ function cargarSolicitudes() {
                     const vendedorNombre = (solicitud.vendedor_nombre || '').toString().trim() || 'Sin vendedor';
                     const idCelda = (window.userRoles && window.userRoles.isAdmin)
                         ? ('<a href="javascript:void(0);" class="link-cronologia-solicitud text-primary fw-semibold text-decoration-underline" role="button" data-id="' +
-                            solicitud.id + '" data-nombre="' + escDataAttr(solicitud.nombre_cliente) + '" title="Ver cronología de la solicitud">#' + solicitud.id + '</a>')
+                            solicitud.id + '" data-nombre="' + escDataAttr(solicitud.nombre_cliente) + '" title="Ver cronología de la solicitud">' + solicitud.id + '</a>')
                         : String(solicitud.id);
                     
                     const accionesComunes = `
@@ -452,7 +453,7 @@ function cargarSolicitudes() {
                     if (isBancoNoAdmin) {
                         row = `
                         <tr>
-                            <td>${idCelda}</td>
+                            <td data-order="${solicitud.id}">${idCelda}</td>
                             <td>${solicitud.nombre_cliente}</td>
                             <td>${solicitud.cedula}</td>
                             <td>
@@ -470,7 +471,7 @@ function cargarSolicitudes() {
                     } else {
                         row = `
                         <tr>
-                            <td>${idCelda}</td>
+                            <td data-order="${solicitud.id}">${idCelda}</td>
                             <td>${solicitud.nombre_cliente}</td>
                             <td>${solicitud.marca_auto || '-'} ${solicitud.modelo_auto || ''} ${solicitud.año_auto || ''}</td>
                             <td>${solicitud.gestor_nombre} ${solicitud.gestor_apellido}</td>
