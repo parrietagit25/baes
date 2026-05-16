@@ -265,14 +265,15 @@ if ($isBanco && !$isAdmin) {
                                             <?php if ($esUsuarioBancoLista): ?>
                                             <th>Cédula</th>
                                             <th>Mis respuestas</th>
-                                            <?php else: ?>
-                                            <th>Respuestas del Banco</th>
                                             <?php endif; ?>
                                             <th>Vehículo</th>
                                             <th>Gestor</th>
                                             <th>Vendedor</th>
                                             <?php if (!$isBanco): ?>
                                             <th>Banco Asignado</th>
+                                            <?php if (!$esUsuarioBancoLista): ?>
+                                            <th>Respuestas del Banco</th>
+                                            <?php endif; ?>
                                             <?php endif; ?>
                                             <th>Estado</th>
                                             <!-- <th>Respuesta Banco</th> -->
@@ -354,12 +355,6 @@ if ($isBanco && !$isAdmin) {
                                                     <i class="fas fa-clipboard-list me-1"></i>Ver mis respuestas
                                                 </button>
                                             </td>
-                                            <?php else: ?>
-                                            <td>
-                                                <button class="btn btn-sm btn-primary" onclick="verRespuestasBancoAdmin(<?php echo $solicitud['id']; ?>)" title="Ver Respuestas del Banco">
-                                                    <i class="fas fa-clipboard-list me-1"></i>Ver Respuestas
-                                                </button>
-                                            </td>
                                             <?php endif; ?>
                                             <td><?php echo htmlspecialchars($solicitud['marca_auto'] ?? '-'); ?> <?php echo htmlspecialchars($solicitud['modelo_auto'] ?? ''); ?> <?php echo $solicitud['ao_auto'] ?? $solicitud['año_auto'] ?? ''; ?></td>
                                             <td>
@@ -398,7 +393,12 @@ if ($isBanco && !$isAdmin) {
                                                     <span class="text-muted">Sin asignar</span>
                                                 <?php endif; ?>
                                             </td>
-                                                                                          <?php endif; ?>
+                                            <td>
+                                                <button class="btn btn-sm btn-primary" onclick="verRespuestasBancoAdmin(<?php echo $solicitud['id']; ?>)" title="Ver Respuestas del Banco">
+                                                    <i class="fas fa-clipboard-list me-1"></i>Ver Respuestas
+                                                </button>
+                                            </td>
+                                            <?php endif; ?>
                                               <td><span class="badge badge-estado <?php echo $estadoClass; ?>"><?php echo htmlspecialchars($solicitud['estado'] ?? 'N/A'); ?></span></td>
                                               <td><?php echo date('d/m/Y H:i', strtotime($solicitud['fecha_creacion'])); ?></td>
                                               <td>

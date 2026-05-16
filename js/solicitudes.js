@@ -472,11 +472,6 @@ function cargarSolicitudes() {
                         <tr>
                             <td>${idCelda}</td>
                             <td>${solicitud.nombre_cliente}</td>
-                            <td>
-                                <button type="button" class="btn btn-sm btn-primary" onclick="verRespuestasBanco(${solicitud.id})" title="Ver respuestas de bancos en esta solicitud">
-                                    <i class="fas fa-clipboard-list me-1"></i>Ver respuestas
-                                </button>
-                            </td>
                             <td>${solicitud.marca_auto || '-'} ${solicitud.modelo_auto || ''} ${solicitud.año_auto || ''}</td>
                             <td>${solicitud.gestor_nombre} ${solicitud.gestor_apellido}</td>
                             <td>${vendedorNombre}</td>
@@ -488,6 +483,11 @@ function cargarSolicitudes() {
                                     </span>` : 
                                     '<span class="text-muted">Sin asignar</span>'
                                 }
+                            </td>
+                            <td>
+                                <button type="button" class="btn btn-sm btn-primary" onclick="verRespuestasBancoAdmin(${solicitud.id})" title="Ver Respuestas del Banco">
+                                    <i class="fas fa-clipboard-list me-1"></i>Ver Respuestas
+                                </button>
                             </td>
                             <td><span class="badge badge-estado ${estadoClass}">${solicitud.estado}</span></td>
                             <!-- <td><span class="badge badge-estado ${respuestaClass}">${solicitud.respuesta_banco}</span></td> -->
