@@ -816,6 +816,7 @@ function prefillFormularioDesdeFinanciamiento(d) {
             abono_porcentaje: '',
             abono_monto: d.abono || ''
         }];
+        sincronizarAbonosVehiculosLista();
         renderizarVehiculos();
     }
     aplicarEjecutivoVentaDesdeFinanciamiento(d);
@@ -2451,12 +2452,61 @@ function agregarVehiculo() {
       $('#modalApartarVehiculo').modal('show');
   }
 
+function parseNumeroVehiculo(val) {
+    if (val === null || val === undefined || val === '') {
+        return null;
+    }
+    var n = parseFloat(String(val).replace(/,/g, ''));
+    return isNaN(n) ? null : n;
+}
+
+/**
+ * Monto abono = precio × (abono % / 100). Vacío si falta precio o porcentaje.
+ */
+function calcularAbonoMontoVehiculo(precio, abonoPorcentaje) {
+    var p = parseNumeroVehiculo(precio);
+    var pct = parseNumeroVehiculo(abonoPorcentaje);
+    if (p === null || pct === null) {
+        return null;
+    }
+    return (Math.round(p * (pct / 100) * 100) / 100).toFixed(2);
+}
+
+function recalcularAbonoMontoVehiculo(index) {
+    if (!vehiculosList[index]) {
+        return;
+    }
+    var v = vehiculosList[index];
+    var calculado = calcularAbonoMontoVehiculo(v.precio, v.abono_porcentaje);
+    if (calculado !== null) {
+        v.abono_monto = calculado;
+    } else if (
+        v.precio === '' || v.precio === null || v.precio === undefined ||
+        v.abono_porcentaje === '' || v.abono_porcentaje === null || v.abono_porcentaje === undefined
+    ) {
+        v.abono_monto = '';
+    }
+    var $inp = $('#veh-abono-monto-' + index);
+    if ($inp.length) {
+        $inp.val(v.abono_monto || '');
+    }
+}
+
+function sincronizarAbonosVehiculosLista() {
+    vehiculosList.forEach(function (_, i) {
+        recalcularAbonoMontoVehiculo(i);
+    });
+}
+
 /**
  * Actualizar un campo de vehículo
  */
 function actualizarVehiculo(index, campo, valor) {
     if (vehiculosList[index]) {
         vehiculosList[index][campo] = valor;
+        if (campo === 'precio' || campo === 'abono_porcentaje') {
+            recalcularAbonoMontoVehiculo(index);
+        }
     }
 }
 
@@ -2530,15 +2580,25 @@ function renderizarVehiculos() {
                                 <label class="form-label">Precio</label>
                                 <input type="number" class="form-control" step="0.01"
                                        value="${vehiculo.precio || ''}" 
+                                       oninput="actualizarVehiculo(${index}, 'precio', this.value)"
                                        onchange="actualizarVehiculo(${index}, 'precio', this.value)">
                             </div>
                         </div>
                         <div class="col-md-4">
                             <div class="mb-3">
                                 <label class="form-label">Abono (%)</label>
-                                <input type="number" class="form-control" step="0.01"
+                                <input type="number" class="form-control" step="0.01" min="0"
                                        value="${vehiculo.abono_porcentaje || ''}" 
+                                       oninput="actualizarVehiculo(${index}, 'abono_porcentaje', this.value)"
                                        onchange="actualizarVehiculo(${index}, 'abono_porcentaje', this.value)">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Monto abono</label>
+                                <input type="text" class="form-control bg-light" id="veh-abono-monto-${index}"
+                                       value="${vehiculo.abono_monto || ''}" readonly tabindex="-1" placeholder="—">
+                                <small class="text-muted">Calculado automáticamente (opcional)</small>
                             </div>
                         </div>
                     </div>
@@ -2569,6 +2629,7 @@ function cargarVehiculos(solicitudId) {
         success: function(response) {
             if (response.success) {
                 vehiculosList = response.data || [];
+                sincronizarAbonosVehiculosLista();
                 renderizarVehiculos();
             }
         },
@@ -2582,6 +2643,7 @@ function cargarVehiculos(solicitudId) {
  * Guardar vehículos de la solicitud
  */
 function guardarVehiculos(solicitudId) {
+    sincronizarAbonosVehiculosLista();
     $.ajax({
         url: 'api/vehiculos_solicitud.php',
         type: 'POST',

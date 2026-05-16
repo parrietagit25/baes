@@ -85,15 +85,22 @@ function guardarVehiculos() {
         ");
         
         foreach ($vehiculos as $index => $vehiculo) {
+            $precio = $normalizar($vehiculo['precio'] ?? null, true);
+            $abonoPct = $normalizar($vehiculo['abono_porcentaje'] ?? null, true);
+            $abonoMonto = $normalizar($vehiculo['abono_monto'] ?? null, true);
+            if ($precio !== null && $abonoPct !== null && is_numeric($precio) && is_numeric($abonoPct)) {
+                $abonoMonto = round((float) $precio * ((float) $abonoPct / 100), 2);
+            }
+
             $stmt->execute([
                 $solicitud_id,
                 trim((string)($vehiculo['marca'] ?? '')) ?: null,
                 trim((string)($vehiculo['modelo'] ?? '')) ?: null,
                 $normalizar($vehiculo['anio'] ?? null),
                 $normalizar($vehiculo['kilometraje'] ?? null),
-                $normalizar($vehiculo['precio'] ?? null, true),
-                $normalizar($vehiculo['abono_porcentaje'] ?? null, true),
-                $normalizar($vehiculo['abono_monto'] ?? null, true),
+                $precio,
+                $abonoPct,
+                $abonoMonto,
                 $index + 1
             ]);
         }
