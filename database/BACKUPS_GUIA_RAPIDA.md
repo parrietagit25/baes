@@ -13,10 +13,24 @@ chmod +x database/restore_mysql_motus.sh
 
 ## 2) Probar backup manual
 
+Si aparece `Permission denied`, el script no es ejecutable (o use `bash` como en la segunda línea):
+
 ```bash
-DB_CONTAINER=motus_db DB_NAME=motus_baes DB_USER=root DB_PASS='motus_root_2024' \
+chmod +x /root/baes/database/backup_mysql_motus.sh /root/baes/database/restore_mysql_motus.sh
+```
+
+```bash
+DB_CONTAINER=motus_db DB_NAME=motus_baes DB_USER=motus_user DB_PASS='motus_2026_automarket' \
 BACKUP_DIR=/root/backups/motus_db RETENTION_DAYS=14 \
 /root/baes/database/backup_mysql_motus.sh
+```
+
+Alternativa sin `chmod` (siempre funciona):
+
+```bash
+DB_CONTAINER=motus_db DB_NAME=motus_baes DB_USER=motus_user DB_PASS='motus_2026_automarket' \
+BACKUP_DIR=/root/backups/motus_db RETENTION_DAYS=14 \
+bash /root/baes/database/backup_mysql_motus.sh
 ```
 
 Verifica:

@@ -13,15 +13,25 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
-if (!in_array('ROLE_ADMIN', $_SESSION['user_roles'] ?? [], true)) {
+$roles = $_SESSION['user_roles'] ?? [];
+$esAdmin = in_array('ROLE_ADMIN', $roles, true);
+$esGestor = in_array('ROLE_GESTOR', $roles, true);
+
+if (!$esAdmin && !$esGestor) {
     http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Solo los administradores pueden gestionar ejecutivos de ventas']);
+    echo json_encode(['success' => false, 'message' => 'No autorizado']);
     exit();
 }
 
 require_once __DIR__ . '/../config/database.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
+
+if (!$esAdmin && $method !== 'GET') {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Solo consulta: los gestores no pueden modificar ejecutivos de ventas']);
+    exit();
+}
 
 switch ($method) {
     case 'GET':

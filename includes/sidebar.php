@@ -58,10 +58,20 @@ $isVendedor = in_array('ROLE_VENDEDOR', $_SESSION['user_roles']);
         </a>
         <?php endif; ?>
 
-        <!-- Gestión de Bancos - Solo Admin -->
+        <!-- Gestión de Bancos (instituciones) - Solo Admin -->
         <?php if ($isAdmin): ?>
         <a class="nav-link <?php echo ($current_page == 'bancos.php') ? 'active' : ''; ?>" href="bancos.php">
             <i class="fas fa-university me-2"></i>Gestión de Bancos
+        </a>
+        <a class="nav-link <?php echo ($current_page == 'ejecutivos_ventas.php') ? 'active' : ''; ?>" href="ejecutivos_ventas.php">
+            <i class="fas fa-user-tie me-2"></i>Ejecutivos de Ventas
+        </a>
+        <?php endif; ?>
+
+        <!-- Consulta catálogos - Gestor (solo lectura) -->
+        <?php if ($isGestor && !$isAdmin): ?>
+        <a class="nav-link <?php echo ($current_page == 'usuarios_banco.php') ? 'active' : ''; ?>" href="usuarios_banco.php">
+            <i class="fas fa-university me-2"></i>Usuarios Banco
         </a>
         <a class="nav-link <?php echo ($current_page == 'ejecutivos_ventas.php') ? 'active' : ''; ?>" href="ejecutivos_ventas.php">
             <i class="fas fa-user-tie me-2"></i>Ejecutivos de Ventas

@@ -1,10 +1,14 @@
+var ejecutivosSoloLectura = window.MOTUS_EJECUTIVOS_SOLO_LECTURA === true;
+
 $(document).ready(function () {
     cargarEjecutivos();
 
-    $('#ejecutivoVentasForm').on('submit', function (e) {
-        e.preventDefault();
-        guardarEjecutivo();
-    });
+    if (!ejecutivosSoloLectura) {
+        $('#ejecutivoVentasForm').on('submit', function (e) {
+            e.preventDefault();
+            guardarEjecutivo();
+        });
+    }
 });
 
 function escHtml(s) {
@@ -54,19 +58,22 @@ function cargarEjecutivos() {
             var solBadge = nSol > 0
                 ? '<span class="badge bg-info">' + nSol + ' solicitud' + (nSol !== 1 ? 'es' : '') + '</span>'
                 : '<span class="text-muted">0</span>';
-            var acciones = '<div class="btn-group btn-group-sm">' +
-                '<button type="button" class="btn btn-primary btn-action" data-action="edit" data-id="' + row.id + '" title="Editar"><i class="fas fa-edit"></i></button>';
-            if (activo) {
-                acciones += '<button type="button" class="btn btn-warning btn-action" data-action="deactivate" data-id="' + row.id + '" title="Desactivar"><i class="fas fa-toggle-off"></i></button>';
-            } else {
-                acciones += '<button type="button" class="btn btn-success btn-action" data-action="activate" data-id="' + row.id + '" title="Activar"><i class="fas fa-toggle-on"></i></button>';
+            var acciones = '';
+            if (!ejecutivosSoloLectura) {
+                acciones = '<div class="btn-group btn-group-sm">' +
+                    '<button type="button" class="btn btn-primary btn-action" data-action="edit" data-id="' + row.id + '" title="Editar"><i class="fas fa-edit"></i></button>';
+                if (activo) {
+                    acciones += '<button type="button" class="btn btn-warning btn-action" data-action="deactivate" data-id="' + row.id + '" title="Desactivar"><i class="fas fa-toggle-off"></i></button>';
+                } else {
+                    acciones += '<button type="button" class="btn btn-success btn-action" data-action="activate" data-id="' + row.id + '" title="Activar"><i class="fas fa-toggle-on"></i></button>';
+                }
+                if (nSol > 0) {
+                    acciones += '<button type="button" class="btn btn-danger btn-action" disabled title="No se puede eliminar: tiene solicitudes asociadas"><i class="fas fa-trash"></i></button>';
+                } else {
+                    acciones += '<button type="button" class="btn btn-danger btn-action" data-action="delete" data-id="' + row.id + '" title="Eliminar"><i class="fas fa-trash"></i></button>';
+                }
+                acciones += '</div>';
             }
-            if (nSol > 0) {
-                acciones += '<button type="button" class="btn btn-danger btn-action" disabled title="No se puede eliminar: tiene solicitudes asociadas"><i class="fas fa-trash"></i></button>';
-            } else {
-                acciones += '<button type="button" class="btn btn-danger btn-action" data-action="delete" data-id="' + row.id + '" title="Eliminar"><i class="fas fa-trash"></i></button>';
-            }
-            acciones += '</div>';
             var tr = '<tr>' +
                 '<td>' + row.id + '</td>' +
                 '<td><strong>' + escHtml(row.nombre) + '</strong></td>' +
@@ -75,7 +82,7 @@ function cargarEjecutivos() {
                 '<td>' + solBadge + '</td>' +
                 '<td><span class="badge badge-estado ' + estadoClass + '">' + estadoTxt + '</span></td>' +
                 '<td>' + escHtml(formatearFecha(row.fecha_creacion)) + '</td>' +
-                '<td>' + acciones + '</td>' +
+                (ejecutivosSoloLectura ? '' : ('<td>' + acciones + '</td>')) +
                 '</tr>';
             tbody.append(tr);
         });
@@ -84,14 +91,17 @@ function cargarEjecutivos() {
             $('#ejecutivosVentasTable').DataTable().destroy();
         }
         setTimeout(function () {
-            $('#ejecutivosVentasTable').DataTable({
+            var dtOpts = {
                 language: { url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json' },
                 pageLength: 15,
                 order: [[1, 'asc']],
-                columnDefs: [{ orderable: false, targets: [7] }],
                 responsive: true,
                 autoWidth: false
-            });
+            };
+            if (!ejecutivosSoloLectura) {
+                dtOpts.columnDefs = [{ orderable: false, targets: [7] }];
+            }
+            $('#ejecutivosVentasTable').DataTable(dtOpts);
         }, 100);
     }).fail(function () {
         mostrarAlerta('Error de conexión', 'danger');

@@ -8,6 +8,8 @@ if (!isset($_SESSION['user_id'])) {
 require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/includes/validar_acceso.php';
 
+$soloLecturaEjecutivos = $isGestor && !$isAdmin;
+
 $totalEj = 0;
 $activosEj = 0;
 $inactivosEj = 0;
@@ -60,11 +62,19 @@ try {
                 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
                     <div>
                         <h2 class="mb-1">Ejecutivos de Ventas</h2>
-                        <p class="text-muted mb-0">Catálogo usado en <strong>Datos generales</strong> de las solicitudes y en copia de correos al banco.</p>
+                        <p class="text-muted mb-0">
+                            <?php if ($soloLecturaEjecutivos): ?>
+                            Consulta del catálogo (solo lectura).
+                            <?php else: ?>
+                            Catálogo usado en <strong>Datos generales</strong> de las solicitudes y en copia de correos al banco.
+                            <?php endif; ?>
+                        </p>
                     </div>
+                    <?php if (!$soloLecturaEjecutivos): ?>
                     <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#ejecutivoVentasModal" onclick="limpiarFormularioEjecutivo()">
                         <i class="fas fa-plus me-2"></i>Nuevo ejecutivo
                     </button>
+                    <?php endif; ?>
                 </div>
 
                 <div class="row mb-4">
@@ -88,10 +98,16 @@ try {
                     </div>
                 </div>
 
+                <?php if (!$soloLecturaEjecutivos): ?>
                 <div class="alert alert-info py-2 small mb-3">
                     <i class="fas fa-info-circle me-1"></i>
                     Ejecute en la base de datos <code>database/migracion_ejecutivos_ventas.sql</code> si la tabla no existe. Si ya tenía la tabla sin <code>activo</code>, use <code>database/migracion_ejecutivos_ventas_columnas_extra.sql</code>.
                 </div>
+                <?php else: ?>
+                <div class="alert alert-secondary py-2 small mb-3">
+                    <i class="fas fa-eye me-1"></i> Vista de consulta. No puede crear, editar ni eliminar registros.
+                </div>
+                <?php endif; ?>
 
                 <div class="card">
                     <div class="card-body">
@@ -106,7 +122,7 @@ try {
                                         <th>Solicitudes</th>
                                         <th>Estado</th>
                                         <th>Alta</th>
-                                        <th>Acciones</th>
+                                        <?php if (!$soloLecturaEjecutivos): ?><th>Acciones</th><?php endif; ?>
                                     </tr>
                                 </thead>
                                 <tbody></tbody>
@@ -119,6 +135,7 @@ try {
     </div>
 </div>
 
+<?php if (!$soloLecturaEjecutivos): ?>
 <div class="modal fade" id="ejecutivoVentasModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -155,7 +172,9 @@ try {
         </div>
     </div>
 </div>
+<?php endif; ?>
 
+<script>window.MOTUS_EJECUTIVOS_SOLO_LECTURA = <?php echo $soloLecturaEjecutivos ? 'true' : 'false'; ?>;</script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
