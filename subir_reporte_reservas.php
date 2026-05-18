@@ -44,7 +44,10 @@ if (!$isAdmin && !$isGestor) {
             <div class="container-fluid py-4">
                 <div class="mb-4">
                     <h2 class="mb-1">Subir Reporte de Reservas</h2>
-                    <p class="text-muted mb-0">Cargue archivos Excel o CSV con el reporte de reservas de vehículos.</p>
+                    <p class="text-muted mb-0">Excel Proforma Autos (fila 4, columna C). Coincide solicitudes y aparta vehículos.</p>
+                </div>
+                <div class="alert alert-info py-2 small mb-3">
+                    Cédula (L), Correo (M), Nombre (J), Marca (T), Modelo (U), Año (X), Km (Y), Total (AC), Abono (AL). Tras subir use <strong>Procesar</strong>.
                 </div>
 
                 <div class="card mb-4">
@@ -53,9 +56,9 @@ if (!$isAdmin && !$isGestor) {
                             <div class="upload-zone mb-3" id="uploadZone">
                                 <i class="fas fa-cloud-upload-alt fa-3x text-primary mb-3"></i>
                                 <p class="mb-2">Arrastre el archivo aquí o haga clic para seleccionar</p>
-                                <p class="small text-muted mb-3">Formatos: .xlsx, .xls, .csv (máx. 25 MB)</p>
+                                <p class="small text-muted mb-3">Formato recomendado: .xlsx (máx. 25 MB)</p>
                                 <input type="file" class="form-control d-none" id="archivo_reporte" name="archivo"
-                                       accept=".xlsx,.xls,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv">
+                                       accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv">
                                 <button type="button" class="btn btn-outline-primary btn-sm" id="btnElegirArchivo">
                                     <i class="fas fa-folder-open me-1"></i>Elegir archivo
                                 </button>
@@ -81,6 +84,8 @@ if (!$isAdmin && !$isGestor) {
                                         <th>Archivo</th>
                                         <th>Tamaño</th>
                                         <th>Subido por</th>
+                                        <th>Estado</th>
+                                        <th>Filas</th>
                                         <th>Fecha</th>
                                         <th>Acciones</th>
                                     </tr>
@@ -88,6 +93,24 @@ if (!$isAdmin && !$isGestor) {
                                 <tbody></tbody>
                             </table>
                         </div>
+                    </div>
+                </div>
+
+                <div class="card mt-4 d-none" id="cardDetalleLineas">
+                    <div class="card-header bg-white border-0 pt-3 d-flex justify-content-between">
+                        <h5 class="mb-0">Detalle reporte #<span id="detalleReporteId"></span></h5>
+                        <button type="button" class="btn-close" id="btnCerrarDetalle"></button>
+                    </div>
+                    <div class="card-body table-responsive">
+                        <table id="tablaLineasReporte" class="table table-sm table-striped w-100">
+                            <thead>
+                                <tr>
+                                    <th>Fila</th><th>Cliente</th><th>Cédula</th><th>Vehículo</th>
+                                    <th>Sol.</th><th>Match</th><th>Estado</th><th>Mensaje</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
                     </div>
                 </div>
             </div>

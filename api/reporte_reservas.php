@@ -30,12 +30,24 @@ if ($method === 'GET' && isset($_GET['download'])) {
 
 header('Content-Type: application/json; charset=utf-8');
 
+$action = $_GET['action'] ?? ($_POST['action'] ?? '');
+
 switch ($method) {
     case 'GET':
-        listarReportes();
+        if ($action === 'lineas' && isset($_GET['reporte_id'])) {
+            listarLineas((int) $_GET['reporte_id']);
+        } else {
+            listarReportes();
+        }
         break;
     case 'POST':
-        subirReporte();
+        if ($action === 'procesar') {
+            procesarReporte((int) ($_POST['reporte_id'] ?? 0));
+        } elseif ($action === 'importar') {
+            importarReporte((int) ($_POST['reporte_id'] ?? 0));
+        } else {
+            subirReporte();
+        }
         break;
     case 'DELETE':
         if (!$esAdmin) {
@@ -74,8 +86,11 @@ function listarReportes(): void
         return;
     }
     try {
+        $colsExtra = columnasReporteExtendidas() ? ',
+                   r.estado, r.filas_total, r.filas_aplicadas, r.filas_sin_coincidencia, r.fecha_procesado' : '';
         $stmt = $pdo->query("
-            SELECT r.id, r.nombre_original, r.tamano_bytes, r.mime_type, r.fecha_subida,
+            SELECT r.id, r.nombre_original, r.tamano_bytes, r.mime_type, r.fecha_subida
+                   {$colsExtra},
                    u.nombre AS usuario_nombre, u.apellido AS usuario_apellido
             FROM reportes_reservas r
             INNER JOIN usuarios u ON u.id = r.usuario_id
@@ -156,10 +171,23 @@ function subirReporte(): void
             $mime !== '' ? $mime : null,
             (int) $_SESSION['user_id'],
         ]);
+        $reporteId = (int) $pdo->lastInsertId();
+        $importMsg = '';
+        $importOk = true;
+        if (in_array($ext, ['xlsx', 'csv'], true) && tablaLineasExiste()) {
+            require_once __DIR__ . '/../includes/ReservasProformaProcessor.php';
+            $proc = new ReservasProformaProcessor($pdo, $reporteId, (int) $_SESSION['user_id']);
+            $imp = $proc->importarDesdeArchivo($rutaCompleta);
+            $importOk = $imp['success'];
+            $importMsg = $imp['message'] ?? '';
+        }
+
         echo json_encode([
             'success' => true,
-            'message' => 'Reporte subido correctamente',
-            'data' => ['id' => (int) $pdo->lastInsertId()],
+            'message' => $importOk
+                ? ('Reporte subido. ' . ($importMsg ?: 'Listo para procesar.'))
+                : ('Archivo guardado pero falló la importación: ' . $importMsg),
+            'data' => ['id' => $reporteId, 'import_ok' => $importOk],
         ]);
     } catch (PDOException $e) {
         @unlink($rutaCompleta);
@@ -200,6 +228,98 @@ function descargarReporte(int $id): void
     header('Content-Length: ' . (string) filesize($path));
     readfile($path);
     exit();
+}
+
+function columnasReporteExtendidas(): bool
+{
+    global $pdo;
+    try {
+        $pdo->query('SELECT estado FROM reportes_reservas LIMIT 1');
+        return true;
+    } catch (PDOException $e) {
+        return false;
+    }
+}
+
+function tablaLineasExiste(): bool
+{
+    global $pdo;
+    try {
+        $pdo->query('SELECT 1 FROM reportes_reservas_lineas LIMIT 1');
+        return true;
+    } catch (PDOException $e) {
+        return false;
+    }
+}
+
+function listarLineas(int $reporteId): void
+{
+    global $pdo;
+    if ($reporteId <= 0 || !tablaLineasExiste()) {
+        echo json_encode(['success' => false, 'message' => 'Reporte o tabla de líneas no disponible']);
+        return;
+    }
+    try {
+        $stmt = $pdo->prepare("
+            SELECT id, fila_excel, nombre_cliente, cedula, correo_cliente, marca, modelo, anio,
+                   precio_total, abono_monto, abono_porcentaje, mov_id, solicitud_id, vehiculo_id,
+                   match_por, estado, mensaje
+            FROM reportes_reservas_lineas
+            WHERE reporte_id = ?
+            ORDER BY fila_excel ASC
+        ");
+        $stmt->execute([$reporteId]);
+        echo json_encode(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+    } catch (PDOException $e) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Error al listar líneas']);
+    }
+}
+
+function importarReporte(int $reporteId): void
+{
+    global $pdo;
+    if ($reporteId <= 0) {
+        echo json_encode(['success' => false, 'message' => 'ID de reporte requerido']);
+        return;
+    }
+    $path = rutaArchivoReporte($reporteId);
+    if (!$path) {
+        echo json_encode(['success' => false, 'message' => 'Reporte no encontrado']);
+        return;
+    }
+    require_once __DIR__ . '/../includes/ReservasProformaProcessor.php';
+    $proc = new ReservasProformaProcessor($pdo, $reporteId, (int) $_SESSION['user_id']);
+    echo json_encode($proc->importarDesdeArchivo($path));
+}
+
+function procesarReporte(int $reporteId): void
+{
+    global $pdo;
+    if ($reporteId <= 0) {
+        echo json_encode(['success' => false, 'message' => 'ID de reporte requerido']);
+        return;
+    }
+    if (!tablaLineasExiste()) {
+        echo json_encode(['success' => false, 'message' => 'Ejecute database/migracion_reportes_reservas_lineas.sql']);
+        return;
+    }
+    require_once __DIR__ . '/../includes/ReservasProformaProcessor.php';
+    $proc = new ReservasProformaProcessor($pdo, $reporteId, (int) $_SESSION['user_id']);
+    echo json_encode($proc->procesarCoincidencias());
+}
+
+function rutaArchivoReporte(int $reporteId): ?string
+{
+    global $pdo;
+    $stmt = $pdo->prepare('SELECT ruta_archivo FROM reportes_reservas WHERE id = ?');
+    $stmt->execute([$reporteId]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$row) {
+        return null;
+    }
+    $path = __DIR__ . '/../' . str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $row['ruta_archivo']);
+    return is_file($path) ? $path : null;
 }
 
 function eliminarReporte(): void
