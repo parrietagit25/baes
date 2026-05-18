@@ -7,6 +7,7 @@ if (!isset($_SESSION['user_id'])) {
 
 require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/includes/validar_acceso.php';
+require_once __DIR__ . '/includes/reporte_reservas_pagina_helper.php';
 
 $userRoles = $_SESSION['user_roles'] ?? [];
 $isAdmin = in_array('ROLE_ADMIN', $userRoles, true);
@@ -14,6 +15,91 @@ $isGestor = in_array('ROLE_GESTOR', $userRoles, true);
 if (!$isAdmin && !$isGestor) {
     header('Location: dashboard.php');
     exit();
+}
+
+$userId = (int) $_SESSION['user_id'];
+
+// API JSON (opcional; puede estar bloqueada por Cloudflare)
+if (isset($_GET['servicio']) && $_GET['servicio'] === '1') {
+    if (($_GET['modo'] ?? '') === 'form') {
+        ob_start();
+        require __DIR__ . '/api/reporte_reservas.php';
+        $jsonOut = ob_get_clean();
+        $data = json_decode($jsonOut, true);
+        if (!is_array($data)) {
+            $_SESSION['flash_reporte'] = ['tipo' => 'danger', 'mensaje' => 'Respuesta inválida del servidor'];
+            header('Location: subir_reporte_reservas.php');
+            exit();
+        }
+        reporte_reservas_flash_desde_resultado($data);
+        if (!empty($data['success']) && !empty($data['data']['needs_import']) && !empty($data['data']['id'])) {
+            header('Location: subir_reporte_reservas.php?importar_id=' . (int) $data['data']['id']);
+            exit();
+        }
+        header('Location: subir_reporte_reservas.php');
+        exit();
+    }
+    require __DIR__ . '/api/reporte_reservas.php';
+    exit();
+}
+
+// Importar filas tras subida (navegación normal, sin AJAX)
+if (!empty($_GET['importar_id'])) {
+    $importarId = (int) $_GET['importar_id'];
+    $imp = reporte_reservas_importar($pdo, $importarId, $userId);
+    reporte_reservas_flash_desde_resultado($imp, 'success');
+    header('Location: subir_reporte_reservas.php');
+    exit();
+}
+
+// Acciones por formulario POST (procesar / eliminar)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion_reporte'])) {
+    $accion = (string) $_POST['accion_reporte'];
+    $reporteIdPost = (int) ($_POST['reporte_id'] ?? 0);
+    if ($accion === 'procesar' && $reporteIdPost > 0) {
+        $res = reporte_reservas_procesar($pdo, $reporteIdPost, $userId);
+        reporte_reservas_flash_desde_resultado($res);
+        header('Location: subir_reporte_reservas.php?ver_reporte=' . $reporteIdPost);
+        exit();
+    }
+    if ($accion === 'eliminar' && $isAdmin && $reporteIdPost > 0) {
+        $res = reporte_reservas_eliminar($pdo, $reporteIdPost);
+        reporte_reservas_flash_desde_resultado($res);
+        header('Location: subir_reporte_reservas.php');
+        exit();
+    }
+    $_SESSION['flash_reporte'] = ['tipo' => 'danger', 'mensaje' => 'Acción no permitida'];
+    header('Location: subir_reporte_reservas.php');
+    exit();
+}
+
+$flashReporte = $_SESSION['flash_reporte'] ?? null;
+unset($_SESSION['flash_reporte']);
+
+$reportesLista = reporte_reservas_listar($pdo);
+$verReporteId = isset($_GET['ver_reporte']) ? (int) $_GET['ver_reporte'] : 0;
+$lineasDetalle = $verReporteId > 0 ? reporte_reservas_listar_lineas($pdo, $verReporteId) : [];
+
+function h($s): string
+{
+    return htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
+}
+
+function badge_estado_reporte_php(?string $estado): string
+{
+    $e = strtolower((string) ($estado ?: 'pendiente'));
+    $map = ['pendiente' => 'secondary', 'procesando' => 'warning', 'completado' => 'success', 'error' => 'danger'];
+    $cls = $map[$e] ?? 'secondary';
+    return '<span class="badge bg-' . $cls . '">' . h($e) . '</span>';
+}
+
+function badge_estado_linea_php(?string $estado): string
+{
+    $e = strtolower(str_replace('_', ' ', (string) ($estado ?: 'pendiente')));
+    $raw = strtolower((string) ($estado ?: 'pendiente'));
+    $map = ['pendiente' => 'secondary', 'aplicado' => 'success', 'sin_coincidencia' => 'warning', 'error' => 'danger'];
+    $cls = $map[$raw] ?? 'secondary';
+    return '<span class="badge bg-' . $cls . '">' . h($e) . '</span>';
 }
 ?>
 <!DOCTYPE html>
@@ -50,9 +136,17 @@ if (!$isAdmin && !$isGestor) {
                     Cédula (L), Correo (M), Nombre (J), Marca (T), Modelo (U), Año (X), Km (Y), Total (AC), Abono (AL). Tras subir use <strong>Procesar</strong>.
                 </div>
 
+                <?php if ($flashReporte): ?>
+                <div class="alert alert-<?php echo h($flashReporte['tipo'] ?? 'info'); ?> alert-dismissible fade show">
+                    <?php echo h($flashReporte['mensaje'] ?? ''); ?>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                <?php endif; ?>
+
                 <div class="card mb-4">
                     <div class="card-body">
-                        <form id="formReporteReservas" enctype="multipart/form-data">
+                        <form id="formReporteReservas" method="post" enctype="multipart/form-data"
+                              action="subir_reporte_reservas.php?servicio=1&amp;modo=form">
                             <div class="upload-zone mb-3" id="uploadZone">
                                 <i class="fas fa-cloud-upload-alt fa-3x text-primary mb-3"></i>
                                 <p class="mb-2">Arrastre el archivo aquí o haga clic para seleccionar</p>
@@ -90,16 +184,57 @@ if (!$isAdmin && !$isGestor) {
                                         <th>Acciones</th>
                                     </tr>
                                 </thead>
-                                <tbody></tbody>
+                                <tbody>
+                                <?php foreach ($reportesLista as $row):
+                                    $subidoPor = trim(($row['usuario_nombre'] ?? '') . ' ' . ($row['usuario_apellido'] ?? ''));
+                                    $filasInfo = isset($row['filas_total']) ? (int) $row['filas_total'] : null;
+                                    ?>
+                                    <tr>
+                                        <td data-order="<?php echo (int) $row['id']; ?>"><?php echo (int) $row['id']; ?></td>
+                                        <td><?php echo h($row['nombre_original'] ?? ''); ?></td>
+                                        <td><?php echo h(reporte_reservas_formatear_tamano($row['tamano_bytes'] ?? 0)); ?></td>
+                                        <td><?php echo h($subidoPor !== '' ? $subidoPor : '-'); ?></td>
+                                        <td><?php echo isset($row['estado']) ? badge_estado_reporte_php($row['estado']) : '—'; ?></td>
+                                        <td><?php
+                                            if ($filasInfo !== null) {
+                                                echo (int) $filasInfo;
+                                                if (isset($row['filas_aplicadas'])) {
+                                                    echo ' <small class="text-muted">(' . (int) $row['filas_aplicadas'] . ' ok)</small>';
+                                                }
+                                            } else {
+                                                echo '—';
+                                            }
+                                        ?></td>
+                                        <td><?php echo h($row['fecha_subida'] ?? ''); ?></td>
+                                        <td class="text-nowrap">
+                                            <a class="btn btn-sm btn-outline-primary me-1" href="subir_reporte_reservas.php?servicio=1&amp;download=<?php echo (int) $row['id']; ?>" title="Descargar"><i class="fas fa-download"></i></a>
+                                            <a class="btn btn-sm btn-outline-info me-1" href="subir_reporte_reservas.php?ver_reporte=<?php echo (int) $row['id']; ?>" title="Ver detalle"><i class="fas fa-list"></i></a>
+                                            <form method="post" action="subir_reporte_reservas.php" class="d-inline" onsubmit="return confirm('¿Procesar este reporte?');">
+                                                <input type="hidden" name="accion_reporte" value="procesar">
+                                                <input type="hidden" name="reporte_id" value="<?php echo (int) $row['id']; ?>">
+                                                <button type="submit" class="btn btn-sm btn-success me-1" title="Procesar"><i class="fas fa-cogs"></i></button>
+                                            </form>
+                                            <?php if ($isAdmin): ?>
+                                            <form method="post" action="subir_reporte_reservas.php" class="d-inline" onsubmit="return confirm('¿Eliminar este reporte?');">
+                                                <input type="hidden" name="accion_reporte" value="eliminar">
+                                                <input type="hidden" name="reporte_id" value="<?php echo (int) $row['id']; ?>">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar"><i class="fas fa-trash"></i></button>
+                                            </form>
+                                            <?php endif; ?>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                                </tbody>
                             </table>
                         </div>
                     </div>
                 </div>
 
-                <div class="card mt-4 d-none" id="cardDetalleLineas">
+                <?php if ($verReporteId > 0): ?>
+                <div class="card mt-4" id="cardDetalleLineas">
                     <div class="card-header bg-white border-0 pt-3 d-flex justify-content-between">
-                        <h5 class="mb-0">Detalle reporte #<span id="detalleReporteId"></span></h5>
-                        <button type="button" class="btn-close" id="btnCerrarDetalle"></button>
+                        <h5 class="mb-0">Detalle reporte #<?php echo $verReporteId; ?></h5>
+                        <a href="subir_reporte_reservas.php" class="btn-close" aria-label="Cerrar"></a>
                     </div>
                     <div class="card-body table-responsive">
                         <table id="tablaLineasReporte" class="table table-sm table-striped w-100">
@@ -109,10 +244,26 @@ if (!$isAdmin && !$isGestor) {
                                     <th>Sol.</th><th>Match</th><th>Estado</th><th>Mensaje</th>
                                 </tr>
                             </thead>
-                            <tbody></tbody>
+                            <tbody>
+                            <?php foreach ($lineasDetalle as $ln):
+                                $veh = trim(implode(' ', array_filter([$ln['marca'] ?? '', $ln['modelo'] ?? '', $ln['anio'] ?? ''])));
+                                ?>
+                                <tr>
+                                    <td><?php echo (int) ($ln['fila_excel'] ?? 0); ?></td>
+                                    <td><?php echo h($ln['nombre_cliente'] ?? ''); ?></td>
+                                    <td><?php echo h($ln['cedula'] ?? ''); ?></td>
+                                    <td><?php echo h($veh); ?></td>
+                                    <td><?php echo !empty($ln['solicitud_id']) ? '#' . (int) $ln['solicitud_id'] : '—'; ?></td>
+                                    <td><?php echo (!empty($ln['match_por']) && $ln['match_por'] !== 'ninguno') ? h($ln['match_por']) : '—'; ?></td>
+                                    <td><?php echo badge_estado_linea_php($ln['estado'] ?? ''); ?></td>
+                                    <td class="small"><?php echo h($ln['mensaje'] ?? ''); ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                            </tbody>
                         </table>
                     </div>
                 </div>
+                <?php endif; ?>
             </div>
         </div>
     </div>
@@ -120,7 +271,7 @@ if (!$isAdmin && !$isGestor) {
 
 <script>
 window.MOTUS_REPORTE_RESERVAS_ADMIN = <?php echo $isAdmin ? 'true' : 'false'; ?>;
-window.MOTUS_REPORTE_RESERVAS_API = 'reporte_reservas_servicio.php';
+window.MOTUS_USAR_AJAX_REPORTES = false;
 </script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
