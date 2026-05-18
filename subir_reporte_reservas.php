@@ -19,26 +19,21 @@ if (!$isAdmin && !$isGestor) {
 
 $userId = (int) $_SESSION['user_id'];
 
-// API JSON (opcional; puede estar bloqueada por Cloudflare)
-if (isset($_GET['servicio']) && $_GET['servicio'] === '1') {
-    if (($_GET['modo'] ?? '') === 'form') {
-        ob_start();
-        require __DIR__ . '/api/reporte_reservas.php';
-        $jsonOut = ob_get_clean();
-        $data = json_decode($jsonOut, true);
-        if (!is_array($data)) {
-            $_SESSION['flash_reporte'] = ['tipo' => 'danger', 'mensaje' => 'Respuesta inválida del servidor'];
-            header('Location: subir_reporte_reservas.php');
-            exit();
-        }
-        reporte_reservas_flash_desde_resultado($data);
-        if (!empty($data['success']) && !empty($data['data']['needs_import']) && !empty($data['data']['id'])) {
-            header('Location: subir_reporte_reservas.php?importar_id=' . (int) $data['data']['id']);
-            exit();
-        }
+// Subida por formulario HTML (sin incluir api/ — evita salida inválida)
+if (isset($_GET['servicio']) && $_GET['servicio'] === '1' && ($_GET['modo'] ?? '') === 'form') {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_FILES['archivo'])) {
+        $_SESSION['flash_reporte'] = ['tipo' => 'danger', 'mensaje' => 'No se recibió el archivo'];
         header('Location: subir_reporte_reservas.php');
         exit();
     }
+    $resultado = reporte_reservas_subir_e_importar($pdo, $userId, $_FILES['archivo']);
+    reporte_reservas_flash_desde_resultado($resultado, !empty($resultado['success']) ? 'success' : 'danger');
+    header('Location: subir_reporte_reservas.php');
+    exit();
+}
+
+// Descarga y API JSON
+if (isset($_GET['servicio']) && $_GET['servicio'] === '1') {
     require __DIR__ . '/api/reporte_reservas.php';
     exit();
 }
@@ -56,6 +51,12 @@ if (!empty($_GET['importar_id'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion_reporte'])) {
     $accion = (string) $_POST['accion_reporte'];
     $reporteIdPost = (int) ($_POST['reporte_id'] ?? 0);
+    if ($accion === 'importar' && $reporteIdPost > 0) {
+        $res = reporte_reservas_importar($pdo, $reporteIdPost, $userId);
+        reporte_reservas_flash_desde_resultado($res);
+        header('Location: subir_reporte_reservas.php?ver_reporte=' . $reporteIdPost);
+        exit();
+    }
     if ($accion === 'procesar' && $reporteIdPost > 0) {
         $res = reporte_reservas_procesar($pdo, $reporteIdPost, $userId);
         reporte_reservas_flash_desde_resultado($res);
@@ -209,6 +210,13 @@ function badge_estado_linea_php(?string $estado): string
                                         <td class="text-nowrap">
                                             <a class="btn btn-sm btn-outline-primary me-1" href="subir_reporte_reservas.php?servicio=1&amp;download=<?php echo (int) $row['id']; ?>" title="Descargar"><i class="fas fa-download"></i></a>
                                             <a class="btn btn-sm btn-outline-info me-1" href="subir_reporte_reservas.php?ver_reporte=<?php echo (int) $row['id']; ?>" title="Ver detalle"><i class="fas fa-list"></i></a>
+                                            <?php if (($filasInfo ?? 0) === 0): ?>
+                                            <form method="post" action="subir_reporte_reservas.php" class="d-inline">
+                                                <input type="hidden" name="accion_reporte" value="importar">
+                                                <input type="hidden" name="reporte_id" value="<?php echo (int) $row['id']; ?>">
+                                                <button type="submit" class="btn btn-sm btn-outline-warning me-1" title="Importar filas del Excel"><i class="fas fa-file-import"></i></button>
+                                            </form>
+                                            <?php endif; ?>
                                             <form method="post" action="subir_reporte_reservas.php" class="d-inline" onsubmit="return confirm('¿Procesar este reporte?');">
                                                 <input type="hidden" name="accion_reporte" value="procesar">
                                                 <input type="hidden" name="reporte_id" value="<?php echo (int) $row['id']; ?>">
