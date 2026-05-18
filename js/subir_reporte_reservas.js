@@ -67,21 +67,44 @@ $(document).ready(function () {
             data: fd,
             processData: false,
             contentType: false,
-            dataType: 'json'
+            dataType: 'json',
+            timeout: 120000
         }).done(function (r) {
-            $btnSubir.prop('disabled', false).html(original);
             if (r.success) {
-                mostrarAlerta(r.message || 'Reporte subido', 'success');
-                $input.val('');
-                $nombre.text('');
-                $btnSubir.prop('disabled', true);
-                cargarReportes();
+                var reporteId = r.data && r.data.id;
+                if (reporteId && r.data.needs_import) {
+                    $btnSubir.html('<i class="fas fa-spinner fa-spin me-2"></i>Importando filas...');
+                    importarReporteId(reporteId, function (imp) {
+                        $btnSubir.prop('disabled', false).html(original);
+                        if (imp.success) {
+                            mostrarAlerta((imp.message || 'Importación lista') + ' Pulse Procesar para aplicar.', 'success');
+                        } else {
+                            mostrarAlerta('Archivo guardado, pero: ' + (imp.message || 'falló la importación'), 'warning');
+                        }
+                        $input.val('');
+                        $nombre.text('');
+                        $btnSubir.prop('disabled', true);
+                        cargarReportes();
+                    }, function (xhr) {
+                        $btnSubir.prop('disabled', false).html(original);
+                        mostrarAlertaAjax(xhr, 'Archivo guardado, pero falló importar las filas del Excel');
+                        cargarReportes();
+                    });
+                } else {
+                    $btnSubir.prop('disabled', false).html(original);
+                    mostrarAlerta(r.message || 'Reporte subido', 'success');
+                    $input.val('');
+                    $nombre.text('');
+                    $btnSubir.prop('disabled', true);
+                    cargarReportes();
+                }
             } else {
+                $btnSubir.prop('disabled', false).html(original);
                 mostrarAlerta(r.message || 'Error al subir', 'danger');
             }
-        }).fail(function () {
+        }).fail(function (xhr) {
             $btnSubir.prop('disabled', false).html(original);
-            mostrarAlerta('Error de conexión', 'danger');
+            mostrarAlertaAjax(xhr, 'Error al subir el reporte');
         });
     });
 
@@ -91,6 +114,42 @@ $(document).ready(function () {
 
     cargarReportes();
 });
+
+function mostrarAlertaAjax(xhr, titulo) {
+    var msg = titulo || 'Error de conexión';
+    if (xhr && xhr.responseJSON && xhr.responseJSON.message) {
+        msg = xhr.responseJSON.message;
+    } else if (xhr && xhr.responseText) {
+        var t = String(xhr.responseText).trim();
+        if (t.indexOf('{') === 0) {
+            try {
+                var j = JSON.parse(t);
+                if (j.message) msg = j.message;
+            } catch (e) { /* ignore */ }
+        } else if (xhr.status === 413) {
+            msg = 'El archivo es demasiado grande para el servidor (413)';
+        } else if (xhr.status === 404) {
+            msg = 'No se encontró api/reporte_reservas.php en el servidor';
+        } else if (xhr.status) {
+            msg = 'Error HTTP ' + xhr.status + (t ? ': ' + t.substring(0, 120) : '');
+        }
+    }
+    mostrarAlerta(msg, 'danger');
+}
+
+function importarReporteId(reporteId, onOk, onFail) {
+    $.ajax({
+        url: 'api/reporte_reservas.php',
+        type: 'POST',
+        data: { action: 'importar', reporte_id: reporteId },
+        dataType: 'json',
+        timeout: 300000
+    }).done(function (r) {
+        if (typeof onOk === 'function') onOk(r);
+    }).fail(function (xhr) {
+        if (typeof onFail === 'function') onFail(xhr);
+    });
+}
 
 function mostrarAlerta(mensaje, tipo) {
     var cls = 'alert-' + (tipo || 'info');
@@ -194,8 +253,8 @@ function cargarReportes() {
                 { orderable: false, targets: 7 }
             ]
         });
-    }).fail(function () {
-        mostrarAlerta('Error de conexión al cargar reportes', 'danger');
+    }).fail(function (xhr) {
+        mostrarAlertaAjax(xhr, 'Error al cargar reportes');
     });
 }
 
@@ -240,8 +299,8 @@ function cargarLineas(reporteId) {
             pageLength: 25,
             order: [[0, 'asc']]
         });
-    }).fail(function () {
-        mostrarAlerta('Error de conexión al cargar detalle', 'danger');
+    }).fail(function (xhr) {
+        mostrarAlertaAjax(xhr, 'Error al cargar detalle');
     });
 }
 
@@ -261,7 +320,8 @@ $(document).on('click', '.btn-procesar-reporte', function () {
         url: 'api/reporte_reservas.php',
         type: 'POST',
         data: { action: 'procesar', reporte_id: id },
-        dataType: 'json'
+        dataType: 'json',
+        timeout: 300000
     }).done(function (r) {
         $btn.prop('disabled', false).html(original);
         if (r.success) {
@@ -277,9 +337,9 @@ $(document).on('click', '.btn-procesar-reporte', function () {
         } else {
             mostrarAlerta(r.message || 'Error al procesar', 'danger');
         }
-    }).fail(function () {
+    }).fail(function (xhr) {
         $btn.prop('disabled', false).html(original);
-        mostrarAlerta('Error de conexión', 'danger');
+        mostrarAlertaAjax(xhr, 'Error al procesar');
     });
 });
 
@@ -301,7 +361,7 @@ $(document).on('click', '.btn-eliminar-reporte', function () {
         } else {
             mostrarAlerta(r.message || 'Error', 'danger');
         }
-    }).fail(function () {
-        mostrarAlerta('Error de conexión', 'danger');
+    }).fail(function (xhr) {
+        mostrarAlertaAjax(xhr, 'Error al eliminar');
     });
 });

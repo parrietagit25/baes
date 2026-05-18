@@ -139,8 +139,11 @@ class ReservasProformaExcelReader
                 }
                 $cells[$colIdx] = $val;
             }
+            if ($cells === []) {
+                continue;
+            }
             $rowArr = [];
-            $maxIdx = max(array_keys($cells) + [$startColIdx]);
+            $maxIdx = max(array_merge(array_keys($cells), [$startColIdx]));
             for ($i = 0; $i <= $maxIdx; $i++) {
                 $rowArr[] = $cells[$i] ?? '';
             }

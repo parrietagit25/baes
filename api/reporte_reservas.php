@@ -114,8 +114,13 @@ function subirReporte(): void
         ]);
         return;
     }
-    if (!isset($_FILES['archivo']) || ($_FILES['archivo']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
-        echo json_encode(['success' => false, 'message' => 'Debe seleccionar un archivo válido']);
+    if (!isset($_FILES['archivo'])) {
+        echo json_encode(['success' => false, 'message' => 'No se recibió el archivo']);
+        return;
+    }
+    $uploadErr = (int) ($_FILES['archivo']['error'] ?? UPLOAD_ERR_NO_FILE);
+    if ($uploadErr !== UPLOAD_ERR_OK) {
+        echo json_encode(['success' => false, 'message' => mensajeErrorSubida($uploadErr)]);
         return;
     }
 
@@ -172,22 +177,11 @@ function subirReporte(): void
             (int) $_SESSION['user_id'],
         ]);
         $reporteId = (int) $pdo->lastInsertId();
-        $importMsg = '';
-        $importOk = true;
-        if (in_array($ext, ['xlsx', 'csv'], true) && tablaLineasExiste()) {
-            require_once __DIR__ . '/../includes/ReservasProformaProcessor.php';
-            $proc = new ReservasProformaProcessor($pdo, $reporteId, (int) $_SESSION['user_id']);
-            $imp = $proc->importarDesdeArchivo($rutaCompleta);
-            $importOk = $imp['success'];
-            $importMsg = $imp['message'] ?? '';
-        }
 
         echo json_encode([
             'success' => true,
-            'message' => $importOk
-                ? ('Reporte subido. ' . ($importMsg ?: 'Listo para procesar.'))
-                : ('Archivo guardado pero falló la importación: ' . $importMsg),
-            'data' => ['id' => $reporteId, 'import_ok' => $importOk],
+            'message' => 'Archivo guardado. Importando filas del Excel…',
+            'data' => ['id' => $reporteId, 'needs_import' => in_array($ext, ['xlsx', 'csv'], true) && tablaLineasExiste()],
         ]);
     } catch (PDOException $e) {
         @unlink($rutaCompleta);
@@ -283,14 +277,26 @@ function importarReporte(int $reporteId): void
         echo json_encode(['success' => false, 'message' => 'ID de reporte requerido']);
         return;
     }
+    if (!tablaLineasExiste()) {
+        echo json_encode(['success' => false, 'message' => 'Ejecute database/migracion_reportes_reservas_lineas.sql']);
+        return;
+    }
     $path = rutaArchivoReporte($reporteId);
     if (!$path) {
         echo json_encode(['success' => false, 'message' => 'Reporte no encontrado']);
         return;
     }
-    require_once __DIR__ . '/../includes/ReservasProformaProcessor.php';
-    $proc = new ReservasProformaProcessor($pdo, $reporteId, (int) $_SESSION['user_id']);
-    echo json_encode($proc->importarDesdeArchivo($path));
+    @set_time_limit(300);
+    @ini_set('memory_limit', '512M');
+    try {
+        require_once __DIR__ . '/../includes/ReservasProformaProcessor.php';
+        $proc = new ReservasProformaProcessor($pdo, $reporteId, (int) $_SESSION['user_id']);
+        echo json_encode($proc->importarDesdeArchivo($path));
+    } catch (Throwable $e) {
+        error_log('reporte_reservas importar: ' . $e->getMessage());
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Error al importar: ' . $e->getMessage()]);
+    }
 }
 
 function procesarReporte(int $reporteId): void
@@ -304,9 +310,43 @@ function procesarReporte(int $reporteId): void
         echo json_encode(['success' => false, 'message' => 'Ejecute database/migracion_reportes_reservas_lineas.sql']);
         return;
     }
-    require_once __DIR__ . '/../includes/ReservasProformaProcessor.php';
-    $proc = new ReservasProformaProcessor($pdo, $reporteId, (int) $_SESSION['user_id']);
-    echo json_encode($proc->procesarCoincidencias());
+    @set_time_limit(300);
+    @ini_set('memory_limit', '512M');
+    try {
+        require_once __DIR__ . '/../includes/ReservasProformaProcessor.php';
+        $proc = new ReservasProformaProcessor($pdo, $reporteId, (int) $_SESSION['user_id']);
+        $stmt = $pdo->prepare('SELECT COUNT(*) FROM reportes_reservas_lineas WHERE reporte_id = ?');
+        $stmt->execute([$reporteId]);
+        if ((int) $stmt->fetchColumn() === 0) {
+            $path = rutaArchivoReporte($reporteId);
+            if ($path) {
+                $imp = $proc->importarDesdeArchivo($path);
+                if (!$imp['success']) {
+                    echo json_encode($imp);
+                    return;
+                }
+            }
+        }
+        echo json_encode($proc->procesarCoincidencias());
+    } catch (Throwable $e) {
+        error_log('reporte_reservas procesar: ' . $e->getMessage());
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Error al procesar: ' . $e->getMessage()]);
+    }
+}
+
+function mensajeErrorSubida(int $code): string
+{
+    $map = [
+        UPLOAD_ERR_INI_SIZE => 'El archivo supera upload_max_filesize del servidor',
+        UPLOAD_ERR_FORM_SIZE => 'El archivo supera el tamaño permitido del formulario',
+        UPLOAD_ERR_PARTIAL => 'El archivo se subió solo parcialmente',
+        UPLOAD_ERR_NO_FILE => 'Debe seleccionar un archivo válido',
+        UPLOAD_ERR_NO_TMP_DIR => 'Falta carpeta temporal en el servidor',
+        UPLOAD_ERR_CANT_WRITE => 'No se pudo escribir el archivo en disco',
+        UPLOAD_ERR_EXTENSION => 'Una extensión de PHP bloqueó la subida',
+    ];
+    return $map[$code] ?? ('Error de subida (código ' . $code . ')');
 }
 
 function rutaArchivoReporte(int $reporteId): ?string
