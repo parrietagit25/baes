@@ -1,3 +1,14 @@
+function urlReporteReservasApi() {
+    return window.MOTUS_REPORTE_RESERVAS_API || 'reporte_reservas_servicio.php';
+}
+
+function ajaxReporteReservas(options) {
+    var opts = $.extend({}, options);
+    opts.url = opts.url || urlReporteReservasApi();
+    opts.headers = $.extend({ 'X-Requested-With': 'XMLHttpRequest' }, opts.headers || {});
+    return $.ajax(opts);
+}
+
 $(document).ready(function () {
     var $input = $('#archivo_reporte');
     var $zone = $('#uploadZone');
@@ -61,8 +72,7 @@ $(document).ready(function () {
         fd.append('archivo', $input[0].files[0]);
         var original = $btnSubir.html();
         $btnSubir.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Subiendo...');
-        $.ajax({
-            url: 'api/reporte_reservas.php',
+        ajaxReporteReservas({
             type: 'POST',
             data: fd,
             processData: false,
@@ -128,8 +138,12 @@ function mostrarAlertaAjax(xhr, titulo) {
             } catch (e) { /* ignore */ }
         } else if (xhr.status === 413) {
             msg = 'El archivo es demasiado grande para el servidor (413)';
+        } else if (/just a moment|cloudflare|cf-browser-verification|enable javascript and cookies/i.test(t)) {
+            msg = 'Cloudflare bloqueó la petición. Suba de nuevo tras desplegar reporte_reservas_servicio.php o pida una regla WAF que permita /api/ en motus.automarket.com.pa';
         } else if (xhr.status === 404) {
-            msg = 'No se encontró api/reporte_reservas.php en el servidor';
+            msg = 'No se encontró el servicio de reportes en el servidor';
+        } else if (xhr.status === 403) {
+            msg = 'Acceso denegado (403). Si ve "Just a moment", es Cloudflare: configure el firewall o use reporte_reservas_servicio.php';
         } else if (xhr.status) {
             msg = 'Error HTTP ' + xhr.status + (t ? ': ' + t.substring(0, 120) : '');
         }
@@ -138,8 +152,7 @@ function mostrarAlertaAjax(xhr, titulo) {
 }
 
 function importarReporteId(reporteId, onOk, onFail) {
-    $.ajax({
-        url: 'api/reporte_reservas.php',
+    ajaxReporteReservas({
         type: 'POST',
         data: { action: 'importar', reporte_id: reporteId },
         dataType: 'json',
@@ -199,8 +212,7 @@ function badgeEstadoLinea(estado) {
 }
 
 function cargarReportes() {
-    $.ajax({
-        url: 'api/reporte_reservas.php',
+    ajaxReporteReservas({
         type: 'GET',
         dataType: 'json'
     }).done(function (r) {
@@ -214,7 +226,7 @@ function cargarReportes() {
         var tbody = $('#tablaReportesReservas tbody');
         tbody.empty();
         (r.data || []).forEach(function (row) {
-            var acciones = '<a class="btn btn-sm btn-outline-primary me-1" href="api/reporte_reservas.php?download=' + row.id + '" title="Descargar"><i class="fas fa-download"></i></a>';
+            var acciones = '<a class="btn btn-sm btn-outline-primary me-1" href="' + urlReporteReservasApi() + '?download=' + row.id + '" title="Descargar"><i class="fas fa-download"></i></a>';
             acciones += '<button type="button" class="btn btn-sm btn-outline-info me-1 btn-ver-lineas" data-id="' + row.id + '" title="Ver detalle"><i class="fas fa-list"></i></button>';
             acciones += '<button type="button" class="btn btn-sm btn-success me-1 btn-procesar-reporte" data-id="' + row.id + '" title="Procesar coincidencias"><i class="fas fa-cogs"></i></button>';
             if (window.MOTUS_REPORTE_RESERVAS_ADMIN) {
@@ -263,8 +275,7 @@ function cargarLineas(reporteId) {
     $('#cardDetalleLineas').removeClass('d-none');
     $('html, body').animate({ scrollTop: $('#cardDetalleLineas').offset().top - 80 }, 300);
 
-    $.ajax({
-        url: 'api/reporte_reservas.php',
+    ajaxReporteReservas({
         type: 'GET',
         data: { action: 'lineas', reporte_id: reporteId },
         dataType: 'json'
@@ -316,8 +327,7 @@ $(document).on('click', '.btn-procesar-reporte', function () {
     var $btn = $(this);
     var original = $btn.html();
     $btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i>');
-    $.ajax({
-        url: 'api/reporte_reservas.php',
+    ajaxReporteReservas({
         type: 'POST',
         data: { action: 'procesar', reporte_id: id },
         dataType: 'json',
@@ -348,8 +358,7 @@ $(document).on('click', '.btn-eliminar-reporte', function () {
     if (!confirm('¿Eliminar este reporte? Esta acción no se puede deshacer.')) {
         return;
     }
-    $.ajax({
-        url: 'api/reporte_reservas.php',
+    ajaxReporteReservas({
         type: 'DELETE',
         data: { id: id },
         dataType: 'json'
