@@ -5,15 +5,28 @@ $(document).ready(function () {
     var $btnSubir = $('#btnSubirReporte');
     var dtLineas = null;
 
-    $('#btnElegirArchivo').on('click', function () {
-        $input.trigger('click');
+    function abrirSelectorArchivo() {
+        var el = $input[0];
+        if (el) {
+            el.click();
+        }
+    }
+
+    $('#btnElegirArchivo').on('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        abrirSelectorArchivo();
+    });
+
+    $input.on('click', function (e) {
+        e.stopPropagation();
     });
 
     $zone.on('click', function (e) {
-        if (e.target.id === 'btnElegirArchivo' || $(e.target).closest('#btnElegirArchivo').length) {
+        if ($(e.target).closest('#btnElegirArchivo, #archivo_reporte').length) {
             return;
         }
-        $input.trigger('click');
+        abrirSelectorArchivo();
     });
 
     $input.on('change', function () {
