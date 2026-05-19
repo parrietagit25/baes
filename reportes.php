@@ -777,6 +777,9 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <?php if ($submenu === 'sucursales'): ?>
+    <script src="js/reportes_sucursales.js?v=<?php echo file_exists(__DIR__ . '/js/reportes_sucursales.js') ? filemtime(__DIR__ . '/js/reportes_sucursales.js') : time(); ?>"></script>
+    <?php endif; ?>
     <script>
 (function() {
     const submenu = '<?php echo $submenu; ?>';
@@ -1879,9 +1882,6 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
     }
 })();
     </script>
-    <?php if ($submenu === 'sucursales'): ?>
-    <script src="js/reportes_sucursales.js?v=<?php echo file_exists(__DIR__ . '/js/reportes_sucursales.js') ? filemtime(__DIR__ . '/js/reportes_sucursales.js') : time(); ?>"></script>
-    <?php endif; ?>
     <?php include __DIR__ . '/includes/chatbot_widget.php'; ?>
 </body>
 </html>
