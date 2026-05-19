@@ -31,6 +31,7 @@ if (in_array($action, [
     'exportar_excel_fin_publica',
     'exportar_excel_fin_enlazada',
     'exportar_excel_vehiculos',
+    'exportar_excel_sucursales',
 ], true)) {
     exportarReporteCsv($action);
     exit();
@@ -78,6 +79,9 @@ switch ($action) {
     case 'reporte_vehiculos':
         reporteVehiculos();
         break;
+    case 'reporte_sucursales':
+        reporteSucursales();
+        break;
     case 'exportar_todos_excel':
         // Ya atendido al inicio.
         echo json_encode(['success' => false, 'message' => 'Acción ya ejecutada']);
@@ -93,6 +97,7 @@ switch ($action) {
     case 'exportar_excel_fin_publica':
     case 'exportar_excel_fin_enlazada':
     case 'exportar_excel_vehiculos':
+    case 'exportar_excel_sucursales':
         // Ya atendido al inicio.
         echo json_encode(['success' => false, 'message' => 'Acción ya ejecutada']);
         break;
@@ -336,6 +341,24 @@ function exportarReporteCsv(string $action): void {
             'Paso A Seg', 'Paso B Seg', 'Paso C Seg', 'Paso D Seg', 'Paso E Seg',
             'Plataforma', 'Timezone', 'Viewport', 'Pantalla'
         ], $rows);
+        return;
+    }
+
+    if ($action === 'exportar_excel_sucursales') {
+        require_once __DIR__ . '/../includes/reportes_sucursales_data.php';
+        $pack = reportes_sucursales_obtener_datos($pdo, (int) date('Y'));
+        $est = REPORTES_SUCURSALES_ESTADOS;
+        $hdr = array_merge(['Codigo', 'Sucursal'], $est, ['Total']);
+        $rows = [];
+        foreach ($pack['por_sucursal'] as $r) {
+            $row = [$r['codigo'], $r['nombre']];
+            foreach ($est as $e) {
+                $row[] = $r[$e] ?? 0;
+            }
+            $row[] = $r['total'] ?? 0;
+            $rows[] = $row;
+        }
+        _outputXlsxDownload('reporte_sucursales.xlsx', 'Por Sucursal', $hdr, $rows);
         return;
     }
 }
@@ -1612,6 +1635,24 @@ function reporteVehiculos(): void
     } catch (PDOException $e) {
         http_response_code(500);
         echo json_encode(['success' => false, 'message' => 'Error de base de datos']);
+    }
+}
+
+function reporteSucursales(): void
+{
+    global $pdo;
+    require_once __DIR__ . '/../includes/reportes_sucursales_data.php';
+    $anio = isset($_GET['anio']) ? (int) $_GET['anio'] : (int) date('Y');
+    if ($anio < 2020 || $anio > 2100) {
+        $anio = (int) date('Y');
+    }
+    try {
+        $data = reportes_sucursales_obtener_datos($pdo, $anio);
+        echo json_encode(['success' => true, 'data' => $data], JSON_UNESCAPED_UNICODE);
+    } catch (Throwable $e) {
+        error_log('reporte_sucursales: ' . $e->getMessage());
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Error al generar el reporte de sucursales']);
     }
 }
 

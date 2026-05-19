@@ -15,7 +15,7 @@ if (!in_array('ROLE_ADMIN', $_SESSION['user_roles'])) {
 }
 
 $submenu = $_GET['submenu'] ?? 'usuarios';
-if (!in_array($submenu, ['usuarios', 'vendedores', 'tiempo', 'banco', 'emails', 'encuestas', 'telemetria', 'fin_publica', 'fin_enlazada', 'vehiculos'], true)) {
+if (!in_array($submenu, ['usuarios', 'vendedores', 'sucursales', 'tiempo', 'banco', 'emails', 'encuestas', 'telemetria', 'fin_publica', 'fin_enlazada', 'vehiculos'], true)) {
     $submenu = 'usuarios';
 }
 $finRepDesde = (new DateTimeImmutable('-365 days'))->format('Y-m-d');
@@ -24,6 +24,7 @@ $estadosCol = ['Nueva', 'En Revisión Banco', 'Aprobada', 'Rechazada', 'Completa
 $titulosReporte = [
     'usuarios' => 'Rep. Usuarios',
     'vendedores' => 'Rep. Vendedores',
+    'sucursales' => 'Rep. Sucursales',
     'tiempo' => 'Rep. Tiempo',
     'banco' => 'Rep. Banco',
     'emails' => 'Rep. Correos',
@@ -36,6 +37,7 @@ $titulosReporte = [
 $exportActionPorSubmenu = [
     'usuarios' => ['action' => 'exportar_excel_usuarios', 'label' => 'Descargar Rep. Usuarios'],
     'vendedores' => ['action' => 'exportar_excel_vendedores', 'label' => 'Descargar Rep. Vendedores'],
+    'sucursales' => ['action' => 'exportar_excel_sucursales', 'label' => 'Descargar Resumen Sucursales'],
     'tiempo' => ['action' => 'exportar_excel_tiempo', 'label' => 'Descargar Rep. Tiempo'],
     'banco' => ['action' => 'exportar_excel_banco', 'label' => 'Descargar Rep. Banco'],
     'emails' => ['action' => 'exportar_excel_correos', 'label' => 'Descargar Rep. Correos'],
@@ -95,6 +97,7 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
                         <p class="mb-0 opacity-90"><?php
                             if ($submenu === 'usuarios') echo 'Total de solicitudes por usuario y estado';
                             elseif ($submenu === 'vendedores') echo 'Total de solicitudes por vendedor y estado';
+                            elseif ($submenu === 'sucursales') echo 'Solicitudes por sucursal, agente y supervisor (siglas CH, CV, TBM, VIS, BDC y SP-*)';
                             elseif ($submenu === 'tiempo') echo 'Tiempo entre cambios de estado por solicitud';
                             elseif ($submenu === 'banco') echo 'Tiempo que tardan los bancos en dar respuesta a las solicitudes asignadas';
                             elseif ($submenu === 'encuestas') echo 'Promedios, totales y detalle de respuestas a las encuestas públicas (vendedores y gestores)';
@@ -189,6 +192,8 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
                             </div>
                         </div>
                     </div>
+
+                    <?php include __DIR__ . '/includes/reportes_panel_sucursales.php'; ?>
 
                     <!-- Rep. Tiempo -->
                     <div id="panel-tiempo" class="report-panel" style="display: <?php echo $submenu === 'tiempo' ? 'block' : 'none'; ?>">
@@ -787,6 +792,8 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
         loadReporteUsuarios();
     } else if (submenu === 'vendedores') {
         loadReporteVendedores();
+    } else if (submenu === 'sucursales') {
+        loadReporteSucursales();
     } else if (submenu === 'tiempo') {
         loadReporteTiempo();
     } else if (submenu === 'banco') {
@@ -1872,6 +1879,9 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
     }
 })();
     </script>
+    <?php if ($submenu === 'sucursales'): ?>
+    <script src="js/reportes_sucursales.js?v=<?php echo file_exists(__DIR__ . '/js/reportes_sucursales.js') ? filemtime(__DIR__ . '/js/reportes_sucursales.js') : time(); ?>"></script>
+    <?php endif; ?>
     <?php include __DIR__ . '/includes/chatbot_widget.php'; ?>
 </body>
 </html>

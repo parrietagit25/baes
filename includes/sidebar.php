@@ -109,6 +109,9 @@ $isVendedor = in_array('ROLE_VENDEDOR', $_SESSION['user_roles']);
         <a class="nav-link ps-4 py-1 small <?php echo ($report_submenu === 'vendedores') ? 'active' : ''; ?>" href="reportes.php?submenu=vendedores">
             <i class="fas fa-user-tie me-1"></i> Rep. Vendedores
         </a>
+        <a class="nav-link ps-4 py-1 small <?php echo ($report_submenu === 'sucursales') ? 'active' : ''; ?>" href="reportes.php?submenu=sucursales">
+            <i class="fas fa-store me-1"></i> Rep. Sucursales
+        </a>
         <a class="nav-link ps-4 py-1 small <?php echo ($report_submenu === 'tiempo') ? 'active' : ''; ?>" href="reportes.php?submenu=tiempo">
             <i class="fas fa-clock me-1"></i> Rep. Tiempo
         </a>
