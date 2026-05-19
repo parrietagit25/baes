@@ -1,17 +1,30 @@
 ﻿<?php
-/** Panel Rep. Sucursales â€” incluir desde reportes.php */
+/** Panel Rep. Sucursales — incluir desde reportes.php */
 $panelSucVisible = ($submenu ?? '') === 'sucursales';
 ?>
 <div id="panel-sucursales" class="report-panel" style="display: <?php echo $panelSucVisible ? 'block' : 'none'; ?>;">
+    <ul class="nav nav-tabs mb-3" id="sucTabsFuente" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" type="button" role="tab" data-suc-fuente="credito" id="sucTabCredito">
+                Solicitudes de crédito
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" type="button" role="tab" data-suc-fuente="financiamiento" id="sucTabFinanciamiento">
+                Sol. Financiamiento
+            </button>
+        </li>
+    </ul>
     <div class="alert alert-secondary small mb-3">
-        <strong>Siglas:</strong> CH, CV, TBM, VIS, BDC = agentes Â· SP-CH, SP-CV, SP-TBM, SP-VIS, SP-BDC = supervisores Â· SP-NN = supervisor nacional.
+        <strong>Siglas:</strong> CH, CV, TBM, VIS, BDC = agentes · SP-CH, SP-CV, SP-TBM, SP-VIS, SP-BDC = supervisores · SP-NN = supervisor nacional.
         El total del supervisor es la suma de solicitudes de los agentes de su sucursal.
+        <span id="sucFuenteNotaFin" class="d-none"> En Sol. Financiamiento, «Solo Sol. Financiamiento» son envíos del formulario público aún sin solicitud Motus vinculada.</span>
     </div>
     <div class="card mb-3">
         <div class="card-body">
             <div class="row g-2 align-items-end">
                 <div class="col-md-2">
-                    <label class="form-label small mb-0">AÃ±o</label>
+                    <label class="form-label small mb-0">Año</label>
                     <select id="sucFiltroAnio" class="form-select form-select-sm">
                         <?php for ($y = (int) date('Y'); $y >= (int) date('Y') - 4; $y--): ?>
                         <option value="<?php echo $y; ?>"<?php echo $y === (int) date('Y') ? ' selected' : ''; ?>><?php echo $y; ?></option>
@@ -28,7 +41,7 @@ $panelSucVisible = ($submenu ?? '') === 'sucursales';
         <div class="col-md-2">
             <div class="card h-100">
                 <div class="card-body text-center">
-                    <div class="text-muted small">Total solicitudes</div>
+                    <div class="text-muted small" id="sucKpiTotalLabel">Total solicitudes</div>
                     <div class="h5 mb-0" id="sucKpiTotal">0</div>
                 </div>
             </div>
@@ -52,7 +65,7 @@ $panelSucVisible = ($submenu ?? '') === 'sucursales';
         <div class="col-md-2">
             <div class="card h-100">
                 <div class="card-body text-center">
-                    <div class="text-muted small">Tasa aprobaciÃ³n</div>
+                    <div class="text-muted small">Tasa aprobación</div>
                     <div class="h5 mb-0 text-success" id="sucKpiTasa">—</div>
                 </div>
             </div>
@@ -60,8 +73,8 @@ $panelSucVisible = ($submenu ?? '') === 'sucursales';
         <div class="col-md-2">
             <div class="card h-100">
                 <div class="card-body text-center">
-                    <div class="text-muted small">Sucursal lÃ­der</div>
-                    <div class="h6 mb-0" id="sucKpiLider">â€”</div>
+                    <div class="text-muted small">Sucursal líder</div>
+                    <div class="h6 mb-0" id="sucKpiLider">—</div>
                 </div>
             </div>
         </div>
@@ -104,7 +117,7 @@ $panelSucVisible = ($submenu ?? '') === 'sucursales';
         <div class="col-12">
             <div class="card">
                 <div class="card-body">
-                    <h6 class="mb-2">LÃ­nea de tiempo â€” solicitudes por mes y sucursal (<span id="sucAnioLabel2"><?php echo date('Y'); ?></span>)</h6>
+                    <h6 class="mb-2">Línea de tiempo — solicitudes por mes y sucursal (<span id="sucAnioLabel2"><?php echo date('Y'); ?></span>)</h6>
                     <div class="fin-chart-wrap" style="min-height:320px"><canvas id="sucChartLineMes"></canvas></div>
                 </div>
             </div>
@@ -124,16 +137,16 @@ $panelSucVisible = ($submenu ?? '') === 'sucursales';
             <div class="table-responsive">
                 <table class="table table-bordered table-reportes table-sm" id="tabla-sucursal-resumen">
                     <thead class="table-light">
-                        <tr>
-                            <th>CÃ³d.</th>
+                        <tr id="sucTheadResumen">
+                            <th>Cód.</th>
                             <th>Sucursal</th>
                             <?php foreach ($estadosCol as $e): ?>
-                            <th class="text-center"><?php echo htmlspecialchars($e); ?></th>
+                            <th class="text-center suc-th-estado"><?php echo htmlspecialchars($e); ?></th>
                             <?php endforeach; ?>
                             <th class="text-center">Total</th>
                         </tr>
                     </thead>
-                    <tbody><tr><td colspan="9" class="text-center text-muted">Cargandoâ€¦</td></tr></tbody>
+                    <tbody><tr><td colspan="9" class="text-center text-muted">Cargando…</td></tr></tbody>
                 </table>
             </div>
         </div>
@@ -144,15 +157,15 @@ $panelSucVisible = ($submenu ?? '') === 'sucursales';
             <div class="table-responsive">
                 <table class="table table-bordered table-reportes table-sm" id="tabla-sucursal-agentes">
                     <thead class="table-light">
-                        <tr>
+                        <tr id="sucTheadAgentes">
                             <th>Agente</th>
                             <?php foreach ($estadosCol as $e): ?>
-                            <th class="text-center"><?php echo htmlspecialchars($e); ?></th>
+                            <th class="text-center suc-th-estado"><?php echo htmlspecialchars($e); ?></th>
                             <?php endforeach; ?>
                             <th class="text-center">Total</th>
                         </tr>
                     </thead>
-                    <tbody><tr><td colspan="8" class="text-center text-muted">Cargandoâ€¦</td></tr></tbody>
+                    <tbody><tr><td colspan="8" class="text-center text-muted">Cargando…</td></tr></tbody>
                 </table>
             </div>
         </div>
@@ -163,19 +176,18 @@ $panelSucVisible = ($submenu ?? '') === 'sucursales';
             <div class="table-responsive">
                 <table class="table table-bordered table-reportes table-sm" id="tabla-sucursal-supervisores">
                     <thead class="table-light">
-                        <tr>
+                        <tr id="sucTheadSupervisores">
                             <th>Supervisor</th>
                             <th>Sucursal</th>
                             <?php foreach ($estadosCol as $e): ?>
-                            <th class="text-center"><?php echo htmlspecialchars($e); ?></th>
+                            <th class="text-center suc-th-estado"><?php echo htmlspecialchars($e); ?></th>
                             <?php endforeach; ?>
                             <th class="text-center">Total</th>
                         </tr>
                     </thead>
-                    <tbody><tr><td colspan="9" class="text-center text-muted">Cargandoâ€¦</td></tr></tbody>
+                    <tbody><tr><td colspan="9" class="text-center text-muted">Cargando…</td></tr></tbody>
                 </table>
             </div>
         </div>
     </div>
 </div>
-

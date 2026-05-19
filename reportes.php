@@ -97,7 +97,7 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
                         <p class="mb-0 opacity-90"><?php
                             if ($submenu === 'usuarios') echo 'Total de solicitudes por usuario y estado';
                             elseif ($submenu === 'vendedores') echo 'Total de solicitudes por vendedor y estado';
-                            elseif ($submenu === 'sucursales') echo 'Solicitudes por sucursal, agente y supervisor (siglas CH, CV, TBM, VIS, BDC y SP-*)';
+                            elseif ($submenu === 'sucursales') echo 'Solicitudes de crédito y Sol. Financiamiento por sucursal, agente y supervisor (siglas CH, CV, TBM, VIS, BDC y SP-*)';
                             elseif ($submenu === 'tiempo') echo 'Tiempo entre cambios de estado por solicitud';
                             elseif ($submenu === 'banco') echo 'Tiempo que tardan los bancos en dar respuesta a las solicitudes asignadas';
                             elseif ($submenu === 'encuestas') echo 'Promedios, totales y detalle de respuestas a las encuestas públicas (vendedores y gestores)';

@@ -346,8 +346,13 @@ function exportarReporteCsv(string $action): void {
 
     if ($action === 'exportar_excel_sucursales') {
         require_once __DIR__ . '/../includes/reportes_sucursales_data.php';
-        $pack = reportes_sucursales_obtener_datos($pdo, (int) date('Y'));
-        $est = REPORTES_SUCURSALES_ESTADOS;
+        $anioExp = isset($_GET['anio']) ? (int) $_GET['anio'] : (int) date('Y');
+        if ($anioExp < 2020 || $anioExp > 2100) {
+            $anioExp = (int) date('Y');
+        }
+        $fuenteExp = reportes_sucursales_normalizar_fuente($_GET['fuente'] ?? 'credito');
+        $pack = reportes_sucursales_obtener_datos($pdo, $anioExp, $fuenteExp);
+        $est = reportes_sucursales_lista_estados($fuenteExp);
         $hdr = array_merge(['Codigo', 'Sucursal'], $est, ['Total']);
         $rows = [];
         foreach ($pack['por_sucursal'] as $r) {
@@ -358,7 +363,8 @@ function exportarReporteCsv(string $action): void {
             $row[] = $r['total'] ?? 0;
             $rows[] = $row;
         }
-        _outputXlsxDownload('reporte_sucursales.xlsx', 'Por Sucursal', $hdr, $rows);
+        $nombreXlsx = $fuenteExp === 'financiamiento' ? 'reporte_sucursales_financiamiento.xlsx' : 'reporte_sucursales_credito.xlsx';
+        _outputXlsxDownload($nombreXlsx, 'Por Sucursal', $hdr, $rows);
         return;
     }
 }
@@ -1646,8 +1652,9 @@ function reporteSucursales(): void
     if ($anio < 2020 || $anio > 2100) {
         $anio = (int) date('Y');
     }
+    $fuente = reportes_sucursales_normalizar_fuente($_GET['fuente'] ?? 'credito');
     try {
-        $data = reportes_sucursales_obtener_datos($pdo, $anio);
+        $data = reportes_sucursales_obtener_datos($pdo, $anio, $fuente);
         echo json_encode(['success' => true, 'data' => $data], JSON_UNESCAPED_UNICODE);
     } catch (Throwable $e) {
         error_log('reporte_sucursales: ' . $e->getMessage());
