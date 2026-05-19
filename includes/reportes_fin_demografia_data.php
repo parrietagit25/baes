@@ -119,20 +119,32 @@ function rep_fin_rango_edad(?int $e): string
     if ($e < 18) {
         return 'Menor de 18';
     }
-    if ($e <= 29) {
-        return '18 – 29';
+    if ($e <= 25) {
+        return '18 – 25';
     }
-    if ($e <= 39) {
-        return '30 – 39';
+    if ($e <= 30) {
+        return '26 – 30';
     }
-    if ($e <= 49) {
-        return '40 – 49';
+    if ($e <= 35) {
+        return '31 – 35';
     }
-    if ($e <= 59) {
-        return '50 – 59';
+    if ($e <= 40) {
+        return '36 – 40';
+    }
+    if ($e <= 45) {
+        return '41 – 45';
+    }
+    if ($e <= 50) {
+        return '46 – 50';
+    }
+    if ($e <= 55) {
+        return '51 – 55';
+    }
+    if ($e <= 60) {
+        return '56 – 60';
     }
 
-    return '60 o más';
+    return 'más de 60';
 }
 
 /** @param mixed $sal */
@@ -145,8 +157,17 @@ function rep_fin_rango_salario($sal): string
     if ($v <= 0) {
         return 'Sin salario declarado';
     }
+    if ($v <= 500) {
+        return 'USD 0 – 500';
+    }
+    if ($v <= 700) {
+        return 'USD 501 – 700';
+    }
+    if ($v <= 900) {
+        return 'USD 701 – 900';
+    }
     if ($v <= 1500) {
-        return 'USD 0 – 1 500';
+        return 'USD 901 – 1 500';
     }
     if ($v <= 2500) {
         return 'USD 1 501 – 2 500';
@@ -294,7 +315,10 @@ function rep_fin_orden_rangos_salario(): array
 {
     return [
         'Sin salario declarado',
-        'USD 0 – 1 500',
+        'USD 0 – 500',
+        'USD 501 – 700',
+        'USD 701 – 900',
+        'USD 901 – 1 500',
         'USD 1 501 – 2 500',
         'USD 2 501 – 4 000',
         'USD 4 001 – 6 000',
@@ -308,11 +332,15 @@ function rep_fin_orden_rangos_edad(): array
     return [
         'Sin edad',
         'Menor de 18',
-        '18 – 29',
-        '30 – 39',
-        '40 – 49',
-        '50 – 59',
-        '60 o más',
+        '18 – 25',
+        '26 – 30',
+        '31 – 35',
+        '36 – 40',
+        '41 – 45',
+        '46 – 50',
+        '51 – 55',
+        '56 – 60',
+        'más de 60',
     ];
 }
 
