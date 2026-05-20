@@ -112,7 +112,6 @@ $puedeRefirma = $isAdmin || $isGestor;
                                         <th>Email</th>
                                         <th>Teléfono</th>
                                         <th>Vendedor</th>
-                                        <th>Vehículo</th>
                                         <th class="col-acciones">Acciones</th>
                                     </tr>
                                 </thead>
@@ -285,7 +284,7 @@ $puedeRefirma = $isAdmin || $isGestor;
                 { responsivePriority: 3, targets: 1 },
                 { responsivePriority: 4, targets: 2 },
                 { responsivePriority: 5, targets: 3 },
-                { responsivePriority: 10001, targets: [4, 5, 6, 7] }
+                { responsivePriority: 10001, targets: [4, 5, 6] }
             ],
             columns: [
                 { data: 'id' },
@@ -302,13 +301,6 @@ $puedeRefirma = $isAdmin || $isGestor;
                     if (!d) return '—';
                     var s = String(d);
                     return '<span class="d-inline-block text-truncate" style="max-width:12rem" title="' + s.replace(/"/g, '&quot;') + '">' + s + '</span>';
-                }},
-                { data: null, orderable: false, render: function(row) {
-                    var v = [];
-                    if (row.marca_auto) v.push(row.marca_auto);
-                    if (row.modelo_auto) v.push(row.modelo_auto);
-                    if (row.anio_auto) v.push(row.anio_auto);
-                    return v.length ? v.join(' ') : '—';
                 }},
                 { data: null, orderable: false, className: 'col-acciones', render: function(row) {
                     var html = '<div class="sol-fin-acciones">' +
