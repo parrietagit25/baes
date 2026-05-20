@@ -88,8 +88,12 @@ function guardarVehiculos() {
             $precio = $normalizar($vehiculo['precio'] ?? null, true);
             $abonoPct = $normalizar($vehiculo['abono_porcentaje'] ?? null, true);
             $abonoMonto = $normalizar($vehiculo['abono_monto'] ?? null, true);
-            if ($precio !== null && $abonoPct !== null && is_numeric($precio) && is_numeric($abonoPct)) {
-                $abonoMonto = round((float) $precio * ((float) $abonoPct / 100), 2);
+            if ($precio !== null && is_numeric($precio) && (float) $precio > 0) {
+                if ($abonoMonto !== null && is_numeric($abonoMonto)) {
+                    $abonoPct = round((float) $abonoMonto / (float) $precio * 100, 2);
+                } elseif ($abonoPct !== null && is_numeric($abonoPct)) {
+                    $abonoMonto = round((float) $precio * ((float) $abonoPct / 100), 2);
+                }
             }
 
             $stmt->execute([

@@ -2473,6 +2473,18 @@ function calcularAbonoMontoVehiculo(precio, abonoPorcentaje) {
     return (Math.round(p * (pct / 100) * 100) / 100).toFixed(2);
 }
 
+/**
+ * Abono % = (monto / precio) × 100. Vacío si falta precio o monto.
+ */
+function calcularAbonoPorcentajeVehiculo(precio, abonoMonto) {
+    var p = parseNumeroVehiculo(precio);
+    var m = parseNumeroVehiculo(abonoMonto);
+    if (p === null || m === null || p <= 0) {
+        return null;
+    }
+    return (Math.round((m / p) * 10000) / 100).toFixed(2);
+}
+
 function recalcularAbonoMontoVehiculo(index) {
     if (!vehiculosList[index]) {
         return;
@@ -2493,9 +2505,43 @@ function recalcularAbonoMontoVehiculo(index) {
     }
 }
 
+function recalcularAbonoPorcentajeVehiculo(index) {
+    if (!vehiculosList[index]) {
+        return;
+    }
+    var v = vehiculosList[index];
+    var calculado = calcularAbonoPorcentajeVehiculo(v.precio, v.abono_monto);
+    if (calculado !== null) {
+        v.abono_porcentaje = calculado;
+    } else if (
+        v.precio === '' || v.precio === null || v.precio === undefined ||
+        v.abono_monto === '' || v.abono_monto === null || v.abono_monto === undefined
+    ) {
+        v.abono_porcentaje = '';
+    }
+    var $inp = $('#veh-abono-pct-' + index);
+    if ($inp.length) {
+        $inp.val(v.abono_porcentaje || '');
+    }
+}
+
+function recalcularAbonosVehiculoPorPrecio(index) {
+    if (!vehiculosList[index]) {
+        return;
+    }
+    var v = vehiculosList[index];
+    var tienePct = v.abono_porcentaje !== '' && v.abono_porcentaje !== null && v.abono_porcentaje !== undefined;
+    var tieneMonto = v.abono_monto !== '' && v.abono_monto !== null && v.abono_monto !== undefined;
+    if (tienePct) {
+        recalcularAbonoMontoVehiculo(index);
+    } else if (tieneMonto) {
+        recalcularAbonoPorcentajeVehiculo(index);
+    }
+}
+
 function sincronizarAbonosVehiculosLista() {
     vehiculosList.forEach(function (_, i) {
-        recalcularAbonoMontoVehiculo(i);
+        recalcularAbonosVehiculoPorPrecio(i);
     });
 }
 
@@ -2505,8 +2551,12 @@ function sincronizarAbonosVehiculosLista() {
 function actualizarVehiculo(index, campo, valor) {
     if (vehiculosList[index]) {
         vehiculosList[index][campo] = valor;
-        if (campo === 'precio' || campo === 'abono_porcentaje') {
+        if (campo === 'precio') {
+            recalcularAbonosVehiculoPorPrecio(index);
+        } else if (campo === 'abono_porcentaje') {
             recalcularAbonoMontoVehiculo(index);
+        } else if (campo === 'abono_monto') {
+            recalcularAbonoPorcentajeVehiculo(index);
         }
     }
 }
@@ -2588,7 +2638,8 @@ function renderizarVehiculos() {
                         <div class="col-md-4">
                             <div class="mb-3">
                                 <label class="form-label">Abono (%)</label>
-                                <input type="number" class="form-control" step="0.01" min="0"
+                                <input type="number" class="form-control" step="0.01" min="0" max="100"
+                                       id="veh-abono-pct-${index}"
                                        value="${vehiculo.abono_porcentaje || ''}" 
                                        oninput="actualizarVehiculo(${index}, 'abono_porcentaje', this.value)"
                                        onchange="actualizarVehiculo(${index}, 'abono_porcentaje', this.value)">
@@ -2597,9 +2648,13 @@ function renderizarVehiculos() {
                         <div class="col-md-4">
                             <div class="mb-3">
                                 <label class="form-label">Monto abono</label>
-                                <input type="text" class="form-control bg-light" id="veh-abono-monto-${index}"
-                                       value="${vehiculo.abono_monto || ''}" readonly tabindex="-1" placeholder="—">
-                                <small class="text-muted">Calculado automáticamente (opcional)</small>
+                                <input type="number" class="form-control" step="0.01" min="0"
+                                       id="veh-abono-monto-${index}"
+                                       value="${vehiculo.abono_monto || ''}"
+                                       oninput="actualizarVehiculo(${index}, 'abono_monto', this.value)"
+                                       onchange="actualizarVehiculo(${index}, 'abono_monto', this.value)"
+                                       placeholder="0.00">
+                                <small class="text-muted">Ingrese % o monto; el otro se calcula con el precio</small>
                             </div>
                         </div>
                     </div>
