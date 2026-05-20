@@ -41,6 +41,18 @@ $puedeRefirma = $isAdmin || $isGestor;
             background: #fff;
             border: 1px solid #d1d5db;
         }
+        .btn-accion-icono {
+            width: 2rem;
+            height: 2rem;
+            padding: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+        }
+        #tablaSolFinanciamiento td:last-child {
+            white-space: nowrap;
+        }
     </style>
 </head>
 <body>
@@ -238,17 +250,17 @@ $puedeRefirma = $isAdmin || $isGestor;
                     return v.length ? v.join(' ') : '—';
                 }},
                 { data: null, orderable: false, render: function(row) {
-                    var html = '<a href="api/sol_financiamiento_pdf.php?id=' + row.id + '" class="btn btn-sm btn-success me-1" target="_blank" title="Descargar PDF"><i class="fas fa-file-pdf"></i> PDF</a>' +
-                               '<button type="button" class="btn btn-sm btn-info btn-ver-detalle me-1" data-id="' + row.id + '"><i class="fas fa-eye"></i> Ver detalle</button>' +
-                               '<button type="button" class="btn btn-sm btn-primary btn-ver-adjuntos me-1" data-id="' + row.id + '"><i class="fas fa-paperclip"></i> Adjuntos</button>';
+                    var html = '<a href="api/sol_financiamiento_pdf.php?id=' + row.id + '" class="btn btn-sm btn-success btn-accion-icono me-1" target="_blank" rel="noopener" title="Descargar PDF"><i class="fas fa-file-pdf"></i></a>' +
+                               '<button type="button" class="btn btn-sm btn-info btn-accion-icono btn-ver-detalle me-1" data-id="' + row.id + '" title="Ver detalle"><i class="fas fa-eye"></i></button>' +
+                               '<button type="button" class="btn btn-sm btn-primary btn-accion-icono btn-ver-adjuntos me-1" data-id="' + row.id + '" title="Adjuntos"><i class="fas fa-paperclip"></i></button>';
                     if (esAdmin) {
-                        html += '<button type="button" class="btn btn-sm btn-secondary btn-editar-registro me-1" data-id="' + row.id + '"><i class="fas fa-pen"></i> Editar</button>';
+                        html += '<button type="button" class="btn btn-sm btn-secondary btn-accion-icono btn-editar-registro me-1" data-id="' + row.id + '" title="Editar"><i class="fas fa-pen"></i></button>';
                     }
                     if (puedeRefirma) {
-                        html += '<button type="button" class="btn btn-sm btn-warning text-dark btn-refirma-registro me-1" data-id="' + row.id + '"><i class="fas fa-signature"></i> Refirma</button>';
+                        html += '<button type="button" class="btn btn-sm btn-warning text-dark btn-accion-icono btn-refirma-registro me-1" data-id="' + row.id + '" title="Refirma"><i class="fas fa-signature"></i></button>';
                     }
                     if (esAdmin) {
-                        html += '<button type="button" class="btn btn-sm btn-danger btn-borrar-registro" data-id="' + row.id + '"><i class="fas fa-trash"></i> Borrar</button>';
+                        html += '<button type="button" class="btn btn-sm btn-danger btn-accion-icono btn-borrar-registro" data-id="' + row.id + '" title="Borrar"><i class="fas fa-trash"></i></button>';
                     }
                     return html;
                 }}
