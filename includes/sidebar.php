@@ -42,6 +42,9 @@ $isVendedor = in_array('ROLE_VENDEDOR', $_SESSION['user_roles']);
         <a class="nav-link <?php echo ($current_page == 'sol_financiamiento.php') ? 'active' : ''; ?>" href="sol_financiamiento.php">
             <i class="fas fa-file-invoice-dollar me-2"></i>Sol Financiamiento
         </a>
+        <a class="nav-link <?php echo ($current_page == 'seguimiento_financiamiento.php') ? 'active' : ''; ?>" href="seguimiento_financiamiento.php">
+            <i class="fas fa-chart-line me-2"></i>Seguimiento
+        </a>
         <a class="nav-link <?php echo ($current_page == 'subir_reporte_reservas.php') ? 'active' : ''; ?>" href="subir_reporte_reservas.php">
             <i class="fas fa-file-upload me-2"></i>Subir Reporte de Reservas
         </a>
