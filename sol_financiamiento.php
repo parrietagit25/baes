@@ -24,12 +24,13 @@ $puedeRefirma = $isAdmin || $isGestor;
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+    <link href="https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css" rel="stylesheet">
     <style>
         .sidebar { min-height: 100vh; background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%); }
         .sidebar .nav-link { color: #ecf0f1; padding: 12px 20px; border-radius: 8px; margin: 5px 10px; transition: all 0.3s ease; }
         .sidebar .nav-link:hover { background: rgba(255,255,255,0.1); color: #fff; transform: translateX(5px); }
         .sidebar .nav-link.active { background: #3498db; color: #fff; }
-        .main-content { background: #f8f9fa; min-height: 100vh; }
+        .main-content { background: #f8f9fa; min-height: 100vh; overflow-x: hidden; max-width: 100%; }
         .card { border: none; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.08); }
         .detalle-seccion { margin-bottom: 1rem; }
         .detalle-seccion h6 { color: #495057; border-bottom: 1px solid #dee2e6; padding-bottom: 0.25rem; }
@@ -50,8 +51,39 @@ $puedeRefirma = $isAdmin || $isGestor;
             justify-content: center;
             line-height: 1;
         }
-        #tablaSolFinanciamiento td:last-child {
+        .sol-fin-dt-wrap {
+            width: 100%;
+            max-width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        .sol-fin-dt-wrap .dataTables_wrapper {
+            width: 100%;
+            overflow-x: auto;
+        }
+        #tablaSolFinanciamiento th.col-acciones,
+        #tablaSolFinanciamiento td.col-acciones {
             white-space: nowrap;
+            min-width: 10.5rem;
+        }
+        .sol-fin-acciones {
+            display: inline-flex;
+            flex-wrap: nowrap;
+            gap: 0.25rem;
+            align-items: center;
+        }
+        #tablaSolFinanciamiento td.col-acciones .btn-accion-icono {
+            flex-shrink: 0;
+        }
+        table.dataTable.dtr-inline.collapsed > tbody > tr > td.dtr-control,
+        table.dataTable.dtr-inline.collapsed > tbody > tr > th.dtr-control {
+            padding-left: 2.5rem;
+        }
+        @media (max-width: 991.98px) {
+            #tablaSolFinanciamiento th.col-acciones,
+            #tablaSolFinanciamiento td.col-acciones {
+                min-width: 9.5rem;
+            }
         }
     </style>
 </head>
@@ -68,8 +100,9 @@ $puedeRefirma = $isAdmin || $isGestor;
                         </div>
                     </div>
                     <div class="card">
-                        <div class="card-body">
-                            <table id="tablaSolFinanciamiento" class="table table-striped table-hover w-100">
+                        <div class="card-body p-2 p-md-3">
+                            <div class="sol-fin-dt-wrap table-responsive">
+                            <table id="tablaSolFinanciamiento" class="table table-striped table-hover w-100 nowrap">
                                 <thead>
                                     <tr>
                                         <th>ID</th>
@@ -80,11 +113,12 @@ $puedeRefirma = $isAdmin || $isGestor;
                                         <th>Teléfono</th>
                                         <th>Vendedor</th>
                                         <th>Vehículo</th>
-                                        <th></th>
+                                        <th class="col-acciones">Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody></tbody>
                             </table>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -170,6 +204,8 @@ $puedeRefirma = $isAdmin || $isGestor;
     <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+    <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
+    <script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
     <script>
     var FIN_CAMPOS_EDITABLES = <?php echo json_encode(array_map(function ($k) use ($finCamposAdminMeta) {
         $type = 'text';
@@ -234,14 +270,39 @@ $puedeRefirma = $isAdmin || $isGestor;
 
         var table = $('#tablaSolFinanciamiento').DataTable({
             ajax: { url: 'api/sol_financiamiento.php', dataSrc: 'data' },
+            responsive: {
+                details: {
+                    type: 'column',
+                    target: 'tr'
+                }
+            },
+            scrollX: true,
+            scrollCollapse: true,
+            autoWidth: false,
+            columnDefs: [
+                { responsivePriority: 1, targets: -1, className: 'col-acciones text-nowrap' },
+                { responsivePriority: 2, targets: 0 },
+                { responsivePriority: 3, targets: 1 },
+                { responsivePriority: 4, targets: 2 },
+                { responsivePriority: 5, targets: 3 },
+                { responsivePriority: 10001, targets: [4, 5, 6, 7] }
+            ],
             columns: [
                 { data: 'id' },
                 { data: 'fecha_creacion', render: function(d) { return d ? d.replace(' ', '<br>') : '—'; } },
                 { data: 'cliente_nombre', defaultContent: '—' },
                 { data: 'cliente_id', defaultContent: '—' },
-                { data: 'cliente_correo', defaultContent: '—' },
+                { data: 'cliente_correo', defaultContent: '—', render: function(d) {
+                    if (!d) return '—';
+                    var s = String(d);
+                    return '<span class="d-inline-block text-truncate" style="max-width:12rem" title="' + s.replace(/"/g, '&quot;') + '">' + s + '</span>';
+                }},
                 { data: 'celular_cliente', defaultContent: '—' },
-                { data: 'email_vendedor', defaultContent: '—' },
+                { data: 'email_vendedor', defaultContent: '—', render: function(d) {
+                    if (!d) return '—';
+                    var s = String(d);
+                    return '<span class="d-inline-block text-truncate" style="max-width:12rem" title="' + s.replace(/"/g, '&quot;') + '">' + s + '</span>';
+                }},
                 { data: null, orderable: false, render: function(row) {
                     var v = [];
                     if (row.marca_auto) v.push(row.marca_auto);
@@ -249,25 +310,36 @@ $puedeRefirma = $isAdmin || $isGestor;
                     if (row.anio_auto) v.push(row.anio_auto);
                     return v.length ? v.join(' ') : '—';
                 }},
-                { data: null, orderable: false, render: function(row) {
-                    var html = '<a href="api/sol_financiamiento_pdf.php?id=' + row.id + '" class="btn btn-sm btn-success btn-accion-icono me-1" target="_blank" rel="noopener" title="Descargar PDF"><i class="fas fa-file-pdf"></i></a>' +
-                               '<button type="button" class="btn btn-sm btn-info btn-accion-icono btn-ver-detalle me-1" data-id="' + row.id + '" title="Ver detalle"><i class="fas fa-eye"></i></button>' +
-                               '<button type="button" class="btn btn-sm btn-primary btn-accion-icono btn-ver-adjuntos me-1" data-id="' + row.id + '" title="Adjuntos"><i class="fas fa-paperclip"></i></button>';
+                { data: null, orderable: false, className: 'col-acciones', render: function(row) {
+                    var html = '<div class="sol-fin-acciones">' +
+                               '<a href="api/sol_financiamiento_pdf.php?id=' + row.id + '" class="btn btn-sm btn-success btn-accion-icono" target="_blank" rel="noopener" title="Descargar PDF"><i class="fas fa-file-pdf"></i></a>' +
+                               '<button type="button" class="btn btn-sm btn-info btn-accion-icono btn-ver-detalle" data-id="' + row.id + '" title="Ver detalle"><i class="fas fa-eye"></i></button>' +
+                               '<button type="button" class="btn btn-sm btn-primary btn-accion-icono btn-ver-adjuntos" data-id="' + row.id + '" title="Adjuntos"><i class="fas fa-paperclip"></i></button>';
                     if (esAdmin) {
-                        html += '<button type="button" class="btn btn-sm btn-secondary btn-accion-icono btn-editar-registro me-1" data-id="' + row.id + '" title="Editar"><i class="fas fa-pen"></i></button>';
+                        html += '<button type="button" class="btn btn-sm btn-secondary btn-accion-icono btn-editar-registro" data-id="' + row.id + '" title="Editar"><i class="fas fa-pen"></i></button>';
                     }
                     if (puedeRefirma) {
-                        html += '<button type="button" class="btn btn-sm btn-warning text-dark btn-accion-icono btn-refirma-registro me-1" data-id="' + row.id + '" title="Refirma"><i class="fas fa-signature"></i></button>';
+                        html += '<button type="button" class="btn btn-sm btn-warning text-dark btn-accion-icono btn-refirma-registro" data-id="' + row.id + '" title="Refirma"><i class="fas fa-signature"></i></button>';
                     }
                     if (esAdmin) {
                         html += '<button type="button" class="btn btn-sm btn-danger btn-accion-icono btn-borrar-registro" data-id="' + row.id + '" title="Borrar"><i class="fas fa-trash"></i></button>';
                     }
-                    return html;
+                    return html + '</div>';
                 }}
             ],
             order: [[0, 'desc']],
             pageLength: 25,
-            language: { url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json', emptyTable: 'No hay registros.' }
+            language: { url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json', emptyTable: 'No hay registros.' },
+            initComplete: function() {
+                var api = this.api();
+                setTimeout(function() { api.columns.adjust().responsive.recalc(); }, 0);
+            }
+        });
+
+        $(window).on('resize', function() {
+            if (table && table.columns) {
+                table.columns.adjust().responsive.recalc();
+            }
         });
 
         $(document).on('click', '.btn-ver-detalle', function() {
