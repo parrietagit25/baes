@@ -78,8 +78,8 @@ $segHasta = (new DateTimeImmutable('today'))->format('Y-m-d');
                                     </button>
                                 </div>
                                 <div class="col-md-2">
-                                    <a href="#" class="btn btn-outline-success btn-sm w-100" id="segFinExportCsv">
-                                        <i class="fas fa-file-excel me-1"></i>Exportar CSV
+                                    <a href="#" class="btn btn-outline-success btn-sm w-100" id="segFinExportXlsx">
+                                        <i class="fas fa-file-excel me-1"></i>Exportar Excel
                                     </a>
                                 </div>
                             </div>

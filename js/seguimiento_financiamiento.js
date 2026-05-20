@@ -134,7 +134,7 @@
         document.getElementById('segFinKpiTotal').textContent = '…';
         document.getElementById('segFinKpiCon').textContent = '…';
         document.getElementById('segFinKpiSin').textContent = '…';
-        document.getElementById('segFinExportCsv').href = 'api/seguimiento_financiamiento.php?action=exportar_csv&' + qs();
+        document.getElementById('segFinExportXlsx').href = 'api/seguimiento_financiamiento.php?action=exportar_xlsx&' + qs();
 
         fetch('api/seguimiento_financiamiento.php?action=reporte&' + qs())
             .then(function (res) { return res.json(); })

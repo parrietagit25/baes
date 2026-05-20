@@ -18,24 +18,14 @@ if (!isset($_SESSION['user_id']) || (!$esAdmin && !$esGestor)) {
 
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../includes/reportes_seguimiento_fin_data.php';
+require_once __DIR__ . '/../includes/xlsx_export.php';
 
 $action = $_GET['action'] ?? 'reporte';
 
-if ($action === 'exportar_csv') {
+if ($action === 'exportar_xlsx' || $action === 'exportar_csv') {
     $filt = rep_segfin_parse_filtros();
     $exp = rep_segfin_export_pack($pdo, $filt);
-
-    header('Content-Type: text/csv; charset=utf-8');
-    header('Content-Disposition: attachment; filename="seguimiento_financiamiento.csv"');
-    echo "\xEF\xBB\xBF";
-    $out = fopen('php://output', 'w');
-    if ($out !== false) {
-        fputcsv($out, $exp['headers'], ';');
-        foreach ($exp['rows'] as $row) {
-            fputcsv($out, $row, ';');
-        }
-        fclose($out);
-    }
+    motus_output_xlsx_download('seguimiento_financiamiento.xlsx', 'Seguimiento', $exp['headers'], $exp['rows']);
     exit();
 }
 
