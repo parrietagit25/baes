@@ -131,10 +131,11 @@ function badge_estado_linea_php(?string $estado): string
             <div class="container-fluid py-4">
                 <div class="mb-4">
                     <h2 class="mb-1">Subir Reporte de Reservas</h2>
-                    <p class="text-muted mb-0">Excel Proforma Autos (fila 4, columna C). Coincide solicitudes y aparta vehículos.</p>
+                    <p class="text-muted mb-0">Excel de reservas (fila 1 encabezados, datos desde fila 2, columnas A–AJ). Coincide solicitudes y aparta vehículos.</p>
                 </div>
                 <div class="alert alert-info py-2 small mb-3">
-                    Cédula (L), Correo (M), Nombre (J), Marca (T), Modelo (U), Año (X), Km (Y), Total (AC), Abono (AL). Tras subir use <strong>Procesar</strong>.
+                    Clave de actualización: <strong>Mov ID</strong> (columna B). Cédula (I), Correo (J), Nombre (H), Marca (Q), Modelo (R), Año (U), Km (V), Total (Z), Abono (AI).
+                    Si vuelve a subir el mismo archivo u otro con registros repetidos, se actualizan las filas existentes e insertan las nuevas. Tras subir use <strong>Importar</strong> y luego <strong>Procesar</strong>.
                 </div>
 
                 <?php if ($flashReporte): ?>

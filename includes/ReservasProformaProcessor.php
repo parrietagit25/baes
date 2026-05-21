@@ -57,6 +57,101 @@ class ReservasProformaProcessor
         return $ts ? date('Y-m-d', $ts) : null;
     }
 
+    public static function normalizarMovId(?string $movId): string
+    {
+        $m = mb_strtoupper(trim((string) $movId), 'UTF-8');
+        return preg_replace('/\s+/u', '', $m) ?? '';
+    }
+
+    /**
+     * @param array<string, mixed> $f
+     * @return array<string, mixed>
+     */
+    private function prepararLineaDesdeFila(array $f): array
+    {
+        $precio = self::parseNumero($f['precio_total'] ?? null);
+        $abono = self::parseNumero($f['abono_monto'] ?? null);
+        $pct = null;
+        if ($precio !== null && $precio > 0 && $abono !== null) {
+            $pct = round(($abono / $precio) * 100, 2);
+        }
+        $movId = trim((string) ($f['mov_id'] ?? ''));
+        $movIdNorm = self::normalizarMovId($movId);
+
+        return [
+            'fila_excel' => (int) ($f['fila_excel'] ?? 0),
+            'mov' => ($f['mov'] ?? '') !== '' ? $f['mov'] : null,
+            'mov_id' => $movId !== '' ? $movId : null,
+            'mov_id_norm' => $movIdNorm !== '' ? $movIdNorm : null,
+            'fecha_emision' => self::parseFecha($f['fecha_emision'] ?? null),
+            'dias_reserva' => is_numeric($f['dias_reserva'] ?? '') ? (int) $f['dias_reserva'] : null,
+            'nombre_sucursal' => ($f['nombre_sucursal'] ?? '') !== '' ? $f['nombre_sucursal'] : null,
+            'nombre_vendedor' => ($f['nombre_vendedor'] ?? '') !== '' ? $f['nombre_vendedor'] : null,
+            'cliente_codigo' => ($f['cliente_codigo'] ?? '') !== '' ? $f['cliente_codigo'] : null,
+            'nombre_cliente' => ($f['nombre_cliente'] ?? '') !== '' ? $f['nombre_cliente'] : null,
+            'cedula' => ($f['cedula'] ?? '') !== '' ? $f['cedula'] : null,
+            'cedula_norm' => self::normalizarCedula($f['cedula'] ?? '') ?: null,
+            'correo_cliente' => ($f['correo_cliente'] ?? '') !== '' ? $f['correo_cliente'] : null,
+            'correo_norm' => self::normalizarCorreo($f['correo_cliente'] ?? '') ?: null,
+            'marca' => ($f['marca'] ?? '') !== '' ? $f['marca'] : null,
+            'modelo' => ($f['modelo'] ?? '') !== '' ? $f['modelo'] : null,
+            'anio' => is_numeric($f['anio'] ?? '') ? (int) $f['anio'] : null,
+            'kilometraje' => is_numeric($f['kilometraje'] ?? '')
+                ? (int) preg_replace('/\D/', '', (string) $f['kilometraje'])
+                : null,
+            'precio_total' => $precio,
+            'abono_monto' => $abono,
+            'abono_porcentaje' => $pct,
+            'unidad' => ($f['unidad'] ?? '') !== '' ? $f['unidad'] : null,
+            'chasis' => ($f['chasis'] ?? '') !== '' ? $f['chasis'] : null,
+            'placas' => ($f['placas'] ?? '') !== '' ? $f['placas'] : null,
+            'datos_excel_json' => $this->jsonDatosExtra($f),
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $f
+     */
+    private function jsonDatosExtra(array $f): ?string
+    {
+        if (!$this->columnaDatosExcelJsonExiste()) {
+            return null;
+        }
+        $extra = [];
+        $keys = [
+            'almacen', 'concepto', 'comentarios', 'observaciones', 'condicion', 'articulo',
+            'tipo_auto', 'cantidad', 'precio_marcado', 'importe', 'impuestos',
+            'liberado', 'ctc_completo', 'banco', 'prestamo', 'mov_liberacion', 'saldo',
+        ];
+        foreach ($keys as $k) {
+            $v = trim((string) ($f[$k] ?? ''));
+            if ($v !== '') {
+                $extra[$k] = $v;
+            }
+        }
+        return $extra === [] ? null : json_encode($extra, JSON_UNESCAPED_UNICODE);
+    }
+
+    private function columnaMovIdNormExiste(): bool
+    {
+        try {
+            $this->pdo->query('SELECT mov_id_norm FROM reportes_reservas_lineas LIMIT 1');
+            return true;
+        } catch (PDOException $e) {
+            return false;
+        }
+    }
+
+    private function columnaDatosExcelJsonExiste(): bool
+    {
+        try {
+            $this->pdo->query('SELECT datos_excel_json FROM reportes_reservas_lineas LIMIT 1');
+            return true;
+        } catch (PDOException $e) {
+            return false;
+        }
+    }
+
     /**
      * @return array{success: bool, message: string, stats?: array}
      */
@@ -69,70 +164,158 @@ class ReservasProformaProcessor
         }
 
         if (count($filas) === 0) {
-            return ['success' => false, 'message' => 'No se encontraron filas de datos desde la fila 4'];
+            return ['success' => false, 'message' => 'No se encontraron filas de datos (revise encabezados en fila 1 y datos desde fila 2)'];
+        }
+
+        $upsert = $this->columnaMovIdNormExiste();
+        if (!$upsert) {
+            return [
+                'success' => false,
+                'message' => 'Ejecute database/migracion_reportes_reservas_layout_aj.sql para actualizar/insertar por Mov ID',
+            ];
         }
 
         $this->pdo->beginTransaction();
         try {
-            $del = $this->pdo->prepare('DELETE FROM reportes_reservas_lineas WHERE reporte_id = ?');
-            $del->execute([$this->reporteId]);
-
-            $ins = $this->pdo->prepare("
-                INSERT INTO reportes_reservas_lineas (
-                    reporte_id, fila_excel, mov, mov_id, fecha_emision, dias_reserva,
+            $sel = $this->pdo->prepare('SELECT id FROM reportes_reservas_lineas WHERE mov_id_norm = ? LIMIT 1');
+            $insCols = 'reporte_id, fila_excel, mov, mov_id, mov_id_norm, fecha_emision, dias_reserva,
                     nombre_sucursal, nombre_vendedor, cliente_codigo, nombre_cliente,
                     cedula, cedula_norm, correo_cliente, correo_norm,
                     marca, modelo, anio, kilometraje, precio_total, abono_monto, abono_porcentaje,
-                    unidad, chasis, placas, estado
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'pendiente')
-            ");
+                    unidad, chasis, placas';
+            $insVals = '?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?';
+            if ($this->columnaDatosExcelJsonExiste()) {
+                $insCols .= ', datos_excel_json';
+                $insVals .= ', ?';
+            }
+            $insCols .= ', estado';
+            $insVals .= ", 'pendiente'";
+            $ins = $this->pdo->prepare("INSERT INTO reportes_reservas_lineas ({$insCols}) VALUES ({$insVals})");
+
+            $updSets = [
+                'reporte_id = ?', 'fila_excel = ?', 'mov = ?', 'mov_id = ?', 'fecha_emision = ?', 'dias_reserva = ?',
+                'nombre_sucursal = ?', 'nombre_vendedor = ?', 'cliente_codigo = ?', 'nombre_cliente = ?',
+                'cedula = ?', 'cedula_norm = ?', 'correo_cliente = ?', 'correo_norm = ?',
+                'marca = ?', 'modelo = ?', 'anio = ?', 'kilometraje = ?', 'precio_total = ?',
+                'abono_monto = ?', 'abono_porcentaje = ?', 'unidad = ?', 'chasis = ?', 'placas = ?',
+            ];
+            if ($this->columnaDatosExcelJsonExiste()) {
+                $updSets[] = 'datos_excel_json = ?';
+            }
+            $updSets[] = "estado = 'pendiente'";
+            $updSets[] = 'solicitud_id = NULL';
+            $updSets[] = 'vehiculo_id = NULL';
+            $updSets[] = "match_por = 'ninguno'";
+            $updSets[] = 'mensaje = NULL';
+            $upd = $this->pdo->prepare('UPDATE reportes_reservas_lineas SET ' . implode(', ', $updSets) . ' WHERE id = ?');
+
+            $insertadas = 0;
+            $actualizadas = 0;
 
             foreach ($filas as $f) {
-                $precio = self::parseNumero($f['precio_total'] ?? null);
-                $abono = self::parseNumero($f['abono_monto'] ?? null);
-                $pct = null;
-                if ($precio !== null && $precio > 0 && $abono !== null) {
-                    $pct = round(($abono / $precio) * 100, 2);
+                $linea = $this->prepararLineaDesdeFila($f);
+                $movNorm = $linea['mov_id_norm'];
+                $existenteId = null;
+                if ($movNorm !== null && $movNorm !== '') {
+                    $sel->execute([$movNorm]);
+                    $existenteId = $sel->fetchColumn();
+                    $sel->closeCursor();
                 }
-                $ins->execute([
-                    $this->reporteId,
-                    (int) ($f['fila_excel'] ?? 0),
-                    $f['mov'] ?: null,
-                    $f['mov_id'] ?: null,
-                    self::parseFecha($f['fecha_emision'] ?? null),
-                    is_numeric($f['dias_reserva'] ?? '') ? (int) $f['dias_reserva'] : null,
-                    $f['nombre_sucursal'] ?: null,
-                    $f['nombre_vendedor'] ?: null,
-                    $f['cliente_codigo'] ?: null,
-                    $f['nombre_cliente'] ?: null,
-                    $f['cedula'] ?: null,
-                    self::normalizarCedula($f['cedula'] ?? '') ?: null,
-                    $f['correo_cliente'] ?: null,
-                    self::normalizarCorreo($f['correo_cliente'] ?? '') ?: null,
-                    $f['marca'] ?: null,
-                    $f['modelo'] ?: null,
-                    is_numeric($f['anio'] ?? '') ? (int) $f['anio'] : null,
-                    is_numeric($f['kilometraje'] ?? '') ? (int) preg_replace('/\D/', '', (string) $f['kilometraje']) : null,
-                    $precio,
-                    $abono,
-                    $pct,
-                    $f['unidad'] ?: null,
-                    $f['chasis'] ?: null,
-                    $f['placas'] ?: null,
-                ]);
+
+                if ($existenteId) {
+                    $params = [
+                        $this->reporteId,
+                        $linea['fila_excel'],
+                        $linea['mov'],
+                        $linea['mov_id'],
+                        $linea['fecha_emision'],
+                        $linea['dias_reserva'],
+                        $linea['nombre_sucursal'],
+                        $linea['nombre_vendedor'],
+                        $linea['cliente_codigo'],
+                        $linea['nombre_cliente'],
+                        $linea['cedula'],
+                        $linea['cedula_norm'],
+                        $linea['correo_cliente'],
+                        $linea['correo_norm'],
+                        $linea['marca'],
+                        $linea['modelo'],
+                        $linea['anio'],
+                        $linea['kilometraje'],
+                        $linea['precio_total'],
+                        $linea['abono_monto'],
+                        $linea['abono_porcentaje'],
+                        $linea['unidad'],
+                        $linea['chasis'],
+                        $linea['placas'],
+                    ];
+                    if ($this->columnaDatosExcelJsonExiste()) {
+                        $params[] = $linea['datos_excel_json'];
+                    }
+                    $params[] = (int) $existenteId;
+                    $upd->execute($params);
+                    $actualizadas++;
+                } else {
+                    $params = [
+                        $this->reporteId,
+                        $linea['fila_excel'],
+                        $linea['mov'],
+                        $linea['mov_id'],
+                        $linea['mov_id_norm'],
+                        $linea['fecha_emision'],
+                        $linea['dias_reserva'],
+                        $linea['nombre_sucursal'],
+                        $linea['nombre_vendedor'],
+                        $linea['cliente_codigo'],
+                        $linea['nombre_cliente'],
+                        $linea['cedula'],
+                        $linea['cedula_norm'],
+                        $linea['correo_cliente'],
+                        $linea['correo_norm'],
+                        $linea['marca'],
+                        $linea['modelo'],
+                        $linea['anio'],
+                        $linea['kilometraje'],
+                        $linea['precio_total'],
+                        $linea['abono_monto'],
+                        $linea['abono_porcentaje'],
+                        $linea['unidad'],
+                        $linea['chasis'],
+                        $linea['placas'],
+                    ];
+                    if ($this->columnaDatosExcelJsonExiste()) {
+                        $params[] = $linea['datos_excel_json'];
+                    }
+                    $ins->execute($params);
+                    $insertadas++;
+                }
             }
+
+            $cnt = $this->pdo->prepare('SELECT COUNT(*) FROM reportes_reservas_lineas WHERE reporte_id = ?');
+            $cnt->execute([$this->reporteId]);
+            $totalReporte = (int) $cnt->fetchColumn();
 
             $this->pdo->prepare("
                 UPDATE reportes_reservas
                 SET filas_total = ?, estado = 'pendiente', filas_aplicadas = 0, filas_sin_coincidencia = 0, fecha_procesado = NULL
                 WHERE id = ?
-            ")->execute([count($filas), $this->reporteId]);
+            ")->execute([$totalReporte, $this->reporteId]);
 
             $this->pdo->commit();
+            $msg = sprintf(
+                '%d filas en este reporte (%d nuevas, %d actualizadas por Mov ID). Ejecute Procesar para aplicar a solicitudes.',
+                $totalReporte,
+                $insertadas,
+                $actualizadas
+            );
             return [
                 'success' => true,
-                'message' => count($filas) . ' filas importadas. Ejecute Procesar para aplicar a solicitudes.',
-                'stats' => ['filas_total' => count($filas)],
+                'message' => $msg,
+                'stats' => [
+                    'filas_total' => $totalReporte,
+                    'filas_insertadas' => $insertadas,
+                    'filas_actualizadas' => $actualizadas,
+                ],
             ];
         } catch (PDOException $e) {
             $this->pdo->rollBack();

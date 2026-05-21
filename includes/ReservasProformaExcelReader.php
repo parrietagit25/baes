@@ -1,33 +1,50 @@
 <?php
 /**
- * Lee .xlsx (primera hoja) desde fila 4, columna C en adelante.
+ * Lee .xlsx / .csv: fila 1 = encabezados, datos desde fila 2, columnas A–AJ.
  */
 class ReservasProformaExcelReader
 {
-    private const DATA_START_ROW = 4;
-    private const DATA_START_COL = 'C';
+    private const DATA_START_ROW = 2;
+    private const DATA_START_COL = 'A';
 
-    /** @var array<string, int> Letra de columna Excel -> índice 0-based en fila */
+    /** @var array<string, string> Campo interno => columna Excel */
     private const COL = [
-        'mov' => 'C',
-        'mov_id' => 'D',
-        'fecha_emision' => 'E',
-        'dias_reserva' => 'F',
-        'nombre_sucursal' => 'G',
-        'nombre_vendedor' => 'H',
-        'cliente_codigo' => 'I',
-        'nombre_cliente' => 'J',
-        'cedula' => 'L',
-        'correo_cliente' => 'M',
-        'marca' => 'T',
-        'modelo' => 'U',
-        'anio' => 'X',
-        'kilometraje' => 'Y',
-        'precio_total' => 'AC',
-        'abono_monto' => 'AL',
+        'mov' => 'A',
+        'mov_id' => 'B',
+        'fecha_emision' => 'C',
+        'dias_reserva' => 'D',
+        'nombre_sucursal' => 'E',
+        'nombre_vendedor' => 'F',
+        'cliente_codigo' => 'G',
+        'nombre_cliente' => 'H',
+        'cedula' => 'I',
+        'correo_cliente' => 'J',
+        'almacen' => 'K',
+        'concepto' => 'L',
+        'comentarios' => 'M',
+        'observaciones' => 'N',
+        'condicion' => 'O',
+        'articulo' => 'P',
+        'marca' => 'Q',
+        'modelo' => 'R',
+        'tipo_auto' => 'S',
+        'cantidad' => 'T',
+        'anio' => 'U',
+        'kilometraje' => 'V',
+        'precio_marcado' => 'W',
+        'importe' => 'X',
+        'impuestos' => 'Y',
+        'precio_total' => 'Z',
+        'liberado' => 'AA',
+        'ctc_completo' => 'AB',
+        'banco' => 'AC',
+        'prestamo' => 'AD',
+        'mov_liberacion' => 'AE',
         'unidad' => 'AF',
         'chasis' => 'AG',
         'placas' => 'AH',
+        'abono_monto' => 'AI',
+        'saldo' => 'AJ',
     ];
 
     public static function leerArchivo(string $path): array
@@ -46,7 +63,7 @@ class ReservasProformaExcelReader
     {
         $fh = fopen($path, 'rb');
         if (!$fh) {
-            throw RuntimeException('No se pudo abrir el CSV');
+            throw new RuntimeException('No se pudo abrir el CSV');
         }
         $rows = [];
         $lineNum = 0;
@@ -69,11 +86,11 @@ class ReservasProformaExcelReader
     private static function leerXlsx(string $path): array
     {
         if (!class_exists('ZipArchive')) {
-            throw RuntimeException('Se requiere extensión ZipArchive de PHP para leer Excel');
+            throw new RuntimeException('Se requiere extensión ZipArchive de PHP para leer Excel');
         }
         $zip = new ZipArchive();
         if ($zip->open($path) !== true) {
-            throw RuntimeException('No se pudo abrir el archivo Excel');
+            throw new RuntimeException('No se pudo abrir el archivo Excel');
         }
 
         $shared = [];
@@ -100,7 +117,7 @@ class ReservasProformaExcelReader
         $sheetXml = $zip->getFromName('xl/worksheets/sheet1.xml');
         $zip->close();
         if ($sheetXml === false) {
-            throw RuntimeException('No se encontró la hoja sheet1 en el Excel');
+            throw new RuntimeException('No se encontró la hoja sheet1 en el Excel');
         }
 
         $sheet = @simplexml_load_string($sheetXml);
@@ -143,7 +160,7 @@ class ReservasProformaExcelReader
                 continue;
             }
             $rowArr = [];
-            $maxIdx = max(array_merge(array_keys($cells), [$startColIdx]));
+            $maxIdx = max(array_merge(array_keys($cells), [$startColIdx + self::colIndex('AJ')]));
             for ($i = 0; $i <= $maxIdx; $i++) {
                 $rowArr[] = $cells[$i] ?? '';
             }
@@ -164,32 +181,16 @@ class ReservasProformaExcelReader
             return trim((string) ($row[$idx] ?? ''));
         };
 
-        return [
-            'mov' => $get(self::COL['mov']),
-            'mov_id' => $get(self::COL['mov_id']),
-            'fecha_emision' => $get(self::COL['fecha_emision']),
-            'dias_reserva' => $get(self::COL['dias_reserva']),
-            'nombre_sucursal' => $get(self::COL['nombre_sucursal']),
-            'nombre_vendedor' => $get(self::COL['nombre_vendedor']),
-            'cliente_codigo' => $get(self::COL['cliente_codigo']),
-            'nombre_cliente' => $get(self::COL['nombre_cliente']),
-            'cedula' => $get(self::COL['cedula']),
-            'correo_cliente' => $get(self::COL['correo_cliente']),
-            'marca' => $get(self::COL['marca']),
-            'modelo' => $get(self::COL['modelo']),
-            'anio' => $get(self::COL['anio']),
-            'kilometraje' => $get(self::COL['kilometraje']),
-            'precio_total' => $get(self::COL['precio_total']),
-            'abono_monto' => $get(self::COL['abono_monto']),
-            'unidad' => $get(self::COL['unidad']),
-            'chasis' => $get(self::COL['chasis']),
-            'placas' => $get(self::COL['placas']),
-        ];
+        $out = [];
+        foreach (self::COL as $key => $letter) {
+            $out[$key] = $get($letter);
+        }
+        return $out;
     }
 
     private static function filaVacia(array $assoc): bool
     {
-        $keys = ['cedula', 'correo_cliente', 'nombre_cliente', 'mov_id', 'marca', 'modelo'];
+        $keys = ['mov_id', 'cedula', 'correo_cliente', 'nombre_cliente', 'marca', 'modelo', 'unidad', 'mov'];
         foreach ($keys as $k) {
             if (($assoc[$k] ?? '') !== '') {
                 return false;
