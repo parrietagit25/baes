@@ -178,19 +178,24 @@ class ReservasProformaProcessor
         $this->pdo->beginTransaction();
         try {
             $sel = $this->pdo->prepare('SELECT id FROM reportes_reservas_lineas WHERE mov_id_norm = ? LIMIT 1');
-            $insCols = 'reporte_id, fila_excel, mov, mov_id, mov_id_norm, fecha_emision, dias_reserva,
-                    nombre_sucursal, nombre_vendedor, cliente_codigo, nombre_cliente,
-                    cedula, cedula_norm, correo_cliente, correo_norm,
-                    marca, modelo, anio, kilometraje, precio_total, abono_monto, abono_porcentaje,
-                    unidad, chasis, placas';
-            $insVals = '?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?';
-            if ($this->columnaDatosExcelJsonExiste()) {
-                $insCols .= ', datos_excel_json';
-                $insVals .= ', ?';
+            $insColumnas = [
+                'reporte_id', 'fila_excel', 'mov', 'mov_id', 'mov_id_norm', 'fecha_emision', 'dias_reserva',
+                'nombre_sucursal', 'nombre_vendedor', 'cliente_codigo', 'nombre_cliente',
+                'cedula', 'cedula_norm', 'correo_cliente', 'correo_norm',
+                'marca', 'modelo', 'anio', 'kilometraje', 'precio_total', 'abono_monto', 'abono_porcentaje',
+                'unidad', 'chasis', 'placas',
+            ];
+            $conJson = $this->columnaDatosExcelJsonExiste();
+            if ($conJson) {
+                $insColumnas[] = 'datos_excel_json';
             }
-            $insCols .= ', estado';
-            $insVals .= ", 'pendiente'";
-            $ins = $this->pdo->prepare("INSERT INTO reportes_reservas_lineas ({$insCols}) VALUES ({$insVals})");
+            $insColumnas[] = 'estado';
+            $insPlaceholders = array_fill(0, count($insColumnas) - 1, '?');
+            $insPlaceholders[] = "'pendiente'";
+            $ins = $this->pdo->prepare(
+                'INSERT INTO reportes_reservas_lineas (' . implode(', ', $insColumnas) . ') VALUES ('
+                . implode(', ', $insPlaceholders) . ')'
+            );
 
             $updSets = [
                 'reporte_id = ?', 'fila_excel = ?', 'mov = ?', 'mov_id = ?', 'fecha_emision = ?', 'dias_reserva = ?',
