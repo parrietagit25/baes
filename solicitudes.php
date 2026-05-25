@@ -315,7 +315,7 @@ if ($isBanco && !$isAdmin) {
                                               $sql .= " WHERE s.gestor_id = " . $_SESSION['user_id'];
                                           }
                                         
-                                        $sql .= " ORDER BY s.fecha_creacion DESC";
+                                        $sql .= " ORDER BY (s.estado = 'Nueva') DESC, s.id DESC";
                                         
                                         $stmt = $pdo->query($sql);
                                         $solicitudes = $stmt->fetchAll();

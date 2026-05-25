@@ -232,7 +232,7 @@ function obtenerSolicitudes() {
             return;
         }
         
-        $sql .= $whereClause . " GROUP BY s.id, u.nombre, u.apellido, ev.nombre, ub.nombre, ub.apellido, b.nombre ORDER BY s.fecha_creacion DESC";
+        $sql .= $whereClause . " GROUP BY s.id, u.nombre, u.apellido, ev.nombre, ub.nombre, ub.apellido, b.nombre ORDER BY (s.estado = 'Nueva') DESC, s.id DESC";
         
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
