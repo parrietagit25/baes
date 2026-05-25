@@ -851,10 +851,6 @@ if ($isBanco && !$isAdmin) {
                                                             title="Enviar resumen por correo a todos los usuarios asignados">
                                                         <i class="fas fa-envelope me-1"></i>Enviar resumen a todos
                                                     </button>
-                                                    <button type="button" class="btn btn-outline-primary btn-sm" id="btnEnviarPipedrive" disabled
-                                                            title="Enviar resumen directo al correo PipeDrive de la solicitud">
-                                                        <i class="fas fa-paper-plane me-1"></i>Enviar a pipedriver
-                                                    </button>
                                                 </div>
                                             </div>
                                             <div class="card-body">
@@ -1932,30 +1928,6 @@ if ($isBanco && !$isAdmin) {
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                     <button type="button" class="btn btn-primary" onclick="confirmarEnviarResumenBancoTodos()">
                         <i class="fas fa-paper-plane me-1"></i>Enviar a todos
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal confirmar envío directo a PipeDrive -->
-    <div class="modal fade" id="modalEnviarPipedrive" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title">
-                        <i class="fas fa-paper-plane me-2"></i>Enviar a PipeDrive
-                    </h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <p class="mb-2" id="textoEnviarPipedriveConfirm"></p>
-                    <p class="small text-muted mb-0">El envío será directo al correo de PipeDrive, sin copias (CC/CCO).</p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="button" class="btn btn-primary" id="btnConfirmarEnviarPipedrive" onclick="confirmarEnviarResumenPipedrive()">
-                        <i class="fas fa-paper-plane me-1"></i>Enviar
                     </button>
                 </div>
             </div>
