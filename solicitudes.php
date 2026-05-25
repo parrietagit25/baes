@@ -8,6 +8,7 @@ if (!isset($_SESSION['user_id'])) {
 
 require_once 'config/database.php';
 require_once 'includes/validar_acceso.php';
+require_once 'includes/solicitud_vehiculo_helper.php';
 
 // Obtener roles del usuario para restricciones
 $userRoles = $_SESSION['user_roles'] ?? [];
@@ -79,27 +80,6 @@ if ($isBanco && !$isAdmin) {
 
     $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE respuesta_banco = 'Rechazado'");
     $solicitudesRechazadas = $stmt->fetch()['total'];
-}
-
-/**
- * Texto columna Vehículo: "206-AF — SUZUKI APV 2024" o solo descripción si no hay unidad.
- *
- * @param array<string, mixed> $s
- */
-function solicitud_texto_vehiculo_lista(array $s): string
-{
-    $unidad = trim((string) ($s['veh_unidad'] ?? ''));
-    $marca = trim((string) ($s['veh_marca'] ?? $s['marca_auto'] ?? ''));
-    $modelo = trim((string) ($s['veh_modelo'] ?? $s['modelo_auto'] ?? ''));
-    $anio = trim((string) ($s['veh_anio'] ?? $s['ao_auto'] ?? $s['año_auto'] ?? ''));
-    $desc = trim($marca . ' ' . $modelo . ' ' . $anio);
-    if ($unidad !== '' && $desc !== '') {
-        return $unidad . ' — ' . $desc;
-    }
-    if ($unidad !== '') {
-        return $unidad;
-    }
-    return $desc !== '' ? $desc : '-';
 }
 ?>
 
@@ -315,10 +295,7 @@ function solicitud_texto_vehiculo_lista(array $s): string
                                                      (SELECT ubs.usuario_banco_id FROM evaluaciones_banco e 
                                                       INNER JOIN usuarios_banco_solicitudes ubs ON e.usuario_banco_id = ubs.id 
                                                       WHERE e.id = s.evaluacion_seleccionada) as usuario_banco_id_seleccionado,
-                                                     (SELECT v.unidad FROM vehiculos_solicitud v WHERE v.solicitud_id = s.id ORDER BY v.orden ASC, v.id ASC LIMIT 1) AS veh_unidad,
-                                                     (SELECT v.marca FROM vehiculos_solicitud v WHERE v.solicitud_id = s.id ORDER BY v.orden ASC, v.id ASC LIMIT 1) AS veh_marca,
-                                                     (SELECT v.modelo FROM vehiculos_solicitud v WHERE v.solicitud_id = s.id ORDER BY v.orden ASC, v.id ASC LIMIT 1) AS veh_modelo,
-                                                     (SELECT v.anio FROM vehiculos_solicitud v WHERE v.solicitud_id = s.id ORDER BY v.orden ASC, v.id ASC LIMIT 1) AS veh_anio
+                                                     " . solicitud_sql_campos_vehiculo_reserva() . "
                                               FROM solicitudes_credito s
                                               LEFT JOIN usuarios u ON s.gestor_id = u.id
                                               LEFT JOIN ejecutivos_ventas ev ON s.ejecutivo_ventas_id = ev.id

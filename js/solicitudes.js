@@ -366,6 +366,27 @@ function inicializarDataTable() {
 }
 
 // Función para inicializar DataTable (las solicitudes ya vienen del HTML)
+function textoVehiculoLista(solicitud) {
+    if (parseInt(solicitud.tiene_reserva_aplicada, 10) <= 0) {
+        return '';
+    }
+    if (solicitud.texto_vehiculo) {
+        return solicitud.texto_vehiculo;
+    }
+    const unidad = String(solicitud.veh_unidad || '').trim();
+    const marca = String(solicitud.veh_marca || solicitud.marca_auto || '').trim();
+    const modelo = String(solicitud.veh_modelo || solicitud.modelo_auto || '').trim();
+    const anio = String(solicitud.veh_anio || solicitud.año_auto || solicitud.ao_auto || '').trim();
+    const desc = (marca + ' ' + modelo + ' ' + anio).trim();
+    if (unidad && desc) {
+        return unidad + ' — ' + desc;
+    }
+    if (unidad) {
+        return unidad;
+    }
+    return desc;
+}
+
 function cargarSolicitudes() {
     // Verificar si la tabla tiene filas ya cargadas desde el servidor
     const filasExistentes = $('#solicitudesTable tbody tr').length;
@@ -461,7 +482,7 @@ function cargarSolicitudes() {
                                     <i class="fas fa-clipboard-list me-1"></i>Ver mis respuestas
                                 </button>
                             </td>
-                            <td>${solicitud.marca_auto || '-'} ${solicitud.modelo_auto || ''} ${solicitud.año_auto || ''}</td>
+                            <td>${textoVehiculoLista(solicitud)}</td>
                             <td>${solicitud.gestor_nombre} ${solicitud.gestor_apellido}</td>
                             <td>${vendedorNombre}</td>
                             <td><span class="badge badge-estado ${estadoClass}">${solicitud.estado}</span></td>
@@ -473,7 +494,7 @@ function cargarSolicitudes() {
                         <tr>
                             <td data-order="${solicitud.id}">${idCelda}</td>
                             <td>${solicitud.nombre_cliente}</td>
-                            <td>${solicitud.marca_auto || '-'} ${solicitud.modelo_auto || ''} ${solicitud.año_auto || ''}</td>
+                            <td>${textoVehiculoLista(solicitud)}</td>
                             <td>${solicitud.gestor_nombre} ${solicitud.gestor_apellido}</td>
                             <td>${vendedorNombre}</td>
                             <td>

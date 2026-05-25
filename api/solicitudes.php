@@ -16,6 +16,7 @@ if (!isset($_SESSION['user_id'])) {
 
 require_once '../config/database.php';
 require_once '../includes/historial_helper.php';
+require_once '../includes/solicitud_vehiculo_helper.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 
@@ -198,7 +199,8 @@ function obtenerSolicitudes() {
                    ev.nombre as vendedor_nombre,
                    ub.nombre as banco_nombre, ub.apellido as banco_apellido,
                    b.nombre as banco_institucion,
-                   COUNT(DISTINCT n.id) as total_notas
+                   COUNT(DISTINCT n.id) as total_notas,
+                   " . solicitud_sql_campos_vehiculo_reserva() . "
             FROM solicitudes_credito s
             LEFT JOIN usuarios u ON s.gestor_id = u.id
             LEFT JOIN ejecutivos_ventas ev ON s.ejecutivo_ventas_id = ev.id
@@ -236,7 +238,10 @@ function obtenerSolicitudes() {
         $stmt->execute($params);
         $solicitudes = $stmt->fetchAll();
         foreach ($solicitudes as &$s) {
-            if (array_key_exists('ao_auto', $s)) $s['año_auto'] = $s['ao_auto'];
+            if (array_key_exists('ao_auto', $s)) {
+                $s['año_auto'] = $s['ao_auto'];
+            }
+            $s['texto_vehiculo'] = solicitud_texto_vehiculo_lista($s);
         }
         unset($s);
         echo json_encode(['success' => true, 'data' => $solicitudes]);
