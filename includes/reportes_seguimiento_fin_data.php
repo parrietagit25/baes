@@ -187,7 +187,6 @@ function rep_segfin_pasar_filtro_vinculo(array $e, array $filt): bool
 function rep_segfin_export_headers(): array
 {
     return [
-        'ID financiamiento',
         'Fecha',
         'Cliente (público)',
         'Email del cliente',
@@ -199,7 +198,6 @@ function rep_segfin_export_headers(): array
         'Rango salario',
         'Perfil estimado',
         'Sector estimado',
-        'ID solicitud',
         'Estado Motus',
         'Perfil Motus',
         'Ingreso Motus',
@@ -225,7 +223,6 @@ function rep_segfin_export_headers(): array
 function rep_segfin_export_row(array $e): array
 {
     return [
-        $e['id'] ?? '',
         $e['fecha_creacion'] ?? '',
         $e['cliente_nombre'] ?? '',
         $e['cliente_email'] ?? '',
@@ -237,7 +234,6 @@ function rep_segfin_export_row(array $e): array
         $e['rango_salario_usd'] ?? '',
         $e['perfil_estimado'] ?? '',
         $e['sector_estimado'] ?? '',
-        $e['solicitud_id'] ?? '',
         $e['solicitud_estado'] ?? '',
         $e['perfil_motus'] ?? '',
         $e['ingreso_motus'] ?? '',
