@@ -6,6 +6,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/reportes_fin_demografia_data.php';
+require_once __DIR__ . '/solicitud_vehiculo_helper.php';
 
 /**
  * @return array{desde:string,hasta:string,vinculo:string}
@@ -44,6 +45,13 @@ function rep_segfin_fetch_raw(PDO $pdo, string $d1, string $d2): array
         ? 'LEFT JOIN ejecutivos_ventas ev ON ev.id = fr.id_vendedor'
         : 'LEFT JOIN ejecutivos_ventas ev ON 1=0';
 
+    $sqlCamposReserva = '';
+    if ($joinSc !== 'LEFT JOIN solicitudes_credito sc ON 1=0'
+        && rep_fin_tabla_existe($pdo, 'vehiculos_solicitud')
+        && rep_fin_tabla_existe($pdo, 'reportes_reservas_lineas')) {
+        $sqlCamposReserva = ',' . solicitud_sql_campos_vehiculo_reserva('sc');
+    }
+
     $sql = "
         SELECT
             fr.id,
@@ -75,6 +83,7 @@ function rep_segfin_fetch_raw(PDO $pdo, string $d1, string $d2): array
             sc.nombre_cliente AS nombre_motus,
             sc.cedula AS cedula_motus,
             ev.nombre AS vendedor_nombre
+            {$sqlCamposReserva}
         FROM financiamiento_registros fr
         {$joinSc}
         {$joinEv}
@@ -110,14 +119,15 @@ function rep_segfin_enriquecer_fila(array $r): array
     $e['vendedor'] = $vNombre !== '' ? $vNombre : trim((string) ($r['email_vendedor'] ?? ''));
     $e['telefono'] = trim((string) ($r['celular_cliente'] ?? ''));
 
-    $veh = [];
-    foreach (['marca_auto', 'modelo_auto', 'anio_auto'] as $k) {
-        $v = trim((string) ($r[$k] ?? ''));
-        if ($v !== '') {
-            $veh[] = $v;
-        }
+    $e['unidad_vehiculo'] = '';
+    if ($sid) {
+        $e['unidad_vehiculo'] = solicitud_texto_vehiculo_lista(array_merge($r, [
+            'marca_auto' => $r['marca_auto'] ?? '',
+            'modelo_auto' => $r['modelo_auto'] ?? '',
+            'ao_auto' => $r['anio_auto'] ?? '',
+            'año_auto' => $r['anio_auto'] ?? '',
+        ]));
     }
-    $e['unidad_vehiculo'] = $veh !== [] ? implode(' ', $veh) : '';
 
     $e['solicitud_id'] = $sid;
     $e['solicitud_estado'] = $sid ? (string) ($r['solicitud_estado'] ?? '') : '';
