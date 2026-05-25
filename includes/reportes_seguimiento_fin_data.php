@@ -52,11 +52,21 @@ function rep_segfin_fetch_raw(PDO $pdo, string $d1, string $d2): array
         $sqlCamposReserva = ',' . solicitud_sql_campos_vehiculo_reserva('sc');
     }
 
+    $sqlClienteCorreo = rep_fin_columna_existe($pdo, 'financiamiento_registros', 'cliente_correo')
+        ? 'fr.cliente_correo'
+        : 'NULL AS cliente_correo';
+    $sqlSolicitudEmail = $joinSc !== 'LEFT JOIN solicitudes_credito sc ON 1=0'
+        && rep_fin_columna_existe($pdo, 'solicitudes_credito', 'email')
+        ? 'sc.email AS solicitud_email'
+        : 'NULL AS solicitud_email';
+
     $sql = "
         SELECT
             fr.id,
             fr.fecha_creacion,
             fr.cliente_nombre,
+            {$sqlClienteCorreo},
+            {$sqlSolicitudEmail},
             fr.cliente_sexo,
             fr.cliente_edad,
             fr.cliente_nacimiento,
@@ -118,6 +128,9 @@ function rep_segfin_enriquecer_fila(array $r): array
     $vNombre = trim((string) ($r['vendedor_nombre'] ?? ''));
     $e['vendedor'] = $vNombre !== '' ? $vNombre : trim((string) ($r['email_vendedor'] ?? ''));
     $e['telefono'] = trim((string) ($r['celular_cliente'] ?? ''));
+    $emailForm = trim((string) ($r['cliente_correo'] ?? ''));
+    $emailMotus = trim((string) ($r['solicitud_email'] ?? ''));
+    $e['cliente_email'] = $emailForm !== '' ? $emailForm : $emailMotus;
 
     $e['unidad_vehiculo'] = '';
     if ($sid) {
@@ -177,6 +190,7 @@ function rep_segfin_export_headers(): array
         'ID financiamiento',
         'Fecha',
         'Cliente (público)',
+        'Email del cliente',
         'Sexo formulario',
         'Género (agrupado)',
         'Edad (calc.)',
@@ -214,6 +228,7 @@ function rep_segfin_export_row(array $e): array
         $e['id'] ?? '',
         $e['fecha_creacion'] ?? '',
         $e['cliente_nombre'] ?? '',
+        $e['cliente_email'] ?? '',
         $e['cliente_sexo'] ?? '',
         $e['genero_label'] ?? '',
         $e['edad_calculada'] ?? '',

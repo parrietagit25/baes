@@ -143,6 +143,7 @@ $segHasta = (new DateTimeImmutable('today'))->format('Y-m-d');
                                                     <th>ID Sol Digital</th>
                                                     <th>Fecha</th>
                                                     <th>Cliente</th>
+                                                    <th>Email del cliente</th>
                                                     <th>Vínculo</th>
                                                     <th>ID Sol MOTUS</th>
                                                     <th>Estado Motus</th>
@@ -155,7 +156,7 @@ $segHasta = (new DateTimeImmutable('today'))->format('Y-m-d');
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                <tr><td colspan="12" class="text-center text-muted">Cargando…</td></tr>
+                                                <tr><td colspan="13" class="text-center text-muted">Cargando…</td></tr>
                                             </tbody>
                                         </table>
                                     </div>
@@ -174,6 +175,7 @@ $segHasta = (new DateTimeImmutable('today'))->format('Y-m-d');
                                             <th>ID financ.</th>
                                             <th>Fecha</th>
                                             <th>Cliente</th>
+                                            <th>Email cliente</th>
                                             <th>Sexo form.</th>
                                             <th>Género agr.</th>
                                             <th>Edad calc.</th>

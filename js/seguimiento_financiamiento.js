@@ -61,7 +61,7 @@
         var tbody = document.querySelector('#tablaSegFin tbody');
         if (!tbody) return;
         if (!filas || !filas.length) {
-            tbody.innerHTML = '<tr><td colspan="12" class="text-center text-muted">Sin registros en el rango</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="13" class="text-center text-muted">Sin registros en el rango</td></tr>';
             return;
         }
         var html = '';
@@ -73,6 +73,7 @@
             html += '<td>' + escapeHtml(r.id_sol_digital) + '</td>';
             html += '<td>' + escapeHtml(r.fecha_creacion || '') + '</td>';
             html += '<td>' + escapeHtml(r.cliente_nombre) + '</td>';
+            html += '<td>' + escapeHtml(r.cliente_email || '—') + '</td>';
             html += '<td>' + badge + '</td>';
             html += '<td>' + escapeHtml(r.id_sol_motus || '—') + '</td>';
             html += '<td>' + escapeHtml(r.solicitud_estado || '—') + '</td>';
@@ -102,6 +103,7 @@
             html += '<td>' + escapeHtml(r.id) + '</td>';
             html += '<td>' + escapeHtml(r.fecha_creacion) + '</td>';
             html += '<td>' + escapeHtml(r.cliente_nombre) + '</td>';
+            html += '<td>' + escapeHtml(r.cliente_email || '—') + '</td>';
             html += '<td>' + escapeHtml(r.cliente_sexo) + '</td>';
             html += '<td>' + escapeHtml(r.genero_label) + '</td>';
             html += '<td>' + escapeHtml(r.edad_calculada) + '</td>';
@@ -141,7 +143,7 @@
             .then(function (data) {
                 if (!data.success) {
                     document.querySelector('#tablaSegFin tbody').innerHTML =
-                        '<tr><td colspan="12" class="text-center text-danger">' + escapeHtml(data.message || 'Error') + '</td></tr>';
+                        '<tr><td colspan="13" class="text-center text-danger">' + escapeHtml(data.message || 'Error') + '</td></tr>';
                     destroyChart();
                     return;
                 }
