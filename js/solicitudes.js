@@ -2416,7 +2416,8 @@ function agregarVehiculo() {
         kilometraje: '',
         precio: '',
         abono_porcentaje: '',
-        abono_monto: ''
+        abono_monto: '',
+        unidad: ''
     });
     renderizarVehiculos();
 }
@@ -2594,6 +2595,14 @@ function renderizarVehiculos() {
                   </div>
                 <div class="card-body">
                     <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Unidad</label>
+                                <input type="text" class="form-control bg-light" readonly
+                                       value="${vehiculo.unidad || ''}"
+                                       placeholder="Se asigna al coincidir con una reserva">
+                            </div>
+                        </div>
                         <div class="col-md-4">
                             <div class="mb-3">
                                 <label class="form-label">Marca</label>

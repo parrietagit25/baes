@@ -505,6 +505,7 @@ class ReservasProformaProcessor
             $abonoPct = round(($abonoMonto / $precio) * 100, 2);
         }
         $movId = trim((string) ($linea['mov_id'] ?? ''));
+        $unidad = trim((string) ($linea['unidad'] ?? ''));
 
         $stmt = $this->pdo->prepare('SELECT * FROM vehiculos_solicitud WHERE solicitud_id = ? ORDER BY orden ASC, id ASC');
         $stmt->execute([$solicitudId]);
@@ -522,7 +523,7 @@ class ReservasProformaProcessor
             $upd = $this->pdo->prepare("
                 UPDATE vehiculos_solicitud
                 SET marca = ?, modelo = ?, anio = ?, kilometraje = ?, precio = ?,
-                    abono_monto = ?, abono_porcentaje = ?, apartado = 1, apartado_en = NOW(), mov_id_reserva = ?
+                    abono_monto = ?, abono_porcentaje = ?, unidad = ?, apartado = 1, apartado_en = NOW(), mov_id_reserva = ?
                 WHERE id = ?
             ");
             $upd->execute([
@@ -533,6 +534,7 @@ class ReservasProformaProcessor
                 $precio,
                 $abonoMonto,
                 $abonoPct,
+                $unidad !== '' ? $unidad : null,
                 $movId ?: null,
                 $vehiculoId,
             ]);
@@ -541,8 +543,8 @@ class ReservasProformaProcessor
             $ins = $this->pdo->prepare("
                 INSERT INTO vehiculos_solicitud (
                     solicitud_id, marca, modelo, anio, kilometraje, precio,
-                    abono_porcentaje, abono_monto, orden, apartado, apartado_en, mov_id_reserva
-                ) VALUES (?,?,?,?,?,?,?,?,?,1,NOW(),?)
+                    abono_porcentaje, abono_monto, unidad, orden, apartado, apartado_en, mov_id_reserva
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,1,NOW(),?)
             ");
             $ins->execute([
                 $solicitudId,
@@ -553,6 +555,7 @@ class ReservasProformaProcessor
                 $precio,
                 $abonoPct,
                 $abonoMonto,
+                $unidad !== '' ? $unidad : null,
                 $orden,
                 $movId ?: null,
             ]);

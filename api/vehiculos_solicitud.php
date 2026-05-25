@@ -80,8 +80,8 @@ function guardarVehiculos() {
         
         // Insertar nuevos vehículos
         $stmt = $pdo->prepare("
-            INSERT INTO vehiculos_solicitud (solicitud_id, marca, modelo, anio, kilometraje, precio, abono_porcentaje, abono_monto, orden)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO vehiculos_solicitud (solicitud_id, marca, modelo, anio, kilometraje, precio, abono_porcentaje, abono_monto, unidad, orden)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         
         foreach ($vehiculos as $index => $vehiculo) {
@@ -95,6 +95,7 @@ function guardarVehiculos() {
                     $abonoMonto = round((float) $precio * ((float) $abonoPct / 100), 2);
                 }
             }
+            $unidad = trim((string)($vehiculo['unidad'] ?? ''));
 
             $stmt->execute([
                 $solicitud_id,
@@ -105,6 +106,7 @@ function guardarVehiculos() {
                 $precio,
                 $abonoPct,
                 $abonoMonto,
+                $unidad !== '' ? $unidad : null,
                 $index + 1
             ]);
         }
