@@ -551,13 +551,17 @@ $puedeRefirma = $isAdmin || $isGestor;
             if (!puedeRefirma) return;
             refirmaRegistroId = $(this).data('id');
             $('#refirmaAlert').addClass('d-none').removeClass('alert-danger alert-success').text('');
+            $('#btnConfirmarRefirma').removeClass('d-none').prop('disabled', false);
             $('#refirmaModal').modal('show');
         });
 
         $('#btnConfirmarRefirma').on('click', function() {
             if (!puedeRefirma || !refirmaRegistroId) return;
+            var $btn = $(this);
+            if ($btn.prop('disabled')) return;
             var $al = $('#refirmaAlert');
             $al.addClass('d-none');
+            $btn.prop('disabled', true).addClass('d-none');
             $.ajax({
                 url: 'api/sol_financiamiento.php',
                 method: 'POST',
@@ -566,12 +570,17 @@ $puedeRefirma = $isAdmin || $isGestor;
             }).done(function(res) {
                 if (res && res.success) {
                     $al.removeClass('d-none alert-danger').addClass('alert-success').text(res.message || 'Listo.');
+                    setTimeout(function() {
+                        window.location.reload();
+                    }, 2000);
                 } else {
+                    $btn.prop('disabled', false).removeClass('d-none');
                     $al.removeClass('d-none alert-success').addClass('alert-danger').text((res && res.message) ? res.message : 'No se pudo generar el enlace.');
                 }
             }).fail(function(xhr) {
                 var msg = 'Error en la solicitud.';
                 if (xhr && xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
+                $btn.prop('disabled', false).removeClass('d-none');
                 $al.removeClass('d-none alert-success').addClass('alert-danger').text(msg);
             });
         });
