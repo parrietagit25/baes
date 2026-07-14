@@ -1,6 +1,7 @@
 <?php
 /**
- * Página pública: el cliente sube adjuntos con un token (24 h, reutilizable).
+ * Página pública: subir adjuntos con token (24 h, reutilizable).
+ * Subida por POST clásico (evita 403 de Cloudflare en fetch/XHR multipart).
  * Enlace: .../financiamiento/solicitar_adjuntos.php?t=TOKEN
  */
 require_once __DIR__ . '/../includes/configuracion_sistema_helper.php';
@@ -10,8 +11,58 @@ if (motus_mantenimiento_activo()) {
     exit();
 }
 
-$token = isset($_GET['t']) ? trim((string) $_GET['t']) : '';
-$apiBase = '../api/financiamiento_adjuntos_public.php';
+require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../api/financiamiento_adjuntos_public_lib.php';
+
+$token = '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $token = isset($_POST['t']) ? trim((string) $_POST['t']) : '';
+} else {
+    $token = isset($_GET['t']) ? trim((string) $_GET['t']) : '';
+}
+
+$alertaTipo = '';
+$alertaMsg = '';
+if (isset($_GET['ok']) && $_GET['ok'] === '1') {
+    $alertaTipo = 'ok';
+    $alertaMsg = isset($_GET['m']) ? (string) $_GET['m'] : 'Archivos subidos correctamente.';
+} elseif (isset($_GET['err']) && $_GET['err'] === '1') {
+    $alertaTipo = 'err';
+    $alertaMsg = isset($_GET['m']) ? (string) $_GET['m'] : 'No se pudo subir.';
+}
+
+$ctx = null;
+$errorToken = '';
+if ($token === '') {
+    $errorToken = 'Enlace incompleto.';
+} elseif (!isset($pdo) || !($pdo instanceof PDO)) {
+    $errorToken = 'Servicio no disponible.';
+} elseif (!finAdjTok_tablaExiste($pdo)) {
+    $errorToken = 'Función no disponible (falta migración de tokens).';
+} else {
+    $ctx = finAdjTok_resolver($pdo, $token);
+    if ($ctx === null) {
+        $errorToken = 'El enlace no es válido, fue reemplazado o ya caducó.';
+    }
+}
+
+// POST clásico: procesar y redirigir (PRG)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $ctx !== null) {
+    $resultado = finAdjTok_procesarSubida($pdo, $ctx, finAdjTok_filesFromRequest());
+    $q = 't=' . rawurlencode($token);
+    if (!empty($resultado['success'])) {
+        $q .= '&ok=1&m=' . rawurlencode((string) ($resultado['message'] ?? 'Listo.'));
+    } else {
+        $q .= '&err=1&m=' . rawurlencode((string) ($resultado['message'] ?? 'Error al subir.'));
+    }
+    header('Location: solicitar_adjuntos.php?' . $q);
+    exit;
+}
+
+$adjuntos = [];
+if ($ctx !== null) {
+    $adjuntos = finAdjTok_listarAdjuntos($pdo, $ctx['fr_id']);
+}
 ?>
 <!doctype html>
 <html lang="es">
@@ -31,139 +82,58 @@ $apiBase = '../api/financiamiento_adjuntos_public.php';
 <body>
   <div class="card-adj">
     <h1 class="h5 mb-2"><i class="fas fa-paperclip me-2"></i>Subir documentos</h1>
-    <p id="subtitulo" class="text-muted-soft small mb-3">Validando enlace…</p>
-    <div id="alerta" class="alert d-none" role="alert"></div>
+    <?php if ($errorToken !== ''): ?>
+      <p class="text-muted-soft small mb-3">No se pudo abrir el enlace.</p>
+      <div class="alert alert-danger" role="alert"><?php echo htmlspecialchars($errorToken, ENT_QUOTES, 'UTF-8'); ?></div>
+    <?php else: ?>
+      <p class="text-muted-soft small mb-3">
+        Hola, <?php echo htmlspecialchars($ctx['cliente_nombre'] !== '' ? $ctx['cliente_nombre'] : 'cliente', ENT_QUOTES, 'UTF-8'); ?>
+      </p>
+      <?php if ($alertaMsg !== ''): ?>
+        <div class="alert <?php echo $alertaTipo === 'ok' ? 'alert-success' : 'alert-danger'; ?>" role="alert">
+          <?php echo htmlspecialchars($alertaMsg, ENT_QUOTES, 'UTF-8'); ?>
+        </div>
+      <?php endif; ?>
 
-    <div id="bloqueOk" class="d-none">
-      <p class="small mb-3">Puede subir archivos (PDF, imágenes, Word/Excel; máx. 10 MB c/u). El enlace es válido hasta la fecha indicada; al volver a abrirlo verá lo que ya tiene cargado.</p>
+      <p class="small mb-3">Puede subir archivos (PDF, imágenes, Word/Excel; máx. 10 MB c/u). El enlace es válido hasta la fecha indicada; al volver a abrirlo verá los adjuntos que ya cargó.</p>
 
       <h2 class="h6">Adjuntos ya cargados</h2>
-      <div id="listaAdjuntos" class="list-adj mb-3">
-        <p class="text-muted-soft small mb-0">Ninguno aún.</p>
+      <div class="list-adj mb-3">
+        <?php if (!$adjuntos): ?>
+          <p class="text-muted-soft small mb-0">Ninguno aún.</p>
+        <?php else: ?>
+          <?php foreach ($adjuntos as $a): ?>
+            <?php
+              $nombre = $a['nombre_original'] !== '' ? $a['nombre_original'] : ('Adjunto #' . $a['id']);
+              $parts = array_filter([
+                  $a['tipo_archivo'] ?? '',
+                  !empty($a['tamano_archivo']) ? (round(((int) $a['tamano_archivo']) / 1024, 1) . ' KB') : '',
+                  $a['fecha_subida'] ?? '',
+              ], static function ($v) { return $v !== '' && $v !== null; });
+            ?>
+            <div class="item">
+              <div><i class="fas fa-file me-2"></i><strong><?php echo htmlspecialchars($nombre, ENT_QUOTES, 'UTF-8'); ?></strong></div>
+              <?php if ($parts): ?>
+                <div class="small text-muted-soft mt-1"><?php echo htmlspecialchars(implode(' · ', $parts), ENT_QUOTES, 'UTF-8'); ?></div>
+              <?php endif; ?>
+            </div>
+          <?php endforeach; ?>
+        <?php endif; ?>
       </div>
 
-      <form id="formAdjuntos" class="mb-2">
+      <form method="post" enctype="multipart/form-data" action="solicitar_adjuntos.php" class="mb-2">
+        <input type="hidden" name="t" value="<?php echo htmlspecialchars($token, ENT_QUOTES, 'UTF-8'); ?>">
         <label class="form-label small" for="inputFiles">Seleccionar archivos</label>
-        <input type="file" class="form-control form-control-sm mb-3" id="inputFiles" name="adjuntos[]" multiple
+        <input type="file" class="form-control form-control-sm mb-3" id="inputFiles" name="adjuntos[]" multiple required
                accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,image/*,application/pdf">
-        <button type="submit" class="btn btn-success" id="btnSubir" disabled>
+        <button type="submit" class="btn btn-success" id="btnSubir">
           <i class="fas fa-cloud-upload-alt me-1"></i>Subir adjuntos
         </button>
       </form>
-      <p id="hintCaduca" class="small text-muted-soft mb-0"></p>
-    </div>
+      <p class="small text-muted-soft mb-0">
+        Enlace válido hasta: <?php echo htmlspecialchars((string) $ctx['expires_at'], ENT_QUOTES, 'UTF-8'); ?>
+      </p>
+    <?php endif; ?>
   </div>
-
-  <script>
-    (function () {
-      var TOKEN = <?php echo json_encode($token, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
-      var API = <?php echo json_encode($apiBase, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
-
-      function showAlert(kind, msg) {
-        var el = document.getElementById('alerta');
-        el.className = 'alert ' + (kind === 'ok' ? 'alert-success' : 'alert-danger');
-        el.textContent = msg;
-        el.classList.remove('d-none');
-      }
-
-      function esc(s) {
-        var d = document.createElement('div');
-        d.textContent = s == null ? '' : String(s);
-        return d.innerHTML;
-      }
-
-      function fmtSize(n) {
-        if (n == null || n === '') return '';
-        n = Number(n);
-        if (!isFinite(n) || n <= 0) return '';
-        if (n < 1024) return n + ' B';
-        if (n < 1048576) return (n / 1024).toFixed(1) + ' KB';
-        return (n / 1048576).toFixed(1) + ' MB';
-      }
-
-      function renderAdjuntos(list) {
-        var box = document.getElementById('listaAdjuntos');
-        if (!list || !list.length) {
-          box.innerHTML = '<p class="text-muted-soft small mb-0">Ninguno aún.</p>';
-          return;
-        }
-        var html = '';
-        list.forEach(function (a) {
-          var meta = [a.tipo_archivo, fmtSize(a.tamano_archivo), a.fecha_subida].filter(Boolean).join(' · ');
-          html += '<div class="item">' +
-            '<div><i class="fas fa-file me-2"></i><strong>' + esc(a.nombre_original || ('Adjunto #' + a.id)) + '</strong></div>' +
-            (meta ? '<div class="small text-muted-soft mt-1">' + esc(meta) + '</div>' : '') +
-            '</div>';
-        });
-        box.innerHTML = html;
-      }
-
-      function aplicarDatos(data) {
-        var nombre = (data && data.cliente_nombre) ? data.cliente_nombre : 'cliente';
-        document.getElementById('subtitulo').textContent = 'Hola, ' + nombre;
-        document.getElementById('hintCaduca').textContent = data.expires_at
-          ? ('Enlace válido hasta: ' + data.expires_at)
-          : '';
-        renderAdjuntos(data.adjuntos || []);
-        document.getElementById('bloqueOk').classList.remove('d-none');
-      }
-
-      if (!TOKEN) {
-        showAlert('err', 'Enlace incompleto.');
-        document.getElementById('subtitulo').textContent = 'No se pudo abrir el enlace.';
-        return;
-      }
-
-      fetch(API + '?t=' + encodeURIComponent(TOKEN))
-        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
-        .then(function (res) {
-          if (!res.j || !res.j.success) {
-            showAlert('err', (res.j && res.j.message) ? res.j.message : 'Enlace no válido.');
-            document.getElementById('subtitulo').textContent = 'Enlace no disponible.';
-            return;
-          }
-          aplicarDatos(res.j.data || {});
-        })
-        .catch(function () {
-          showAlert('err', 'Error de conexión.');
-          document.getElementById('subtitulo').textContent = 'No se pudo validar el enlace.';
-        });
-
-      var input = document.getElementById('inputFiles');
-      var btn = document.getElementById('btnSubir');
-      input.addEventListener('change', function () {
-        btn.disabled = !(input.files && input.files.length);
-      });
-
-      document.getElementById('formAdjuntos').addEventListener('submit', function (e) {
-        e.preventDefault();
-        if (!input.files || !input.files.length) return;
-        btn.disabled = true;
-        var fd = new FormData();
-        fd.append('t', TOKEN);
-        for (var i = 0; i < input.files.length; i++) {
-          fd.append('adjuntos[]', input.files[i]);
-        }
-        fetch(API, { method: 'POST', body: fd })
-          .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
-          .then(function (res) {
-            if (!res.j || !res.j.success) {
-              showAlert('err', (res.j && res.j.message) ? res.j.message : 'No se pudo subir.');
-              if (res.j && res.j.data) aplicarDatos(res.j.data);
-              btn.disabled = !(input.files && input.files.length);
-              return;
-            }
-            showAlert('ok', res.j.message || 'Archivos subidos.');
-            if (res.j.data) aplicarDatos(res.j.data);
-            input.value = '';
-            btn.disabled = true;
-          })
-          .catch(function () {
-            showAlert('err', 'Error de conexión al subir.');
-            btn.disabled = !(input.files && input.files.length);
-          });
-      });
-    })();
-  </script>
 </body>
 </html>
