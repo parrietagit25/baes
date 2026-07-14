@@ -28,12 +28,17 @@ if (!empty($solicitud['promocion'])) {
 $content .= '
     </div>
     
-    <p><strong>Próximos Pasos:</strong></p>
-    <ul>
-        <li>Nuestro equipo se pondrá en contacto con usted para coordinar la documentación necesaria</li>
-        <li>Se programará una cita para la firma de documentos</li>
-        <li>Una vez completada la documentación, procederemos con la entrega del vehículo</li>
-    </ul>
+    <div class="info-box" style="border-left: 4px solid #dc3545; background: #fff8f8;">
+        <p style="margin-top:0;"><strong>IMPORTANTE — Próximos pasos</strong></p>
+        <ul style="margin-bottom:0; padding-left: 1.25rem;">
+            <li>Nuestro equipo se pondrá en contacto con usted para acompañarle en los próximos pasos.</li>
+            <li>Reservar la unidad de su preferencia.</li>
+            <li>Completar la documentación requerida para la unidad.</li>
+            <li>Confirmar su disponibilidad para la firma de documentos.</li>
+            <li>Se programará una cita para la firma de documentos.</li>
+            <li>Trabajamos con las principales aseguradoras del país; le haremos llegar las mejores propuestas de pólizas.</li>
+        </ul>
+    </div>
     
     <p>Si tiene alguna pregunta, no dude en contactarnos.</p>
     
