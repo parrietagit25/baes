@@ -48,6 +48,9 @@ $isVendedor = in_array('ROLE_VENDEDOR', $_SESSION['user_roles']);
         <a class="nav-link <?php echo ($current_page == 'subir_reporte_reservas.php') ? 'active' : ''; ?>" href="subir_reporte_reservas.php">
             <i class="fas fa-file-upload me-2"></i>Subir Reporte de Reservas
         </a>
+        <a class="nav-link <?php echo ($current_page == 'ferias.php' || $current_page == 'feria_panel.php') ? 'active' : ''; ?>" href="ferias.php">
+            <i class="fas fa-store me-2"></i>Ferias
+        </a>
         <?php endif; ?>
         
         <!-- Gestión de Usuarios - Solo Admin -->

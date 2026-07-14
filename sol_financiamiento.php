@@ -334,8 +334,8 @@ $puedeRefirma = $isAdmin || $isGestor;
             }
         });
 
-        $(document).on('click', '.btn-ver-detalle', function() {
-            var id = $(this).data('id');
+        function abrirDetalleRegistro(id) {
+            if (!id) return;
             var $content = $('#detalleContent');
             $content.html('<p class="text-muted">Cargando...</p>');
             $('#detalleModal').modal('show');
@@ -392,7 +392,23 @@ $puedeRefirma = $isAdmin || $isGestor;
                 .fail(function() {
                     $content.html('<p class="text-danger">Error al cargar.</p>');
                 });
+        }
+
+        $(document).on('click', '.btn-ver-detalle', function() {
+            abrirDetalleRegistro($(this).data('id'));
         });
+
+        // Deep-link desde panel Ferias: sol_financiamiento.php?abrir_registro=ID
+        var urlParamsFin = new URLSearchParams(window.location.search);
+        var abrirRegistroId = urlParamsFin.get('abrir_registro');
+        if (abrirRegistroId && /^\d+$/.test(abrirRegistroId)) {
+            setTimeout(function () {
+                abrirDetalleRegistro(parseInt(abrirRegistroId, 10));
+                try {
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                } catch (e) { /* ignore */ }
+            }, 400);
+        }
 
         $(document).on('click', '.btn-borrar-registro', function() {
             if (!esAdmin) {
