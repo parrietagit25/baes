@@ -2371,6 +2371,36 @@ if ($isBanco && !$isAdmin) {
                 .replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;');
         }
+
+        function destruirDataTableRespuestas(selector) {
+            if (!$.fn.DataTable || !$.fn.DataTable.isDataTable(selector)) return;
+            $(selector).DataTable().destroy();
+        }
+
+        function initDataTableRespuestas(selector) {
+            if (!$.fn.DataTable || !$(selector).length) return;
+            destruirDataTableRespuestas(selector);
+            $(selector).DataTable({
+                language: { url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json' },
+                pageLength: 10,
+                lengthMenu: [[10, 25, 50, -1], [10, 25, 50, 'Todos']],
+                order: [[0, 'desc']],
+                scrollX: true,
+                autoWidth: false,
+                columnDefs: [
+                    { orderable: false, targets: -1 }
+                ]
+            });
+        }
+
+        function ajustarDataTableEnModal(modalSelector, tableSelector) {
+            $(modalSelector).one('shown.bs.modal', function() {
+                if ($.fn.DataTable && $.fn.DataTable.isDataTable(tableSelector)) {
+                    $(tableSelector).DataTable().columns.adjust();
+                }
+            });
+        }
+
         function bloqueEncabezadoClienteRespuestas(solicitudId, solicitudCliente) {
             var sc = solicitudCliente || {};
             var nombre = escapeHtmlText(sc.nombre_cliente || '');
@@ -2475,14 +2505,15 @@ if ($isBanco && !$isAdmin) {
                     var headerHtml = bloqueEncabezadoClienteRespuestas(solicitudId, response.solicitud_cliente);
                     var evaluacionSeleccionada = response.evaluacion_seleccionada;
                     var comentarioSeleccionGlobal = response.comentario_seleccion_propuesta || '';
+                    destruirDataTableRespuestas('#tablaRespuestasBanco');
                     if (response.data.length > 0) {
-                        let html = '<div class="table-responsive"><table class="table table-striped">';
+                        let html = '<div class="table-responsive"><table id="tablaRespuestasBanco" class="table table-striped table-hover w-100">';
                         html += '<thead><tr><th>Fecha</th><th>Vehículo</th><th>Decisión</th><th>Tasa %</th><th>Valor a Financiar</th><th>Abono</th><th>Plazo</th><th>Letra mensual</th><th>Letra quincenal</th><th>Promoción</th><th>Comentarios</th><th>Comentario al seleccionar</th><th>Motivo reevaluación</th><th>Selección</th></tr></thead>';
                         html += '<tbody>';
                         
                         response.data.forEach(function(evaluacion) {
                             html += '<tr>';
-                            html += '<td>' + new Date(evaluacion.fecha_evaluacion).toLocaleString('es-PA') + '</td>';
+                            html += '<td data-order="' + escapeHtmlText(evaluacion.fecha_evaluacion || '') + '">' + new Date(evaluacion.fecha_evaluacion).toLocaleString('es-PA') + '</td>';
                             html += '<td>' + (evaluacion.vehiculo_marca ? `${evaluacion.vehiculo_marca} ${evaluacion.vehiculo_modelo || ''}`.trim() : '-') + '</td>';
                             html += '<td><span class="badge badge-estado estado-revision">' + evaluacion.decision.toUpperCase().replace('_', ' ') + '</span></td>';
                             html += '<td>' + (evaluacion.tasa_bancaria != null && evaluacion.tasa_bancaria !== '' ? parseFloat(evaluacion.tasa_bancaria).toLocaleString('es-PA', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%' : '-') + '</td>';
@@ -2510,11 +2541,13 @@ if ($isBanco && !$isAdmin) {
                         
                         html += '</tbody></table></div>';
                         $('#respuestasBancoContent').html(headerHtml + html);
+                        initDataTableRespuestas('#tablaRespuestasBanco');
                     } else {
                         $('#respuestasBancoContent').html(headerHtml + '<div class="alert alert-info">No hay respuestas registradas para esta solicitud.</div>');
                     }
                     
                     $('#modalRespuestasBanco').modal('show');
+                    ajustarDataTableEnModal('#modalRespuestasBanco', '#tablaRespuestasBanco');
                 },
                 error: function() {
                     $('#respuestasBancoContent').html('<div class="alert alert-danger">Error al cargar las respuestas del banco.</div>');
@@ -2547,6 +2580,7 @@ if ($isBanco && !$isAdmin) {
                         return;
                     }
                     var headerHtml = bloqueEncabezadoClienteRespuestas(solicitudId, response.solicitud_cliente);
+                    destruirDataTableRespuestas('#tablaRespuestasBancoAdmin');
                     if (response.data.length > 0) {
                           const evaluacionSeleccionada = response.evaluacion_seleccionada;
                           const comentarioSeleccionGlobal = response.comentario_seleccion_propuesta || '';
@@ -2560,7 +2594,7 @@ if ($isBanco && !$isAdmin) {
                               html += '<i class="fas fa-unlock me-1"></i>Activar Nuevamente</button></div>';
                           }
 
-                          html += '<div class="table-responsive"><table class="table table-striped">';
+                          html += '<div class="table-responsive"><table id="tablaRespuestasBancoAdmin" class="table table-striped table-hover w-100">';
                           html += '<thead><tr><th>Fecha</th><th>Banco</th><th>Vehículo</th><th>Decisión</th><th>Tasa %</th><th>Valor a Financiar</th><th>Abono</th><th>Plazo</th><th>Letra mensual</th><th>Letra quincenal</th><th>Promoción</th><th>Comentarios</th><th>Comentario al seleccionar</th><th>Motivo reevaluación</th>';
                           if (mostrarAcciones) {
                               html += '<th>Acciones</th>';
@@ -2572,7 +2606,7 @@ if ($isBanco && !$isAdmin) {
                           
                           response.data.forEach(function(evaluacion) {
                               html += '<tr>';
-                              html += '<td>' + new Date(evaluacion.fecha_evaluacion).toLocaleString('es-PA') + '</td>';
+                              html += '<td data-order="' + escapeHtmlText(evaluacion.fecha_evaluacion || '') + '">' + new Date(evaluacion.fecha_evaluacion).toLocaleString('es-PA') + '</td>';
                               html += '<td>' + (evaluacion.nombre ? `${evaluacion.nombre} ${evaluacion.apellido || ''}`.trim() : '-') + '</td>';
                               html += '<td>' + (evaluacion.vehiculo_marca ? `${evaluacion.vehiculo_marca} ${evaluacion.vehiculo_modelo || ''}`.trim() : '-') + '</td>';
                               html += '<td><span class="badge badge-estado estado-revision">' + evaluacion.decision.toUpperCase().replace('_', ' ') + '</span></td>';
@@ -2606,11 +2640,13 @@ if ($isBanco && !$isAdmin) {
                           
                           html += '</tbody></table></div>';
                           $('#respuestasBancoAdminContent').html(headerHtml + html);
+                          initDataTableRespuestas('#tablaRespuestasBancoAdmin');
                     } else {
                         $('#respuestasBancoAdminContent').html(headerHtml + '<div class="alert alert-info">No hay respuestas registradas para esta solicitud.</div>');
                     }
                     
                     $('#modalRespuestasBancoAdmin').modal('show');
+                    ajustarDataTableEnModal('#modalRespuestasBancoAdmin', '#tablaRespuestasBancoAdmin');
                 },
                 error: function() {
                     $('#respuestasBancoAdminContent').html('<div class="alert alert-danger">Error al cargar las respuestas del banco.</div>');
