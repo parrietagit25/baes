@@ -16,6 +16,26 @@ if (!isset($_SESSION['user_id'])) {
 
 require_once '../config/database.php';
 
+function evaluaciones_tiene_letra_quincenal(PDO $pdo): bool
+{
+    static $cache = null;
+    if ($cache !== null) {
+        return $cache;
+    }
+    try {
+        $db = $pdo->query('SELECT DATABASE()')->fetchColumn();
+        $st = $pdo->prepare("
+            SELECT COUNT(*) FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'evaluaciones_banco' AND COLUMN_NAME = 'letra_quincenal'
+        ");
+        $st->execute([$db]);
+        $cache = ((int) $st->fetchColumn()) > 0;
+    } catch (Throwable $e) {
+        $cache = false;
+    }
+    return $cache;
+}
+
 $method = $_SERVER['REQUEST_METHOD'];
 
 switch ($method) {
@@ -220,25 +240,51 @@ function guardarEvaluacion() {
         }
         
         // Guardar evaluación en la tabla de historial
-        $stmt = $pdo->prepare("
-            INSERT INTO evaluaciones_banco 
-            (solicitud_id, vehiculo_id, usuario_banco_id, decision, valor_financiar, abono, plazo, letra, promocion, tasa_bancaria, comentarios)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ");
-        
-        $stmt->execute([
-            $solicitudId,
-            !empty($_POST['vehiculo_evaluacion']) ? $_POST['vehiculo_evaluacion'] : null,
-            $asignacion['id'],
-            $decision,
-            $_POST['valor_financiar'] ?? null,
-            $_POST['abono_evaluacion'] ?? null,
-            $_POST['plazo_evaluacion'] ?? null,
-            $_POST['letra_evaluacion'] ?? null,
-            $_POST['promocion_evaluacion'] ?? null,
-            $tasaBancaria,
-            $_POST['comentarios_evaluacion'] ?? null
-        ]);
+        $letraQuincenal = $_POST['letra_quincenal_evaluacion'] ?? null;
+        if ($letraQuincenal === '') {
+            $letraQuincenal = null;
+        }
+
+        if (evaluaciones_tiene_letra_quincenal($pdo)) {
+            $stmt = $pdo->prepare("
+                INSERT INTO evaluaciones_banco 
+                (solicitud_id, vehiculo_id, usuario_banco_id, decision, valor_financiar, abono, plazo, letra, letra_quincenal, promocion, tasa_bancaria, comentarios)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([
+                $solicitudId,
+                !empty($_POST['vehiculo_evaluacion']) ? $_POST['vehiculo_evaluacion'] : null,
+                $asignacion['id'],
+                $decision,
+                $_POST['valor_financiar'] ?? null,
+                $_POST['abono_evaluacion'] ?? null,
+                $_POST['plazo_evaluacion'] ?? null,
+                $_POST['letra_evaluacion'] ?? null,
+                $letraQuincenal,
+                $_POST['promocion_evaluacion'] ?? null,
+                $tasaBancaria,
+                $_POST['comentarios_evaluacion'] ?? null
+            ]);
+        } else {
+            $stmt = $pdo->prepare("
+                INSERT INTO evaluaciones_banco 
+                (solicitud_id, vehiculo_id, usuario_banco_id, decision, valor_financiar, abono, plazo, letra, promocion, tasa_bancaria, comentarios)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([
+                $solicitudId,
+                !empty($_POST['vehiculo_evaluacion']) ? $_POST['vehiculo_evaluacion'] : null,
+                $asignacion['id'],
+                $decision,
+                $_POST['valor_financiar'] ?? null,
+                $_POST['abono_evaluacion'] ?? null,
+                $_POST['plazo_evaluacion'] ?? null,
+                $_POST['letra_evaluacion'] ?? null,
+                $_POST['promocion_evaluacion'] ?? null,
+                $tasaBancaria,
+                $_POST['comentarios_evaluacion'] ?? null
+            ]);
+        }
         
         $evaluacionId = $pdo->lastInsertId();
         

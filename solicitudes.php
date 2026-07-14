@@ -1394,19 +1394,30 @@ if ($isBanco && !$isAdmin) {
                                         </div>
                                     </div>
                                     <div class="row">
-                                        <div class="col-md-6">
+                                        <div class="col-md-4">
                                             <div class="mb-3">
                                                 <label for="plazo_evaluacion" class="form-label">Plazo (Meses)</label>
                                                 <input type="number" class="form-control" id="plazo_evaluacion" name="plazo_evaluacion" min="1" disabled>
                                             </div>
                                         </div>
-                                        <div class="col-md-6">
+                                        <div class="col-md-4">
                                             <div class="mb-3">
-                                                <label for="letra_evaluacion" class="form-label">Letra (Monto)</label>
+                                                <label for="letra_evaluacion" class="form-label">Letra (monto mensual)</label>
                                                 <div class="input-group">
                                                     <span class="input-group-text">$</span>
-                                                    <input type="number" class="form-control" id="letra_evaluacion" name="letra_evaluacion" step="0.01" min="0" disabled>
+                                                    <input type="number" class="form-control" id="letra_evaluacion" name="letra_evaluacion" step="0.01" min="0" disabled readonly>
                                                 </div>
+                                                <div class="form-text">Se calcula con valor a financiar, tasa y plazo.</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label for="letra_quincenal_evaluacion" class="form-label">Letra (monto quincenal)</label>
+                                                <div class="input-group">
+                                                    <span class="input-group-text">$</span>
+                                                    <input type="number" class="form-control" id="letra_quincenal_evaluacion" name="letra_quincenal_evaluacion" step="0.01" min="0" disabled readonly>
+                                                </div>
+                                                <div class="form-text">Se calcula automáticamente (amortización quincenal).</div>
                                             </div>
                                         </div>
                                     </div>
@@ -1746,14 +1757,81 @@ if ($isBanco && !$isAdmin) {
         }
 
         // Al cambiar el vehículo, refrescar datos en Información de la Solicitud
+        // y sugerir abono desde el vehículo seleccionado
         $(document).on('change', '#vehiculo_evaluacion', function() {
-            renderAprobacionSolicitudInfo($(this).val());
+            var vid = $(this).val();
+            renderAprobacionSolicitudInfo(vid);
+            if (!vid) return;
+            for (var i = 0; i < aprobacionVehiculosCache.length; i++) {
+                if (String(aprobacionVehiculosCache[i].id) === String(vid)) {
+                    var v = aprobacionVehiculosCache[i];
+                    if (v.abono_monto != null && v.abono_monto !== '' && !$('#abono_evaluacion').prop('disabled')) {
+                        $('#abono_evaluacion').val(v.abono_monto);
+                    }
+                    if (v.precio != null && v.precio !== '' && !$('#valor_financiar').prop('disabled')) {
+                        var precio = parseFloat(v.precio) || 0;
+                        var abono = parseFloat(v.abono_monto) || 0;
+                        var financiable = Math.max(0, precio - abono);
+                        if (financiable > 0) {
+                            $('#valor_financiar').val(financiable.toFixed(2));
+                        }
+                    }
+                    calcularLetrasEvaluacion();
+                    break;
+                }
+            }
+        });
+
+        /**
+         * Cuota francesa: principal, tasa anual %, periodos, periodos/año.
+         */
+        function calcCuotaAmortizacion(principal, tasaAnualPct, nPeriodos, periodosPorAnio) {
+            principal = parseFloat(principal);
+            tasaAnualPct = parseFloat(tasaAnualPct);
+            nPeriodos = parseInt(nPeriodos, 10);
+            if (!isFinite(principal) || principal <= 0 || !isFinite(nPeriodos) || nPeriodos <= 0) {
+                return null;
+            }
+            if (!isFinite(tasaAnualPct) || tasaAnualPct < 0) {
+                tasaAnualPct = 0;
+            }
+            if (tasaAnualPct === 0) {
+                return principal / nPeriodos;
+            }
+            var r = (tasaAnualPct / 100) / periodosPorAnio;
+            var factor = Math.pow(1 + r, nPeriodos);
+            return principal * (r * factor) / (factor - 1);
+        }
+
+        function calcularLetrasEvaluacion() {
+            var valor = parseFloat($('#valor_financiar').val());
+            var plazoMeses = parseInt($('#plazo_evaluacion').val(), 10);
+            var tasa = parseFloat($('#tasa_bancaria_evaluacion').val());
+
+            if (!isFinite(valor) || valor <= 0 || !isFinite(plazoMeses) || plazoMeses <= 0) {
+                $('#letra_evaluacion').val('');
+                $('#letra_quincenal_evaluacion').val('');
+                return;
+            }
+            if (!isFinite(tasa) || tasa < 0) {
+                tasa = 0;
+            }
+
+            var mensual = calcCuotaAmortizacion(valor, tasa, plazoMeses, 12);
+            var quincenal = calcCuotaAmortizacion(valor, tasa, plazoMeses * 2, 24);
+
+            $('#letra_evaluacion').val(mensual != null ? mensual.toFixed(2) : '');
+            $('#letra_quincenal_evaluacion').val(quincenal != null ? quincenal.toFixed(2) : '');
+        }
+
+        $(document).on('input change', '#valor_financiar, #abono_evaluacion, #plazo_evaluacion, #tasa_bancaria_evaluacion', function() {
+            calcularLetrasEvaluacion();
         });
 
         // Función para mostrar/ocultar campos según la decisión
         window.mostrarCamposDecision = function(decision) {
             // Ocultar todos los campos primero
-            const campos = ['#valor_financiar', '#abono_evaluacion', '#plazo_evaluacion', '#letra_evaluacion', '#promocion_evaluacion', '#comentarios_evaluacion'];
+            const campos = ['#valor_financiar', '#abono_evaluacion', '#plazo_evaluacion', '#letra_evaluacion', '#letra_quincenal_evaluacion', '#promocion_evaluacion', '#comentarios_evaluacion'];
             campos.forEach(function(campo) {
                 $(campo).prop('disabled', true);
                 $(campo).prop('required', false);
@@ -1767,12 +1845,17 @@ if ($isBanco && !$isAdmin) {
                 // Solo habilitar comentarios
                 $('#comentarios_evaluacion').prop('disabled', false);
                 $('#comentarios_evaluacion').prop('required', true);
+                $('#letra_evaluacion').val('');
+                $('#letra_quincenal_evaluacion').val('');
             } else if (decision === 'preaprobado' || decision === 'aprobado' || decision === 'aprobado_condicional') {
-                // Habilitar todos los campos
-                campos.forEach(function(campo) {
+                // Habilitar entrada; letras se calculan (quedan readonly)
+                ['#valor_financiar', '#abono_evaluacion', '#plazo_evaluacion', '#promocion_evaluacion', '#comentarios_evaluacion'].forEach(function(campo) {
                     $(campo).prop('disabled', false);
                 });
+                $('#letra_evaluacion').prop('disabled', false).prop('readonly', true);
+                $('#letra_quincenal_evaluacion').prop('disabled', false).prop('readonly', true);
                 $('#comentarios_evaluacion').prop('required', false);
+                calcularLetrasEvaluacion();
             } else {
                 // Ocultar contenedor si no hay selección
                 $('#camposDecision').hide();
@@ -2302,7 +2385,7 @@ if ($isBanco && !$isAdmin) {
                     var comentarioSeleccionGlobal = response.comentario_seleccion_propuesta || '';
                     if (response.data.length > 0) {
                         let html = '<div class="table-responsive"><table class="table table-striped">';
-                        html += '<thead><tr><th>Fecha</th><th>Vehículo</th><th>Decisión</th><th>Tasa %</th><th>Valor a Financiar</th><th>Abono</th><th>Plazo</th><th>Letra</th><th>Promoción</th><th>Comentarios</th><th>Comentario al seleccionar</th><th>Motivo reevaluación</th><th>Selección</th></tr></thead>';
+                        html += '<thead><tr><th>Fecha</th><th>Vehículo</th><th>Decisión</th><th>Tasa %</th><th>Valor a Financiar</th><th>Abono</th><th>Plazo</th><th>Letra mensual</th><th>Letra quincenal</th><th>Promoción</th><th>Comentarios</th><th>Comentario al seleccionar</th><th>Motivo reevaluación</th><th>Selección</th></tr></thead>';
                         html += '<tbody>';
                         
                         response.data.forEach(function(evaluacion) {
@@ -2315,6 +2398,7 @@ if ($isBanco && !$isAdmin) {
                             html += '<td>' + (evaluacion.abono ? '$' + parseFloat(evaluacion.abono).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
                             html += '<td>' + (evaluacion.plazo ? evaluacion.plazo + ' meses' : '-') + '</td>';
                             html += '<td>' + (evaluacion.letra ? '$' + parseFloat(evaluacion.letra).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
+                            html += '<td>' + (evaluacion.letra_quincenal ? '$' + parseFloat(evaluacion.letra_quincenal).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
                             html += '<td>' + (evaluacion.promocion || '-') + '</td>';
                             html += '<td>' + (evaluacion.comentarios || '-') + '</td>';
                             var textoSeleccionFila = (evaluacionSeleccionada && String(evaluacion.id) === String(evaluacionSeleccionada)) ? comentarioSeleccionGlobal : '';
@@ -2377,7 +2461,7 @@ if ($isBanco && !$isAdmin) {
                           const mostrarAcciones = !evaluacionSeleccionada; // No mostrar acciones si hay una evaluación seleccionada
                           
                           let html = '<div class="table-responsive"><table class="table table-striped">';
-                          html += '<thead><tr><th>Fecha</th><th>Banco</th><th>Vehículo</th><th>Decisión</th><th>Tasa %</th><th>Valor a Financiar</th><th>Abono</th><th>Plazo</th><th>Letra</th><th>Promoción</th><th>Comentarios</th><th>Comentario al seleccionar</th><th>Motivo reevaluación</th>';
+                          html += '<thead><tr><th>Fecha</th><th>Banco</th><th>Vehículo</th><th>Decisión</th><th>Tasa %</th><th>Valor a Financiar</th><th>Abono</th><th>Plazo</th><th>Letra mensual</th><th>Letra quincenal</th><th>Promoción</th><th>Comentarios</th><th>Comentario al seleccionar</th><th>Motivo reevaluación</th>';
                           if (mostrarAcciones) {
                               html += '<th>Acciones</th>';
                           } else {
@@ -2397,6 +2481,7 @@ if ($isBanco && !$isAdmin) {
                               html += '<td>' + (evaluacion.abono ? '$' + parseFloat(evaluacion.abono).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
                               html += '<td>' + (evaluacion.plazo ? evaluacion.plazo + ' meses' : '-') + '</td>';
                               html += '<td>' + (evaluacion.letra ? '$' + parseFloat(evaluacion.letra).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
+                              html += '<td>' + (evaluacion.letra_quincenal ? '$' + parseFloat(evaluacion.letra_quincenal).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
                               html += '<td>' + (evaluacion.promocion || '-') + '</td>';
                               html += '<td>' + (evaluacion.comentarios || '-') + '</td>';
                               var textoSel = (evaluacionSeleccionada && String(evaluacion.id) === String(evaluacionSeleccionada)) ? comentarioSeleccionGlobal : '';
