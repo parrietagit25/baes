@@ -1604,12 +1604,84 @@ if ($isBanco && !$isAdmin) {
           // Pasar ID del usuario a JavaScript
           window.userId = <?php echo $_SESSION['user_id']; ?>;
 
+        // Cache vehículos del modal de decisión (usuario banco)
+        var aprobacionVehiculosCache = [];
+        var aprobacionSolicitudCache = null;
+
+        function aprobacionFmtMoney(v) {
+            if (v === null || v === undefined || v === '') return '—';
+            var n = parseFloat(v);
+            if (!isFinite(n)) return '—';
+            return '$' + n.toLocaleString('es-PA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function aprobacionEsc(s) {
+            if (s == null || s === '') return '';
+            return String(s)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        function renderAprobacionSolicitudInfo(vehiculoId) {
+            var solicitud = aprobacionSolicitudCache || {};
+            var html = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <strong>Cliente:</strong> ${aprobacionEsc(solicitud.nombre_cliente || '—')}<br>
+                        <strong>Cédula:</strong> ${aprobacionEsc(solicitud.cedula || '—')}<br>
+                        <strong>Gestor:</strong> ${aprobacionEsc((solicitud.gestor_nombre || '') + ' ' + (solicitud.gestor_apellido || '')).trim() || '—'}<br>
+                        <strong>Estado:</strong> <span class="badge bg-info">${aprobacionEsc(solicitud.estado || '—')}</span>
+                    </div>
+                    <div class="col-md-6" id="aprobacionVehiculoDetalle">
+            `;
+
+            var veh = null;
+            if (vehiculoId) {
+                for (var i = 0; i < aprobacionVehiculosCache.length; i++) {
+                    if (String(aprobacionVehiculosCache[i].id) === String(vehiculoId)) {
+                        veh = aprobacionVehiculosCache[i];
+                        break;
+                    }
+                }
+            }
+
+            if (veh) {
+                var abonoPct = (veh.abono_porcentaje != null && veh.abono_porcentaje !== '')
+                    ? aprobacionEsc(veh.abono_porcentaje) + '%'
+                    : '—';
+                html += `
+                        <div class="border rounded p-2 bg-light">
+                            <div class="fw-semibold mb-1"><i class="fas fa-car me-1"></i>Vehículo seleccionado</div>
+                            <strong>Marca:</strong> ${aprobacionEsc(veh.marca || '—')}<br>
+                            <strong>Modelo:</strong> ${aprobacionEsc(veh.modelo || '—')}<br>
+                            <strong>Año:</strong> ${aprobacionEsc(veh.anio || '—')}<br>
+                            <strong>Kilometraje:</strong> ${aprobacionEsc(veh.kilometraje || '—')}<br>
+                            <strong>Precio:</strong> ${aprobacionFmtMoney(veh.precio)}<br>
+                            <strong>Abono:</strong> ${abonoPct}<br>
+                            <strong>Monto abono:</strong> ${aprobacionFmtMoney(veh.abono_monto)}
+                        </div>
+                `;
+            } else {
+                html += '<span class="text-muted">Seleccione un vehículo para ver sus datos.</span>';
+            }
+
+            html += `
+                    </div>
+                </div>
+            `;
+            $('#aprobacionSolicitudInfo').html(html);
+        }
+
         // Función para abrir modal de aprobación
         function abrirModalAprobacion(solicitudId) {
             // Limpiar formulario
             $('#aprobacionForm')[0].reset();
             $('#camposDecision').hide();
             $('#aprobacion_solicitud_id').val(solicitudId);
+            aprobacionVehiculosCache = [];
+            aprobacionSolicitudCache = null;
             
             // Obtener información de la solicitud
             $.ajax({
@@ -1619,24 +1691,8 @@ if ($isBanco && !$isAdmin) {
                 dataType: 'json',
                 success: function(response) {
                     if (response.success) {
-                        const solicitud = response.data;
-                        
-                        // Mostrar información de la solicitud
-                        $('#aprobacionSolicitudInfo').html(`
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <strong>Cliente:</strong> ${solicitud.nombre_cliente}<br>
-                                    <strong>Cédula:</strong> ${solicitud.cedula}<br>
-                                    <strong>Vehículo:</strong> ${solicitud.marca_auto || 'N/A'} ${solicitud.modelo_auto || ''}
-                                </div>
-                                <div class="col-md-6">
-                                    <strong>Gestor:</strong> ${solicitud.gestor_nombre} ${solicitud.gestor_apellido}<br>
-                                    <strong>Estado:</strong> <span class="badge bg-info">${solicitud.estado}</span><br>
-                                    <strong>Precio:</strong> $${solicitud.precio_especial || 'N/A'}
-                                </div>
-                            </div>
-                        `);
-                        
+                        aprobacionSolicitudCache = response.data;
+                        renderAprobacionSolicitudInfo(null);
                         // Cargar vehículos
                         cargarVehiculosParaEvaluacion(solicitudId);
                     } else {
@@ -1658,12 +1714,14 @@ if ($isBanco && !$isAdmin) {
                 dataType: 'json',
                 success: function(response) {
                     if (response.success) {
+                        aprobacionVehiculosCache = Array.isArray(response.data) ? response.data : [];
                         const $select = $('#vehiculo_evaluacion');
                         $select.empty().append('<option value="">Seleccione un vehículo</option>');
                         
-                        if (response.data && response.data.length > 0) {
-                            response.data.forEach(function(vehiculo) {
-                                const text = `${vehiculo.marca || 'N/A'} ${vehiculo.modelo || ''}`;
+                        if (aprobacionVehiculosCache.length > 0) {
+                            aprobacionVehiculosCache.forEach(function(vehiculo) {
+                                const text = `${vehiculo.marca || 'N/A'} ${vehiculo.modelo || ''}`.trim()
+                                    + (vehiculo.anio ? ` (${vehiculo.anio})` : '');
                                 $select.append(`<option value="${vehiculo.id}">${text}</option>`);
                             });
                         } else {
@@ -1672,17 +1730,25 @@ if ($isBanco && !$isAdmin) {
                         
                         // Mostrar modal después de cargar vehículos
                         $('#aprobacionModal').modal('show');
+                        renderAprobacionSolicitudInfo($select.val());
                     } else {
+                        aprobacionVehiculosCache = [];
                         $('#vehiculo_evaluacion').empty().append('<option value="">Error al cargar vehículos</option>');
                         $('#aprobacionModal').modal('show');
                     }
                 },
                 error: function() {
+                    aprobacionVehiculosCache = [];
                     $('#vehiculo_evaluacion').empty().append('<option value="">Error al cargar vehículos</option>');
                     $('#aprobacionModal').modal('show');
                 }
             });
         }
+
+        // Al cambiar el vehículo, refrescar datos en Información de la Solicitud
+        $(document).on('change', '#vehiculo_evaluacion', function() {
+            renderAprobacionSolicitudInfo($(this).val());
+        });
 
         // Función para mostrar/ocultar campos según la decisión
         window.mostrarCamposDecision = function(decision) {
