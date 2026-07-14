@@ -1374,7 +1374,7 @@ if ($isBanco && !$isAdmin) {
                                 </div>
                                 <div class="card-body">
                                     <div class="row">
-                                        <div class="col-md-6">
+                                        <div class="col-md-4">
                                             <div class="mb-3">
                                                 <label for="valor_financiar" class="form-label">Valor a Financiar</label>
                                                 <div class="input-group">
@@ -1383,9 +1383,19 @@ if ($isBanco && !$isAdmin) {
                                                 </div>
                                             </div>
                                         </div>
-                                        <div class="col-md-6">
+                                        <div class="col-md-4">
                                             <div class="mb-3">
-                                                <label for="abono_evaluacion" class="form-label">Abono</label>
+                                                <label for="abono_pct_evaluacion" class="form-label">Abono %</label>
+                                                <div class="input-group">
+                                                    <input type="number" class="form-control" id="abono_pct_evaluacion" name="abono_pct_evaluacion" step="0.01" min="0" max="100" disabled placeholder="0.00">
+                                                    <span class="input-group-text">%</span>
+                                                </div>
+                                                <div class="form-text">Calcula el Abono $ según el precio del vehículo.</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label for="abono_evaluacion" class="form-label">Abono $</label>
                                                 <div class="input-group">
                                                     <span class="input-group-text">$</span>
                                                     <input type="number" class="form-control" id="abono_evaluacion" name="abono_evaluacion" step="0.01" min="0" disabled>
@@ -1684,8 +1694,8 @@ if ($isBanco && !$isAdmin) {
                             <strong>Año:</strong> ${aprobacionEsc(veh.anio || '—')}<br>
                             <strong>Kilometraje:</strong> ${aprobacionEsc(veh.kilometraje || '—')}<br>
                             <strong>Precio:</strong> ${aprobacionFmtMoney(veh.precio)}<br>
-                            <strong>Abono:</strong> ${abonoPct}<br>
-                            <strong>Monto abono:</strong> ${aprobacionFmtMoney(veh.abono_monto)}
+                            <strong>Abono %:</strong> ${abonoPct}<br>
+                            <strong>Abono $:</strong> ${aprobacionFmtMoney(veh.abono_monto)}
                         </div>
                 `;
             } else {
@@ -1775,7 +1785,7 @@ if ($isBanco && !$isAdmin) {
         }
 
         // Al cambiar el vehículo, refrescar datos en Información de la Solicitud
-        // y sugerir abono desde el vehículo seleccionado
+        // y sugerir abono % / abono $ / valor a financiar desde el vehículo
         $(document).on('change', '#vehiculo_evaluacion', function() {
             var vid = $(this).val();
             renderAprobacionSolicitudInfo(vid);
@@ -1783,22 +1793,60 @@ if ($isBanco && !$isAdmin) {
             for (var i = 0; i < aprobacionVehiculosCache.length; i++) {
                 if (String(aprobacionVehiculosCache[i].id) === String(vid)) {
                     var v = aprobacionVehiculosCache[i];
-                    if (v.abono_monto != null && v.abono_monto !== '' && !$('#abono_evaluacion').prop('disabled')) {
-                        $('#abono_evaluacion').val(v.abono_monto);
-                    }
-                    if (v.precio != null && v.precio !== '' && !$('#valor_financiar').prop('disabled')) {
-                        var precio = parseFloat(v.precio) || 0;
-                        var abono = parseFloat(v.abono_monto) || 0;
-                        var financiable = Math.max(0, precio - abono);
-                        if (financiable > 0) {
-                            $('#valor_financiar').val(financiable.toFixed(2));
+                    if (!$('#abono_evaluacion').prop('disabled')) {
+                        if (v.abono_porcentaje != null && v.abono_porcentaje !== '') {
+                            $('#abono_pct_evaluacion').val(v.abono_porcentaje);
+                        } else {
+                            $('#abono_pct_evaluacion').val('');
+                        }
+                        if (v.abono_monto != null && v.abono_monto !== '') {
+                            $('#abono_evaluacion').val(v.abono_monto);
+                        } else if (v.precio && v.abono_porcentaje) {
+                            calcularAbonoMontoDesdePct();
+                        } else {
+                            $('#abono_evaluacion').val('');
                         }
                     }
+                    sincronizarValorFinanciarDesdeVehiculo();
                     calcularLetrasEvaluacion();
                     break;
                 }
             }
         });
+
+        function obtenerPrecioVehiculoSeleccionado() {
+            var vid = $('#vehiculo_evaluacion').val();
+            if (!vid) return null;
+            for (var i = 0; i < aprobacionVehiculosCache.length; i++) {
+                if (String(aprobacionVehiculosCache[i].id) === String(vid)) {
+                    var p = parseFloat(aprobacionVehiculosCache[i].precio);
+                    return isFinite(p) && p > 0 ? p : null;
+                }
+            }
+            return null;
+        }
+
+        function calcularAbonoMontoDesdePct() {
+            var pct = parseFloat($('#abono_pct_evaluacion').val());
+            var precio = obtenerPrecioVehiculoSeleccionado();
+            if (!isFinite(pct) || pct < 0 || precio == null) {
+                return;
+            }
+            var monto = precio * (pct / 100);
+            $('#abono_evaluacion').val(monto.toFixed(2));
+            sincronizarValorFinanciarDesdeVehiculo();
+            calcularLetrasEvaluacion();
+        }
+
+        function sincronizarValorFinanciarDesdeVehiculo() {
+            if ($('#valor_financiar').prop('disabled')) return;
+            var precio = obtenerPrecioVehiculoSeleccionado();
+            if (precio == null) return;
+            var abono = parseFloat($('#abono_evaluacion').val());
+            if (!isFinite(abono) || abono < 0) abono = 0;
+            var financiable = Math.max(0, precio - abono);
+            $('#valor_financiar').val(financiable.toFixed(2));
+        }
 
         /**
          * Cuota francesa: principal, tasa anual %, periodos, periodos/año.
@@ -1842,14 +1890,29 @@ if ($isBanco && !$isAdmin) {
             $('#letra_quincenal_evaluacion').val(quincenal != null ? quincenal.toFixed(2) : '');
         }
 
-        $(document).on('input change', '#valor_financiar, #abono_evaluacion, #plazo_evaluacion, #tasa_bancaria_evaluacion', function() {
+        $(document).on('input change', '#abono_pct_evaluacion', function() {
+            calcularAbonoMontoDesdePct();
+        });
+
+        $(document).on('input change', '#abono_evaluacion', function() {
+            // Si edita Abono $ a mano, recalcular % si hay precio de vehículo
+            var precio = obtenerPrecioVehiculoSeleccionado();
+            var monto = parseFloat($('#abono_evaluacion').val());
+            if (precio != null && isFinite(monto) && monto >= 0) {
+                $('#abono_pct_evaluacion').val(((monto / precio) * 100).toFixed(2));
+            }
+            sincronizarValorFinanciarDesdeVehiculo();
+            calcularLetrasEvaluacion();
+        });
+
+        $(document).on('input change', '#valor_financiar, #plazo_evaluacion, #tasa_bancaria_evaluacion', function() {
             calcularLetrasEvaluacion();
         });
 
         // Función para mostrar/ocultar campos según la decisión
         window.mostrarCamposDecision = function(decision) {
             // Ocultar todos los campos primero
-            const campos = ['#valor_financiar', '#abono_evaluacion', '#plazo_evaluacion', '#letra_evaluacion', '#letra_quincenal_evaluacion', '#promocion_evaluacion', '#comentarios_evaluacion'];
+            const campos = ['#valor_financiar', '#abono_pct_evaluacion', '#abono_evaluacion', '#plazo_evaluacion', '#letra_evaluacion', '#letra_quincenal_evaluacion', '#promocion_evaluacion', '#comentarios_evaluacion'];
             campos.forEach(function(campo) {
                 $(campo).prop('disabled', true);
                 $(campo).prop('required', false);
@@ -1867,7 +1930,7 @@ if ($isBanco && !$isAdmin) {
                 $('#letra_quincenal_evaluacion').val('');
             } else if (decision === 'preaprobado' || decision === 'aprobado' || decision === 'aprobado_condicional') {
                 // Habilitar entrada; letras se calculan (quedan readonly)
-                ['#valor_financiar', '#abono_evaluacion', '#plazo_evaluacion', '#promocion_evaluacion', '#comentarios_evaluacion'].forEach(function(campo) {
+                ['#valor_financiar', '#abono_pct_evaluacion', '#abono_evaluacion', '#plazo_evaluacion', '#promocion_evaluacion', '#comentarios_evaluacion'].forEach(function(campo) {
                     $(campo).prop('disabled', false);
                 });
                 $('#letra_evaluacion').prop('disabled', false).prop('readonly', true);
