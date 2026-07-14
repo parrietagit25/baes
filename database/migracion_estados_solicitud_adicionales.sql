@@ -1,17 +1,5 @@
--- Ampliar enum de estado en solicitudes_credito (solo etiquetas operativas).
--- Ejecutar una sola vez.
+-- Estados de solicitud como etiqueta libre (incluye Evaluation/Comité/etc.).
+-- Evita problemas de ENUM con acentos al ampliar valores.
 
 ALTER TABLE `solicitudes_credito`
-  MODIFY COLUMN `estado` ENUM(
-    'Nueva',
-    'En Revisión Banco',
-    'Aprobada',
-    'Rechazada',
-    'Completada',
-    'Desistimiento',
-    'Evaluacion',
-    'Comité',
-    'Reconsideración',
-    'Pre Aprobado',
-    'Aprobado con Condición'
-  ) COLLATE utf8mb4_unicode_ci DEFAULT 'Nueva';
+  MODIFY COLUMN `estado` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Nueva';
