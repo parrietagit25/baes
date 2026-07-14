@@ -2864,44 +2864,34 @@ function mostrarAlertaFinGuardado(solicitudIdAnterior, nuevaSolicitudId) {
     }, 400);
 }
 
-// ========== FUNCIONES PARA GESTIÓN DE CITAS Y FIRMA ==========
+// ========== EVENTOS CITA Y FIRMA (reactivo, sin recargar página) ==========
 
-// Función para verificar si hay una evaluación seleccionada y mostrar/ocultar pestaña "Cita y Firma"
 function verificarEvaluacionSeleccionada(solicitudId) {
-    // La pestaña "Cita y Firma" solo debe aparecer para admin y gestor
-    // Si el usuario NO es admin ni gestor, ocultar la pestaña inmediatamente
     if (!window.userRoles || (!window.userRoles.isAdmin && !window.userRoles.isGestor)) {
         $('#cita-firma-tab-li').hide();
-        // Si estaba activa, cambiar a otra pestaña
         if ($('#cita-firma-tab').hasClass('active')) {
             $('#datos-generales-tab').tab('show');
         }
         return;
     }
-    
-    // Solo para admin y gestor: verificar si hay una evaluación seleccionada
+
     $.ajax({
         url: 'api/evaluaciones_banco.php',
         type: 'GET',
         data: { solicitud_id: solicitudId },
         dataType: 'json',
         success: function(response) {
-            // Si hay una evaluación seleccionada, mostrar la pestaña
             if (response.success && response.evaluacion_seleccionada) {
                 $('#cita-firma-tab-li').show();
             } else {
-                // No hay evaluación seleccionada, ocultar la pestaña
                 $('#cita-firma-tab-li').hide();
-                // Si estaba activa, cambiar a otra pestaña
                 if ($('#cita-firma-tab').hasClass('active')) {
                     $('#datos-generales-tab').tab('show');
                 }
             }
         },
-        error: function(xhr) {
-            // En caso de error, ocultar la pestaña
+        error: function() {
             $('#cita-firma-tab-li').hide();
-            // Si estaba activa, cambiar a otra pestaña
             if ($('#cita-firma-tab').hasClass('active')) {
                 $('#datos-generales-tab').tab('show');
             }
@@ -2909,18 +2899,34 @@ function verificarEvaluacionSeleccionada(solicitudId) {
     });
 }
 
-// Función para cargar citas cuando se abre la pestaña "Cita y Firma"
 $(document).on('shown.bs.tab', '#cita-firma-tab', function() {
     const solicitudId = $('#solicitud_id').val();
     if (solicitudId) {
-        cargarCitas(solicitudId);
+        cargarEventosCitaFirma(solicitudId);
     }
 });
 
-// Función para cargar citas
-function cargarCitas(solicitudId) {
-    $('#citasTableBody').html('<tr><td colspan="5" class="text-center"><div class="spinner-border spinner-border-sm" role="status"></div> Cargando citas...</td></tr>');
-    
+function escapeHtmlEvento(str) {
+    if (str == null || str === '') return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function formatearFechaEvento(fecha) {
+    if (!fecha) return '-';
+    var p = String(fecha).substring(0, 10).split('-');
+    if (p.length === 3) return p[2] + '/' + p[1] + '/' + p[0];
+    return fecha;
+}
+
+function cargarEventosCitaFirma(solicitudId) {
+    $('#eventosCitaFirmaTableBody').html(
+        '<tr><td colspan="4" class="text-center"><div class="spinner-border spinner-border-sm" role="status"></div> Cargando eventos...</td></tr>'
+    );
+
     $.ajax({
         url: 'api/citas_firma.php',
         type: 'GET',
@@ -2928,194 +2934,204 @@ function cargarCitas(solicitudId) {
         dataType: 'json',
         success: function(response) {
             if (response.success) {
-                mostrarCitas(response.data);
+                renderEventosCitaFirma(response.data || []);
             } else {
-                $('#citasTableBody').html('<tr><td colspan="5" class="text-center text-muted">' + (response.message || 'No se pudieron cargar las citas') + '</td></tr>');
+                $('#eventosCitaFirmaTableBody').html(
+                    '<tr><td colspan="4" class="text-center text-muted">' +
+                    escapeHtmlEvento(response.message || 'No se pudieron cargar los eventos') +
+                    '</td></tr>'
+                );
             }
         },
         error: function() {
-            $('#citasTableBody').html('<tr><td colspan="5" class="text-center text-danger">Error al cargar las citas</td></tr>');
+            $('#eventosCitaFirmaTableBody').html(
+                '<tr><td colspan="4" class="text-center text-danger">Error al cargar los eventos</td></tr>'
+            );
         }
     });
 }
 
-// Función para mostrar citas en la tabla
-function mostrarCitas(citas) {
-    const tbody = $('#citasTableBody');
+function renderEventosCitaFirma(eventos) {
+    var tbody = $('#eventosCitaFirmaTableBody');
     tbody.empty();
-    
-    if (citas.length === 0) {
-        tbody.html('<tr><td colspan="5" class="text-center text-muted">No hay citas registradas</td></tr>');
+
+    if (!eventos.length) {
+        tbody.html('<tr><td colspan="4" class="text-center text-muted">No hay eventos registrados</td></tr>');
         return;
     }
-    
-    citas.forEach(function(cita) {
-        const fecha = new Date(cita.fecha_cita).toLocaleDateString('es-PA');
-        const hora = cita.hora_cita ? cita.hora_cita.substring(0, 5) : '-';
-        const comentarios = cita.comentarios || '-';
-        
-        // Estado de asistencia
-        let estadoBadge = '';
-        switch(cita.asistio) {
-            case 'asistio':
-                estadoBadge = '<span class="badge bg-success">Asistió</span>';
-                break;
-            case 'no_asistio':
-                estadoBadge = '<span class="badge bg-danger">No Asistió</span>';
-                break;
-            default:
-                estadoBadge = '<span class="badge bg-warning">Pendiente</span>';
-        }
-        
-        // Botones de acción
-        let botonesAccion = '';
-        if (cita.asistio !== 'asistio') {
-            botonesAccion += '<button class="btn btn-success btn-sm me-1" onclick="actualizarAsistencia(' + cita.id + ', \'asistio\')" title="Marcar como Asistió"><i class="fas fa-check"></i> Asistió</button>';
-        }
-        if (cita.asistio !== 'no_asistio') {
-            botonesAccion += '<button class="btn btn-danger btn-sm me-1" onclick="actualizarAsistencia(' + cita.id + ', \'no_asistio\')" title="Marcar como No Asistió"><i class="fas fa-times"></i> No Asistió</button>';
-        }
-        // Botón de eliminar
-        botonesAccion += '<button class="btn btn-danger btn-sm" onclick="eliminarCita(' + cita.id + ')" title="Eliminar Cita"><i class="fas fa-trash"></i></button>';
-        
-        const row = `
-            <tr>
-                <td>${fecha}</td>
-                <td>${hora}</td>
-                <td>${comentarios}</td>
-                <td>${estadoBadge}</td>
-                <td>
-                    <div class="btn-group btn-group-sm">
-                        ${botonesAccion}
-                    </div>
-                </td>
-            </tr>
-        `;
-        
-        tbody.append(row);
+
+    eventos.forEach(function(ev) {
+        var id = parseInt(ev.id, 10);
+        var nombre = escapeHtmlEvento(ev.nombre_evento || '(Sin nombre)');
+        var fecha = escapeHtmlEvento(formatearFechaEvento(ev.fecha_evento));
+        var comentario = escapeHtmlEvento(ev.comentario || '');
+        var comentarioHtml = comentario
+            ? '<div class="small text-break" style="max-width:360px;white-space:pre-wrap;">' + comentario + '</div>'
+            : '<span class="text-muted">—</span>';
+
+        tbody.append(
+            '<tr data-evento-id="' + id + '">' +
+                '<td>' + nombre + '</td>' +
+                '<td>' + fecha + '</td>' +
+                '<td>' + comentarioHtml + '</td>' +
+                '<td>' +
+                    '<div class="btn-group btn-group-sm">' +
+                        '<button type="button" class="btn btn-outline-primary" title="Editar" onclick="editarEventoCitaFirma(' + id + ')">' +
+                            '<i class="fas fa-edit"></i>' +
+                        '</button>' +
+                        '<button type="button" class="btn btn-outline-danger" title="Eliminar" onclick="eliminarEventoCitaFirma(' + id + ')">' +
+                            '<i class="fas fa-trash"></i>' +
+                        '</button>' +
+                    '</div>' +
+                '</td>' +
+            '</tr>'
+        );
     });
 }
 
-// Función para guardar una nueva cita
-function guardarCita() {
-    const solicitudId = $('#solicitud_id').val();
-    const fechaCita = $('#fecha_cita').val();
-    const horaCita = $('#hora_cita').val();
-    const comentarios = $('#comentarios_cita').val();
-    
+function restaurarModalSolicitudTrasEvento() {
+    if ($('#solicitudModal').hasClass('show')) {
+        document.body.classList.add('modal-open');
+        if (!$('.modal-backdrop').length) {
+            $('<div class="modal-backdrop fade show"></div>').appendTo(document.body);
+        }
+    }
+}
+
+function abrirModalEventoCitaFirma(evento) {
+    var solicitudId = $('#solicitud_id').val();
     if (!solicitudId) {
-        mostrarAlerta('Debe guardar la solicitud antes de crear una cita', 'warning');
+        mostrarAlerta('Debe guardar la solicitud antes de registrar eventos', 'warning');
         return;
     }
-    
-    if (!fechaCita || !horaCita) {
-        mostrarAlerta('Por favor complete la fecha y hora de la cita', 'warning');
+
+    $('#evento_cita_id').val(evento && evento.id ? evento.id : '');
+    $('#evento_nombre').val(evento && evento.nombre_evento ? evento.nombre_evento : '');
+    $('#evento_fecha').val(evento && evento.fecha_evento ? String(evento.fecha_evento).substring(0, 10) : '');
+    $('#evento_comentario').val(evento && evento.comentario ? evento.comentario : '');
+    $('#modalEventoCitaFirmaTitulo').text(evento && evento.id ? 'Editar Evento' : 'Agregar Evento');
+
+    var modalEl = document.getElementById('modalEventoCitaFirma');
+    var modal = bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: true, focus: true });
+    modal.show();
+}
+
+$(document).on('shown.bs.modal', '#modalEventoCitaFirma', function() {
+    var zIndex = 1065;
+    $(this).css('z-index', zIndex);
+    $('.modal-backdrop').last().css('z-index', zIndex - 1);
+});
+
+$(document).on('hidden.bs.modal', '#modalEventoCitaFirma', function() {
+    restaurarModalSolicitudTrasEvento();
+});
+
+function editarEventoCitaFirma(eventoId) {
+    $.ajax({
+        url: 'api/citas_firma.php',
+        type: 'GET',
+        data: { id: eventoId },
+        dataType: 'json',
+        success: function(response) {
+            if (response.success && response.data) {
+                abrirModalEventoCitaFirma(response.data);
+            } else {
+                mostrarAlerta(response.message || 'No se pudo cargar el evento', 'danger');
+            }
+        },
+        error: function() {
+            mostrarAlerta('Error al cargar el evento', 'danger');
+        }
+    });
+}
+
+function guardarEventoCitaFirma() {
+    var solicitudId = $('#solicitud_id').val();
+    var eventoId = $('#evento_cita_id').val();
+    var nombre = ($('#evento_nombre').val() || '').trim();
+    var fecha = ($('#evento_fecha').val() || '').trim();
+    var comentario = ($('#evento_comentario').val() || '').trim();
+
+    if (!solicitudId) {
+        mostrarAlerta('Debe guardar la solicitud antes de registrar eventos', 'warning');
         return;
     }
-    
+    if (!nombre || !fecha) {
+        mostrarAlerta('Complete el nombre y la fecha del evento', 'warning');
+        return;
+    }
+
+    var $btn = $('#btnGuardarEventoCitaFirma');
+    $btn.prop('disabled', true);
+
+    var data = {
+        solicitud_id: solicitudId,
+        nombre_evento: nombre,
+        fecha_evento: fecha,
+        comentario: comentario
+    };
+    if (eventoId) {
+        data.action = 'actualizar';
+        data.id = eventoId;
+    }
+
     $.ajax({
         url: 'api/citas_firma.php',
         type: 'POST',
-        data: {
-            solicitud_id: solicitudId,
-            fecha_cita: fechaCita,
-            hora_cita: horaCita,
-            comentarios: comentarios
-        },
-        dataType: 'json',
-                  success: function(response) {
-              if (response.success) {
-                  mostrarAlerta('Cita creada correctamente', 'success');
-                  // Recargar la página después de un breve delay para mostrar el mensaje
-                  setTimeout(function() {
-                      location.reload();
-                  }, 1500);
-              } else {
-                  mostrarAlerta('Error al crear cita: ' + response.message, 'danger');
-              }
-          },
-        error: function() {
-            mostrarAlerta('Error de conexión al crear cita', 'danger');
-        }
-    });
-}
-
-// Función para actualizar la asistencia de una cita
-function actualizarAsistencia(citaId, asistio) {
-    const solicitudId = $('#solicitud_id').val();
-    
-    if (!solicitudId) {
-        mostrarAlerta('Error: No se encontró el ID de la solicitud', 'danger');
-        return;
-    }
-    
-    // Enviar datos como form-urlencoded para PUT request
-    const datos = 'id=' + encodeURIComponent(citaId) + '&asistio=' + encodeURIComponent(asistio);
-    
-    $.ajax({
-        url: 'api/citas_firma.php',
-        type: 'PUT',
-        data: datos,
-        contentType: 'application/x-www-form-urlencoded',
+        data: data,
         dataType: 'json',
         success: function(response) {
+            $btn.prop('disabled', false);
             if (response.success) {
-                mostrarAlerta('Asistencia actualizada correctamente', 'success');
-                // Recargar citas
-                cargarCitas(solicitudId);
+                var modalEl = document.getElementById('modalEventoCitaFirma');
+                var modal = bootstrap.Modal.getInstance(modalEl);
+                if (modal) modal.hide();
+                mostrarAlerta(response.message || 'Evento guardado', 'success');
+                cargarEventosCitaFirma(solicitudId);
             } else {
-                mostrarAlerta('Error al actualizar asistencia: ' + response.message, 'danger');
+                mostrarAlerta(response.message || 'No se pudo guardar el evento', 'danger');
             }
         },
         error: function() {
-            mostrarAlerta('Error de conexión al actualizar asistencia', 'danger');
+            $btn.prop('disabled', false);
+            mostrarAlerta('Error de conexión al guardar el evento', 'danger');
         }
     });
 }
 
-// Función para eliminar una cita
-function eliminarCita(citaId) {
-    if (!confirm('¿Está seguro de que desea eliminar esta cita? Esta acción no se puede deshacer.')) {
+function eliminarEventoCitaFirma(eventoId) {
+    if (!confirm('¿Eliminar este evento? Esta acción no se puede deshacer.')) {
         return;
     }
-    
-    const solicitudId = $('#solicitud_id').val();
-    
-    if (!solicitudId) {
-        mostrarAlerta('Error: No se encontró el ID de la solicitud', 'danger');
-        return;
-    }
-    
-    // Enviar datos como form-urlencoded para DELETE request
-    const datos = 'id=' + encodeURIComponent(citaId);
-    
+
+    var solicitudId = $('#solicitud_id').val();
     $.ajax({
         url: 'api/citas_firma.php',
         type: 'DELETE',
-        data: datos,
+        data: 'id=' + encodeURIComponent(eventoId),
         contentType: 'application/x-www-form-urlencoded',
         dataType: 'json',
         success: function(response) {
             if (response.success) {
-                mostrarAlerta('Cita eliminada correctamente', 'success');
-                // Recargar citas
-                cargarCitas(solicitudId);
+                mostrarAlerta(response.message || 'Evento eliminado', 'success');
+                cargarEventosCitaFirma(solicitudId);
             } else {
-                mostrarAlerta('Error al eliminar cita: ' + response.message, 'danger');
+                mostrarAlerta(response.message || 'No se pudo eliminar el evento', 'danger');
             }
         },
         error: function(xhr) {
-            let mensaje = 'Error de conexión al eliminar cita';
+            var mensaje = 'Error al eliminar el evento';
             try {
-                const errorResponse = JSON.parse(xhr.responseText);
-                if (errorResponse.message) {
-                    mensaje = errorResponse.message;
-                }
-            } catch (e) {
-                // Usar mensaje por defecto
-            }
+                var err = JSON.parse(xhr.responseText);
+                if (err.message) mensaje = err.message;
+            } catch (e) {}
             mostrarAlerta(mensaje, 'danger');
         }
     });
 }
+
+// Compatibilidad por si quedan referencias antiguas
+function cargarCitas(solicitudId) { cargarEventosCitaFirma(solicitudId); }
+function guardarCita() { abrirModalEventoCitaFirma(); }
+function eliminarCita(id) { eliminarEventoCitaFirma(id); }
 

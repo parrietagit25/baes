@@ -119,6 +119,7 @@ if ($isBanco && !$isAdmin) {
             background: #f8f9fa;
             min-height: 100vh;
         }
+        #modalEventoCitaFirma { z-index: 1065; }
         .card {
             border: none;
             border-radius: 15px;
@@ -882,73 +883,27 @@ if ($isBanco && !$isAdmin) {
                             <!-- Cita y Firma -->
                             <div class="tab-pane fade" id="cita-firma" role="tabpanel">
                                 <div class="mt-3">
-                                    <!-- Formulario para crear cita -->
-                                    <div class="card">
-                                        <div class="card-header">
-                                            <h6 class="mb-0">
-                                                <i class="fas fa-calendar-plus me-2"></i>Agendar Cita
-                                            </h6>
-                                        </div>
-                                        <div class="card-body">
-                                            <form id="citaForm">
-                                                <div class="row">
-                                                                                                          <div class="col-md-4">
-                                                          <div class="mb-3">
-                                                             <label for="fecha_cita" class="form-label">Fecha de la Cita *</label>
-                                                             <input type="date" class="form-control" id="fecha_cita" name="fecha_cita">
-                                                          </div>
-                                                      </div>
-                                                      <div class="col-md-4">
-                                                          <div class="mb-3">
-                                                             <label for="hora_cita" class="form-label">Hora de la Cita *</label>
-                                                             <input type="time" class="form-control" id="hora_cita" name="hora_cita">
-                                                          </div>
-                                                      </div>
-                                                    <div class="col-md-4">
-                                                        <div class="mb-3">
-                                                            <label for="comentarios_cita" class="form-label">Comentarios</label>
-                                                            <textarea class="form-control" id="comentarios_cita" name="comentarios" rows="3" placeholder="Ingrese comentarios sobre la cita..."></textarea>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div class="row">
-                                                    <div class="col-md-12">
-                                                        <button type="button" class="btn btn-success" onclick="guardarCita()">
-                                                            <i class="fas fa-save me-2"></i>Guardar Cita
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </form>
-                                        </div>
+                                    <div class="d-flex justify-content-start mb-3">
+                                        <button type="button" class="btn btn-primary" id="btnAgregarEventoCitaFirma" onclick="abrirModalEventoCitaFirma()">
+                                            <i class="fas fa-plus me-2"></i>Agregar Evento
+                                        </button>
                                     </div>
-                                    
-                                    <!-- Tabla de Citas -->
-                                    <div class="mt-4">
-                                        <div class="card">
-                                            <div class="card-header">
-                                                <h6 class="mb-0">
-                                                    <i class="fas fa-list me-2"></i>Registro de Citas
-                                                </h6>
-                                            </div>
-                                            <div class="card-body">
-                                                <div class="table-responsive">
-                                                    <table class="table table-sm" id="citasTable">
-                                                        <thead>
-                                                            <tr>
-                                                                <th>Fecha</th>
-                                                                <th>Hora</th>
-                                                                <th>Comentarios</th>
-                                                                <th>Estado Asistencia</th>
-                                                                <th>Acciones</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody id="citasTableBody">
-                                                            <!-- Se llenará dinámicamente -->
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                            </div>
-                                        </div>
+                                    <div class="table-responsive">
+                                        <table class="table table-striped table-hover align-middle" id="eventosCitaFirmaTable">
+                                            <thead>
+                                                <tr>
+                                                    <th>Nombre del evento</th>
+                                                    <th>Fecha</th>
+                                                    <th>Comentario</th>
+                                                    <th style="width:120px;">Acciones</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="eventosCitaFirmaTableBody">
+                                                <tr>
+                                                    <td colspan="4" class="text-center text-muted">No hay eventos registrados</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
                                     </div>
                                 </div>
                             </div>
@@ -2841,6 +2796,41 @@ if ($isBanco && !$isAdmin) {
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Agregar / Editar Evento (Cita y Firma) — se abre sobre Editar Solicitud -->
+    <div class="modal fade" id="modalEventoCitaFirma" tabindex="-1" aria-labelledby="modalEventoCitaFirmaLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="modalEventoCitaFirmaLabel">
+                        <i class="fas fa-calendar-plus me-2"></i><span id="modalEventoCitaFirmaTitulo">Agregar Evento</span>
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="evento_cita_id" value="">
+                    <div class="mb-3">
+                        <label for="evento_nombre" class="form-label">Nombre del Evento *</label>
+                        <input type="text" class="form-control" id="evento_nombre" maxlength="255" placeholder="Ej. Firma de documentos, Entrega de póliza...">
+                    </div>
+                    <div class="mb-3">
+                        <label for="evento_fecha" class="form-label">Fecha del evento *</label>
+                        <input type="date" class="form-control" id="evento_fecha">
+                    </div>
+                    <div class="mb-0">
+                        <label for="evento_comentario" class="form-label">Comentario</label>
+                        <textarea class="form-control" id="evento_comentario" rows="3" placeholder="Detalle u observaciones del evento..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" id="btnGuardarEventoCitaFirma" onclick="guardarEventoCitaFirma()">
+                        <i class="fas fa-save me-2"></i>Guardar
+                    </button>
                 </div>
             </div>
         </div>
