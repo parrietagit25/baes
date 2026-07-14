@@ -62,6 +62,7 @@ if (!in_array('ROLE_BANCO', $userRoles, true)) {
                                         <th>Plazo</th>
                                         <th>Letra</th>
                                         <th>Promoción</th>
+                                        <th>Cuantía</th>
                                         <th>Seleccionada</th>
                                         <th></th>
                                     </tr>
@@ -150,6 +151,7 @@ if (!in_array('ROLE_BANCO', $userRoles, true)) {
                 },
                 { data: 'letra', render: function (d) { return fmtMoney(d); } },
                 { data: 'promocion', defaultContent: '-', render: function (d) { return esc(d || '-'); } },
+                { data: 'cuantia', render: function (d) { return fmtMoney(d); } },
                 {
                     data: 'es_propuesta_seleccionada',
                     render: function (d) {

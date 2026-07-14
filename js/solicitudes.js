@@ -1326,6 +1326,7 @@ function htmlRespuestaBancoCard(evaluacion, bancoLabel) {
                     <div class="col-md-4"><strong>Letra mensual:</strong> ${muroFmtMoney(evaluacion.letra)}</div>
                     <div class="col-md-4"><strong>Letra quincenal:</strong> ${muroFmtMoney(evaluacion.letra_quincenal)}</div>
                     <div class="col-md-4"><strong>Promoción:</strong> ${muroEsc(evaluacion.promocion || '—')}</div>
+                    <div class="col-md-4"><strong>Cuantía:</strong> ${muroFmtMoney(evaluacion.cuantia)}</div>
                     <div class="col-12"><strong>Comentarios:</strong> ${muroEsc(evaluacion.comentarios || '—')}</div>
                 </div>
             </div>

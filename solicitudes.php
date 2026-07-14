@@ -1486,8 +1486,15 @@ if ($isBanco && !$isAdmin) {
                                                 </select>
                                             </div>
                                         </div>
-                                        <div class="col-md-6">
-                                            <!-- Columna vacía para mantener el layout -->
+                                        <div class="col-md-6" id="wrap_cuantia_evaluacion" style="display: none;">
+                                            <div class="mb-3">
+                                                <label for="cuantia_evaluacion" class="form-label">Cuantía</label>
+                                                <div class="input-group">
+                                                    <span class="input-group-text">$</span>
+                                                    <input type="number" class="form-control" id="cuantia_evaluacion" name="cuantia_evaluacion" step="0.01" min="0" disabled placeholder="0.00">
+                                                </div>
+                                                <div class="form-text">Monto asociado a la promoción seleccionada.</div>
+                                            </div>
                                         </div>
                                     </div>
                                     <div class="mb-3">
@@ -1853,8 +1860,27 @@ if ($isBanco && !$isAdmin) {
 
         // Sin cálculo automático: el banco ingresa Valor a Financiar, Abono %, Abono $ y Letras a mano.
 
+        window.actualizarCampoCuantiaPromocion = function() {
+            var tienePromo = (($('#promocion_evaluacion').val() || '').trim() !== '');
+            var decisionHabilitada = !$('#promocion_evaluacion').prop('disabled');
+            if (tienePromo && decisionHabilitada) {
+                $('#wrap_cuantia_evaluacion').show();
+                $('#cuantia_evaluacion').prop('disabled', false);
+            } else {
+                $('#wrap_cuantia_evaluacion').hide();
+                $('#cuantia_evaluacion').prop('disabled', true);
+                if (!tienePromo) {
+                    $('#cuantia_evaluacion').val('');
+                }
+            }
+        };
+
+        $(document).on('change', '#promocion_evaluacion', function() {
+            actualizarCampoCuantiaPromocion();
+        });
+
         window.mostrarCamposDecision = function(decision) {
-            const campos = ['#valor_financiar', '#abono_pct_evaluacion', '#abono_evaluacion', '#plazo_evaluacion', '#letra_evaluacion', '#letra_quincenal_evaluacion', '#promocion_evaluacion', '#comentarios_evaluacion'];
+            const campos = ['#valor_financiar', '#abono_pct_evaluacion', '#abono_evaluacion', '#plazo_evaluacion', '#letra_evaluacion', '#letra_quincenal_evaluacion', '#promocion_evaluacion', '#cuantia_evaluacion', '#comentarios_evaluacion'];
             campos.forEach(function(campo) {
                 $(campo).prop('disabled', true);
                 $(campo).prop('required', false);
@@ -1867,13 +1893,17 @@ if ($isBanco && !$isAdmin) {
                 $('#comentarios_evaluacion').prop('required', true);
                 $('#letra_evaluacion').val('');
                 $('#letra_quincenal_evaluacion').val('');
+                $('#promocion_evaluacion').val('');
+                actualizarCampoCuantiaPromocion();
             } else if (decision === 'preaprobado' || decision === 'aprobado' || decision === 'aprobado_condicional') {
                 ['#valor_financiar', '#abono_pct_evaluacion', '#abono_evaluacion', '#plazo_evaluacion', '#letra_evaluacion', '#letra_quincenal_evaluacion', '#promocion_evaluacion', '#comentarios_evaluacion'].forEach(function(campo) {
                     $(campo).prop('disabled', false).prop('readonly', false);
                 });
                 $('#comentarios_evaluacion').prop('required', false);
+                actualizarCampoCuantiaPromocion();
             } else {
                 $('#camposDecision').hide();
+                actualizarCampoCuantiaPromocion();
             }
         };
 
@@ -2435,7 +2465,7 @@ if ($isBanco && !$isAdmin) {
                     destruirDataTableRespuestas('#tablaRespuestasBanco');
                     if (response.data.length > 0) {
                         let html = '<div class="table-responsive"><table id="tablaRespuestasBanco" class="table table-striped table-hover w-100">';
-                        html += '<thead><tr><th>Fecha</th><th>Vehículo</th><th>Decisión</th><th>Tasa %</th><th>Valor a Financiar</th><th>Abono</th><th>Plazo</th><th>Letra mensual</th><th>Letra quincenal</th><th>Promoción</th><th>Comentarios</th><th>Comentario al seleccionar</th><th>Motivo reevaluación</th><th>Selección</th></tr></thead>';
+                        html += '<thead><tr><th>Fecha</th><th>Vehículo</th><th>Decisión</th><th>Tasa %</th><th>Valor a Financiar</th><th>Abono</th><th>Plazo</th><th>Letra mensual</th><th>Letra quincenal</th><th>Promoción</th><th>Cuantía</th><th>Comentarios</th><th>Comentario al seleccionar</th><th>Motivo reevaluación</th><th>Selección</th></tr></thead>';
                         html += '<tbody>';
                         
                         response.data.forEach(function(evaluacion) {
@@ -2450,6 +2480,7 @@ if ($isBanco && !$isAdmin) {
                             html += '<td>' + (evaluacion.letra ? '$' + parseFloat(evaluacion.letra).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
                             html += '<td>' + (evaluacion.letra_quincenal ? '$' + parseFloat(evaluacion.letra_quincenal).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
                             html += '<td>' + (evaluacion.promocion || '-') + '</td>';
+                            html += '<td>' + (evaluacion.cuantia != null && evaluacion.cuantia !== '' ? '$' + parseFloat(evaluacion.cuantia).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
                             html += '<td>' + (evaluacion.comentarios || '-') + '</td>';
                             var textoSeleccionFila = (evaluacionSeleccionada && String(evaluacion.id) === String(evaluacionSeleccionada)) ? comentarioSeleccionGlobal : '';
                             html += '<td>' + celdaComentarioGestor(textoSeleccionFila) + '</td>';
@@ -2522,7 +2553,7 @@ if ($isBanco && !$isAdmin) {
                           }
 
                           html += '<div class="table-responsive"><table id="tablaRespuestasBancoAdmin" class="table table-striped table-hover w-100">';
-                          html += '<thead><tr><th>Fecha</th><th>Banco</th><th>Vehículo</th><th>Decisión</th><th>Tasa %</th><th>Valor a Financiar</th><th>Abono</th><th>Plazo</th><th>Letra mensual</th><th>Letra quincenal</th><th>Promoción</th><th>Comentarios</th><th>Comentario al seleccionar</th><th>Motivo reevaluación</th>';
+                          html += '<thead><tr><th>Fecha</th><th>Banco</th><th>Vehículo</th><th>Decisión</th><th>Tasa %</th><th>Valor a Financiar</th><th>Abono</th><th>Plazo</th><th>Letra mensual</th><th>Letra quincenal</th><th>Promoción</th><th>Cuantía</th><th>Comentarios</th><th>Comentario al seleccionar</th><th>Motivo reevaluación</th>';
                           if (mostrarAcciones) {
                               html += '<th>Acciones</th>';
                           } else {
@@ -2544,6 +2575,7 @@ if ($isBanco && !$isAdmin) {
                               html += '<td>' + (evaluacion.letra ? '$' + parseFloat(evaluacion.letra).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
                               html += '<td>' + (evaluacion.letra_quincenal ? '$' + parseFloat(evaluacion.letra_quincenal).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
                               html += '<td>' + (evaluacion.promocion || '-') + '</td>';
+                              html += '<td>' + (evaluacion.cuantia != null && evaluacion.cuantia !== '' ? '$' + parseFloat(evaluacion.cuantia).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
                               html += '<td>' + (evaluacion.comentarios || '-') + '</td>';
                               var textoSel = (evaluacionSeleccionada && String(evaluacion.id) === String(evaluacionSeleccionada)) ? comentarioSeleccionGlobal : '';
                               html += '<td>' + celdaComentarioGestor(textoSel) + '</td>';
