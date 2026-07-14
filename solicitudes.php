@@ -1217,16 +1217,16 @@ if ($isBanco && !$isAdmin) {
 
     <!-- Modal de Detalles -->
     <div class="modal fade" id="detallesModal" tabindex="-1">
-        <div class="modal-dialog modal-xl">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">
+                <div class="modal-header" style="background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);">
+                    <h5 class="modal-title text-white">
                         <i class="fas fa-eye me-2"></i>Detalles de la Solicitud
                     </h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body" id="detallesContent">
-                    <!-- Contenido se carga via AJAX -->
+                    <!-- Contenido se carga via JS -->
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>

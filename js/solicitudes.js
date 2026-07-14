@@ -1055,52 +1055,50 @@ function guardarSolicitud() {
 
 // Función para ver detalles
 function verDetalles(id) {
-    $.ajax({
-        url: 'api/solicitudes.php',
-        type: 'GET',
-        data: { id: id },
-        dataType: 'json',
-        success: function(response) {
-            if (response.success) {
-                mostrarDetalles(response.data);
-            } else {
-                mostrarAlerta('Error al cargar detalles: ' + response.message, 'danger');
-            }
-        },
-        error: function() {
-            mostrarAlerta('Error de conexión al cargar detalles', 'danger');
-        }
-    });
+    mostrarDetalles(id);
 }
 
-// Función para mostrar detalles en modal
-function mostrarDetalles(solicitud) {
-    const contenido = `
-        <div class="row">
-            <div class="col-md-6">
-                <h6>Datos del Cliente</h6>
-                <p><strong>Nombre:</strong> ${solicitud.nombre_cliente}</p>
-                <p><strong>Cédula:</strong> ${solicitud.cedula}</p>
-                <p><strong>Teléfono:</strong> ${solicitud.telefono || '-'}</p>
-                <p><strong>Email:</strong> ${solicitud.email || '-'}</p>
-                <p><strong>Dirección:</strong> ${solicitud.direccion || '-'}</p>
+// Función para mostrar detalles en modal (zona en construcción)
+function mostrarDetalles(solicitudOrId) {
+    var solicitudId = typeof solicitudOrId === 'object' && solicitudOrId
+        ? (solicitudOrId.id || '')
+        : (solicitudOrId || '');
+
+    var contenido = `
+        <div class="text-center py-4 px-3" style="background: linear-gradient(180deg, #fff8ef 0%, #ffffff 70%); border-radius: 12px;">
+            <div class="mb-3" aria-hidden="true">
+                <i class="fas fa-hard-hat text-warning" style="font-size: 3.5rem;"></i>
+                <i class="fas fa-tools text-secondary mx-3" style="font-size: 2.4rem;"></i>
+                <i class="fas fa-cone text-danger" style="font-size: 2.8rem;"></i>
             </div>
-            <div class="col-md-6">
-                <h6>Datos del Vehículo</h6>
-                <p><strong>Marca:</strong> ${solicitud.marca_auto || '-'}</p>
-                <p><strong>Modelo:</strong> ${solicitud.modelo_auto || '-'}</p>
-                <p><strong>Año:</strong> ${solicitud.año_auto || '-'}</p>
-                <p><strong>Precio:</strong> $${solicitud.precio_especial || '-'}</p>
+            <div class="mb-3">
+                <span class="badge rounded-pill text-bg-warning px-3 py-2">
+                    <i class="fas fa-person-digging me-2"></i>Zona en construcción
+                </span>
             </div>
-        </div>
-        <div class="row mt-3">
-            <div class="col-12">
-                <h6>Comentarios del Gestor</h6>
-                <p>${solicitud.comentarios_gestor || 'Sin comentarios'}</p>
+            <h4 class="fw-bold mb-2" style="color:#d35400;">Zona en construcción</h4>
+            <p class="text-muted mb-3 mx-auto" style="max-width: 460px;">
+                Esta vista de <strong>Detalles de la Solicitud</strong> está en desarrollo.
+                Pronto podrá consultar aquí la información completa de la solicitud.
+            </p>
+            <div class="d-flex justify-content-center gap-3 mb-3 flex-wrap" aria-hidden="true">
+                <div class="border rounded-3 bg-white px-3 py-2 shadow-sm">
+                    <i class="fas fa-file-alt text-primary fa-lg"></i>
+                </div>
+                <div class="border rounded-3 bg-white px-3 py-2 shadow-sm">
+                    <i class="fas fa-car text-success fa-lg"></i>
+                </div>
+                <div class="border rounded-3 bg-white px-3 py-2 shadow-sm">
+                    <i class="fas fa-user-check text-info fa-lg"></i>
+                </div>
+                <div class="border rounded-3 bg-white px-3 py-2 shadow-sm">
+                    <i class="fas fa-clipboard-list text-secondary fa-lg"></i>
+                </div>
             </div>
+            ${solicitudId ? '<p class="small text-muted mb-0">Solicitud #' + solicitudId + '</p>' : ''}
         </div>
     `;
-    
+
     $('#detallesContent').html(contenido);
     $('#detallesModal').modal('show');
 }
