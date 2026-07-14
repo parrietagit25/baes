@@ -56,6 +56,9 @@ switch ($method) {
                 case 'seleccionar_propuesta':
                     seleccionarPropuesta();
                     break;
+                case 'activar_nuevamente':
+                    activarNuevamentePropuestas();
+                    break;
                 case 'solicitar_reevaluacion':
                     solicitarReevaluacion();
                     break;
@@ -414,6 +417,64 @@ function seleccionarPropuesta() {
     } catch (PDOException $e) {
         http_response_code(500);
         echo json_encode(['success' => false, 'message' => 'Error al seleccionar propuesta: ' . $e->getMessage()]);
+    }
+}
+
+/**
+ * Quita la propuesta seleccionada para que todos los bancos puedan interactuar de nuevo.
+ */
+function activarNuevamentePropuestas() {
+    global $pdo;
+
+    try {
+        if (!isset($_SESSION['user_roles']) || (!in_array('ROLE_ADMIN', $_SESSION['user_roles']) && !in_array('ROLE_GESTOR', $_SESSION['user_roles']))) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Solo los administradores y gestores pueden activar nuevamente las propuestas']);
+            return;
+        }
+
+        if (empty($_POST['solicitud_id'])) {
+            echo json_encode(['success' => false, 'message' => 'Solicitud requerida']);
+            return;
+        }
+
+        $solicitudId = (int) $_POST['solicitud_id'];
+
+        $stmt = $pdo->prepare("
+            SELECT id, evaluacion_seleccionada
+            FROM solicitudes_credito
+            WHERE id = ?
+        ");
+        $stmt->execute([$solicitudId]);
+        $solicitud = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$solicitud) {
+            echo json_encode(['success' => false, 'message' => 'Solicitud no encontrada']);
+            return;
+        }
+
+        if (empty($solicitud['evaluacion_seleccionada'])) {
+            echo json_encode(['success' => false, 'message' => 'No hay una propuesta seleccionada para esta solicitud']);
+            return;
+        }
+
+        $stmt = $pdo->prepare("
+            UPDATE solicitudes_credito
+            SET evaluacion_seleccionada = NULL,
+                fecha_aprobacion_propuesta = NULL,
+                comentario_seleccion_propuesta = NULL,
+                evaluacion_en_reevaluacion = NULL
+            WHERE id = ?
+        ");
+        $stmt->execute([$solicitudId]);
+
+        echo json_encode([
+            'success' => true,
+            'message' => 'Solicitud reactivada. Todos los bancos habilitados pueden volver a interactuar y podrá seleccionar otra propuesta.'
+        ]);
+    } catch (PDOException $e) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Error al activar nuevamente: ' . $e->getMessage()]);
     }
 }
 

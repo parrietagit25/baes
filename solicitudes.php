@@ -2552,7 +2552,15 @@ if ($isBanco && !$isAdmin) {
                           const comentarioSeleccionGlobal = response.comentario_seleccion_propuesta || '';
                           const mostrarAcciones = !evaluacionSeleccionada; // No mostrar acciones si hay una evaluación seleccionada
                           
-                          let html = '<div class="table-responsive"><table class="table table-striped">';
+                          let html = '';
+                          if (evaluacionSeleccionada) {
+                              html += '<div class="alert alert-warning d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">';
+                              html += '<div class="mb-0"><i class="fas fa-lock me-2"></i>Hay una propuesta seleccionada. Los demás bancos no pueden interactuar con esta solicitud.</div>';
+                              html += '<button type="button" class="btn btn-outline-dark btn-sm" onclick="activarNuevamentePropuestas(' + solicitudId + ')">';
+                              html += '<i class="fas fa-unlock me-1"></i>Activar Nuevamente</button></div>';
+                          }
+
+                          html += '<div class="table-responsive"><table class="table table-striped">';
                           html += '<thead><tr><th>Fecha</th><th>Banco</th><th>Vehículo</th><th>Decisión</th><th>Tasa %</th><th>Valor a Financiar</th><th>Abono</th><th>Plazo</th><th>Letra mensual</th><th>Letra quincenal</th><th>Promoción</th><th>Comentarios</th><th>Comentario al seleccionar</th><th>Motivo reevaluación</th>';
                           if (mostrarAcciones) {
                               html += '<th>Acciones</th>';
@@ -2627,6 +2635,34 @@ if ($isBanco && !$isAdmin) {
             $('#reevaluacion_usuario_banco_id').val(usuarioBancoId);
             $('#comentarioReevaluacion').val('');
             $('#modalSolicitarReevaluacion').modal('show');
+        }
+
+        // Reactivar bancos: limpia la propuesta seleccionada
+        function activarNuevamentePropuestas(solicitudId) {
+            if (!confirm('¿Activar nuevamente esta solicitud?\n\nSe quitará la propuesta seleccionada y todos los bancos habilitados podrán volver a interactuar (p. ej. si el cliente cambia de banco o hay que ajustar condiciones).')) {
+                return;
+            }
+
+            $.ajax({
+                url: 'api/evaluaciones_banco.php',
+                type: 'POST',
+                data: {
+                    action: 'activar_nuevamente',
+                    solicitud_id: solicitudId
+                },
+                dataType: 'json',
+                success: function(response) {
+                    if (response.success) {
+                        alert(response.message);
+                        verRespuestasBancoAdmin(solicitudId);
+                    } else {
+                        alert('Error: ' + (response.message || 'No se pudo activar nuevamente'));
+                    }
+                },
+                error: function() {
+                    alert('Error al activar nuevamente la solicitud');
+                }
+            });
         }
 
         // Función para procesar la selección de propuesta
