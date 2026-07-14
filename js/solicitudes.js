@@ -1662,6 +1662,7 @@ function cargarInfoSolicitud(id) {
                             <div class="card-body">
                                 <p class="mb-1"><strong>Nombre:</strong> ${muroEsc(solicitud.nombre_cliente)}</p>
                                 <p class="mb-1"><strong>Cédula:</strong> ${muroEsc(solicitud.cedula)}</p>
+                                <p class="mb-1"><strong>Perfil financiero:</strong> ${muroEsc(solicitud.perfil_financiero || '—')}</p>
                                 <p class="mb-1"><strong>Teléfono:</strong> ${muroEsc(solicitud.telefono || '—')}</p>
                                 <p class="mb-0"><strong>Correo:</strong> ${muroEsc(solicitud.email || '—')}</p>
                             </div>
