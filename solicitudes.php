@@ -1801,13 +1801,22 @@ if ($isBanco && !$isAdmin) {
                         }
                         if (v.abono_monto != null && v.abono_monto !== '') {
                             $('#abono_evaluacion').val(v.abono_monto);
-                        } else if (v.precio && v.abono_porcentaje) {
-                            calcularAbonoMontoDesdePct();
+                            sincronizarValorFinanciarDesdeVehiculo();
                         } else {
-                            $('#abono_evaluacion').val('');
+                            // Valor a financiar = precio; luego Abono % → Abono $ (sin tocar valor)
+                            var precioInit = parseFloat(v.precio);
+                            if (isFinite(precioInit) && precioInit > 0 && !$('#valor_financiar').prop('disabled')) {
+                                $('#valor_financiar').val(precioInit.toFixed(2));
+                            }
+                            if (v.abono_porcentaje) {
+                                calcularAbonoMontoDesdePct();
+                            } else {
+                                $('#abono_evaluacion').val('');
+                            }
                         }
+                    } else {
+                        sincronizarValorFinanciarDesdeVehiculo();
                     }
-                    sincronizarValorFinanciarDesdeVehiculo();
                     calcularLetrasEvaluacion();
                     break;
                 }
@@ -1827,15 +1836,13 @@ if ($isBanco && !$isAdmin) {
         }
 
         function calcularAbonoMontoDesdePct() {
+            // Abono % sobre Valor a Financiar → solo actualiza Abono $
             var pct = parseFloat($('#abono_pct_evaluacion').val());
-            var precio = obtenerPrecioVehiculoSeleccionado();
-            if (!isFinite(pct) || pct < 0 || precio == null) {
+            var valorFinanciar = parseFloat($('#valor_financiar').val());
+            if (!isFinite(pct) || pct < 0 || !isFinite(valorFinanciar) || valorFinanciar < 0) {
                 return;
             }
-            var monto = precio * (pct / 100);
-            $('#abono_evaluacion').val(monto.toFixed(2));
-            sincronizarValorFinanciarDesdeVehiculo();
-            calcularLetrasEvaluacion();
+            $('#abono_evaluacion').val((valorFinanciar * (pct / 100)).toFixed(2));
         }
 
         function sincronizarValorFinanciarDesdeVehiculo() {
@@ -1895,17 +1902,21 @@ if ($isBanco && !$isAdmin) {
         });
 
         $(document).on('input change', '#abono_evaluacion', function() {
-            // Si edita Abono $ a mano, recalcular % si hay precio de vehículo
-            var precio = obtenerPrecioVehiculoSeleccionado();
+            // Si edita Abono $ a mano, recalcular % sobre Valor a Financiar (sin tocarlo)
+            var valorFinanciar = parseFloat($('#valor_financiar').val());
             var monto = parseFloat($('#abono_evaluacion').val());
-            if (precio != null && isFinite(monto) && monto >= 0) {
-                $('#abono_pct_evaluacion').val(((monto / precio) * 100).toFixed(2));
+            if (isFinite(valorFinanciar) && valorFinanciar > 0 && isFinite(monto) && monto >= 0) {
+                $('#abono_pct_evaluacion').val(((monto / valorFinanciar) * 100).toFixed(2));
             }
-            sincronizarValorFinanciarDesdeVehiculo();
-            calcularLetrasEvaluacion();
         });
 
         $(document).on('input change', '#valor_financiar, #plazo_evaluacion, #tasa_bancaria_evaluacion', function() {
+            if ($(this).is('#valor_financiar')) {
+                var pct = parseFloat($('#abono_pct_evaluacion').val());
+                if (isFinite(pct) && pct >= 0) {
+                    calcularAbonoMontoDesdePct();
+                }
+            }
             calcularLetrasEvaluacion();
         });
 
