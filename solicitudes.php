@@ -1457,9 +1457,9 @@ if ($isBanco && !$isAdmin) {
                                                 <label for="letra_evaluacion" class="form-label">Letra (monto mensual)</label>
                                                 <div class="input-group">
                                                     <span class="input-group-text">$</span>
-                                                    <input type="number" class="form-control" id="letra_evaluacion" name="letra_evaluacion" step="0.01" min="0" disabled readonly>
+                                                    <input type="number" class="form-control" id="letra_evaluacion" name="letra_evaluacion" step="0.01" min="0" disabled>
                                                 </div>
-                                                <div class="form-text">Se calcula con valor a financiar, tasa y plazo.</div>
+                                                <div class="form-text">Ingrese el monto de la letra mensual.</div>
                                             </div>
                                         </div>
                                         <div class="col-md-4">
@@ -1467,9 +1467,9 @@ if ($isBanco && !$isAdmin) {
                                                 <label for="letra_quincenal_evaluacion" class="form-label">Letra (monto quincenal)</label>
                                                 <div class="input-group">
                                                     <span class="input-group-text">$</span>
-                                                    <input type="number" class="form-control" id="letra_quincenal_evaluacion" name="letra_quincenal_evaluacion" step="0.01" min="0" disabled readonly>
+                                                    <input type="number" class="form-control" id="letra_quincenal_evaluacion" name="letra_quincenal_evaluacion" step="0.01" min="0" disabled>
                                                 </div>
-                                                <div class="form-text">Se calcula automáticamente (amortización quincenal).</div>
+                                                <div class="form-text">Ingrese el monto de la letra quincenal.</div>
                                             </div>
                                         </div>
                                     </div>
@@ -1822,8 +1822,7 @@ if ($isBanco && !$isAdmin) {
             });
         }
 
-        // Al cambiar el vehículo, refrescar datos en Información de la Solicitud
-        // y sugerir abono % / abono $ / valor a financiar desde el vehículo
+        // Al cambiar el vehículo, refrescar datos y sugerir valores del vehículo (sin cálculos automáticos)
         $(document).on('change', '#vehiculo_evaluacion', function() {
             var vid = $(this).val();
             renderAprobacionSolicitudInfo(vid);
@@ -1839,155 +1838,41 @@ if ($isBanco && !$isAdmin) {
                         }
                         if (v.abono_monto != null && v.abono_monto !== '') {
                             $('#abono_evaluacion').val(v.abono_monto);
-                            sincronizarValorFinanciarDesdeVehiculo();
                         } else {
-                            // Valor a financiar = precio; luego Abono % → Abono $ (sin tocar valor)
-                            var precioInit = parseFloat(v.precio);
-                            if (isFinite(precioInit) && precioInit > 0 && !$('#valor_financiar').prop('disabled')) {
-                                $('#valor_financiar').val(precioInit.toFixed(2));
-                            }
-                            if (v.abono_porcentaje) {
-                                calcularAbonoMontoDesdePct();
-                            } else {
-                                $('#abono_evaluacion').val('');
-                            }
+                            $('#abono_evaluacion').val('');
                         }
-                    } else {
-                        sincronizarValorFinanciarDesdeVehiculo();
+                        var precioInit = parseFloat(v.precio);
+                        if (isFinite(precioInit) && precioInit > 0 && !$('#valor_financiar').prop('disabled')) {
+                            $('#valor_financiar').val(precioInit.toFixed(2));
+                        }
                     }
-                    calcularLetrasEvaluacion();
                     break;
                 }
             }
         });
 
-        function obtenerPrecioVehiculoSeleccionado() {
-            var vid = $('#vehiculo_evaluacion').val();
-            if (!vid) return null;
-            for (var i = 0; i < aprobacionVehiculosCache.length; i++) {
-                if (String(aprobacionVehiculosCache[i].id) === String(vid)) {
-                    var p = parseFloat(aprobacionVehiculosCache[i].precio);
-                    return isFinite(p) && p > 0 ? p : null;
-                }
-            }
-            return null;
-        }
+        // Sin cálculo automático: el banco ingresa Valor a Financiar, Abono %, Abono $ y Letras a mano.
 
-        function calcularAbonoMontoDesdePct() {
-            // Abono % sobre Valor a Financiar → solo actualiza Abono $
-            var pct = parseFloat($('#abono_pct_evaluacion').val());
-            var valorFinanciar = parseFloat($('#valor_financiar').val());
-            if (!isFinite(pct) || pct < 0 || !isFinite(valorFinanciar) || valorFinanciar < 0) {
-                return;
-            }
-            $('#abono_evaluacion').val((valorFinanciar * (pct / 100)).toFixed(2));
-        }
-
-        function sincronizarValorFinanciarDesdeVehiculo() {
-            if ($('#valor_financiar').prop('disabled')) return;
-            var precio = obtenerPrecioVehiculoSeleccionado();
-            if (precio == null) return;
-            var abono = parseFloat($('#abono_evaluacion').val());
-            if (!isFinite(abono) || abono < 0) abono = 0;
-            var financiable = Math.max(0, precio - abono);
-            $('#valor_financiar').val(financiable.toFixed(2));
-        }
-
-        /**
-         * Cuota francesa: principal, tasa anual %, periodos, periodos/año.
-         */
-        function calcCuotaAmortizacion(principal, tasaAnualPct, nPeriodos, periodosPorAnio) {
-            principal = parseFloat(principal);
-            tasaAnualPct = parseFloat(tasaAnualPct);
-            nPeriodos = parseInt(nPeriodos, 10);
-            if (!isFinite(principal) || principal <= 0 || !isFinite(nPeriodos) || nPeriodos <= 0) {
-                return null;
-            }
-            if (!isFinite(tasaAnualPct) || tasaAnualPct < 0) {
-                tasaAnualPct = 0;
-            }
-            if (tasaAnualPct === 0) {
-                return principal / nPeriodos;
-            }
-            var r = (tasaAnualPct / 100) / periodosPorAnio;
-            var factor = Math.pow(1 + r, nPeriodos);
-            return principal * (r * factor) / (factor - 1);
-        }
-
-        function calcularLetrasEvaluacion() {
-            var valor = parseFloat($('#valor_financiar').val());
-            var plazoMeses = parseInt($('#plazo_evaluacion').val(), 10);
-            var tasa = parseFloat($('#tasa_bancaria_evaluacion').val());
-
-            if (!isFinite(valor) || valor <= 0 || !isFinite(plazoMeses) || plazoMeses <= 0) {
-                $('#letra_evaluacion').val('');
-                $('#letra_quincenal_evaluacion').val('');
-                return;
-            }
-            if (!isFinite(tasa) || tasa < 0) {
-                tasa = 0;
-            }
-
-            var mensual = calcCuotaAmortizacion(valor, tasa, plazoMeses, 12);
-            var quincenal = calcCuotaAmortizacion(valor, tasa, plazoMeses * 2, 24);
-
-            $('#letra_evaluacion').val(mensual != null ? mensual.toFixed(2) : '');
-            $('#letra_quincenal_evaluacion').val(quincenal != null ? quincenal.toFixed(2) : '');
-        }
-
-        $(document).on('input change', '#abono_pct_evaluacion', function() {
-            calcularAbonoMontoDesdePct();
-        });
-
-        $(document).on('input change', '#abono_evaluacion', function() {
-            // Si edita Abono $ a mano, recalcular % sobre Valor a Financiar (sin tocarlo)
-            var valorFinanciar = parseFloat($('#valor_financiar').val());
-            var monto = parseFloat($('#abono_evaluacion').val());
-            if (isFinite(valorFinanciar) && valorFinanciar > 0 && isFinite(monto) && monto >= 0) {
-                $('#abono_pct_evaluacion').val(((monto / valorFinanciar) * 100).toFixed(2));
-            }
-        });
-
-        $(document).on('input change', '#valor_financiar, #plazo_evaluacion, #tasa_bancaria_evaluacion', function() {
-            if ($(this).is('#valor_financiar')) {
-                var pct = parseFloat($('#abono_pct_evaluacion').val());
-                if (isFinite(pct) && pct >= 0) {
-                    calcularAbonoMontoDesdePct();
-                }
-            }
-            calcularLetrasEvaluacion();
-        });
-
-        // Función para mostrar/ocultar campos según la decisión
         window.mostrarCamposDecision = function(decision) {
-            // Ocultar todos los campos primero
             const campos = ['#valor_financiar', '#abono_pct_evaluacion', '#abono_evaluacion', '#plazo_evaluacion', '#letra_evaluacion', '#letra_quincenal_evaluacion', '#promocion_evaluacion', '#comentarios_evaluacion'];
             campos.forEach(function(campo) {
                 $(campo).prop('disabled', true);
                 $(campo).prop('required', false);
             });
-            
-            // Mostrar contenedor
+
             $('#camposDecision').show();
-            
-            // Habilitar campos según la decisión
+
             if (decision === 'rechazado') {
-                // Solo habilitar comentarios
                 $('#comentarios_evaluacion').prop('disabled', false);
                 $('#comentarios_evaluacion').prop('required', true);
                 $('#letra_evaluacion').val('');
                 $('#letra_quincenal_evaluacion').val('');
             } else if (decision === 'preaprobado' || decision === 'aprobado' || decision === 'aprobado_condicional') {
-                // Habilitar entrada; letras se calculan (quedan readonly)
-                ['#valor_financiar', '#abono_pct_evaluacion', '#abono_evaluacion', '#plazo_evaluacion', '#promocion_evaluacion', '#comentarios_evaluacion'].forEach(function(campo) {
-                    $(campo).prop('disabled', false);
+                ['#valor_financiar', '#abono_pct_evaluacion', '#abono_evaluacion', '#plazo_evaluacion', '#letra_evaluacion', '#letra_quincenal_evaluacion', '#promocion_evaluacion', '#comentarios_evaluacion'].forEach(function(campo) {
+                    $(campo).prop('disabled', false).prop('readonly', false);
                 });
-                $('#letra_evaluacion').prop('disabled', false).prop('readonly', true);
-                $('#letra_quincenal_evaluacion').prop('disabled', false).prop('readonly', true);
                 $('#comentarios_evaluacion').prop('required', false);
-                calcularLetrasEvaluacion();
             } else {
-                // Ocultar contenedor si no hay selección
                 $('#camposDecision').hide();
             }
         };
