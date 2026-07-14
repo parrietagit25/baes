@@ -1069,11 +1069,11 @@ function mostrarDetalles(solicitudOrId) {
             <div class="mb-3" aria-hidden="true">
                 <i class="fas fa-hard-hat text-warning" style="font-size: 3.5rem;"></i>
                 <i class="fas fa-tools text-secondary mx-3" style="font-size: 2.4rem;"></i>
-                <i class="fas fa-cone text-danger" style="font-size: 2.8rem;"></i>
+                <i class="fas fa-exclamation-triangle text-danger" style="font-size: 2.8rem;"></i>
             </div>
             <div class="mb-3">
                 <span class="badge rounded-pill text-bg-warning px-3 py-2">
-                    <i class="fas fa-person-digging me-2"></i>Zona en construcción
+                    <i class="fas fa-hard-hat me-2"></i>Zona en construcción
                 </span>
             </div>
             <h4 class="fw-bold mb-2" style="color:#d35400;">Zona en construcción</h4>
