@@ -2,10 +2,19 @@
 /**
  * Subida y consulta de reportes de reservas (admin y gestor).
  */
-session_start();
+if (session_status() !== PHP_SESSION_ACTIVE) {
+    session_start();
+}
+
+// Evitar que Notice/Warning contaminen descargas binarias (p. ej. Excel)
+if (isset($_GET['download'])) {
+    ini_set('display_errors', '0');
+    error_reporting(E_ALL & ~E_NOTICE & ~E_WARNING & ~E_DEPRECATED & ~E_STRICT);
+}
 
 if (!isset($_SESSION['user_id'])) {
     http_response_code(401);
+    header('Content-Type: application/json; charset=utf-8');
     echo json_encode(['success' => false, 'message' => 'No autorizado']);
     exit();
 }
@@ -15,7 +24,8 @@ $esAdmin = in_array('ROLE_ADMIN', $roles, true);
 $esGestor = in_array('ROLE_GESTOR', $roles, true);
 if (!$esAdmin && !$esGestor) {
     http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Acceso denegado']);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['success' => false, 'message' => 'No autorizado']);
     exit();
 }
 
