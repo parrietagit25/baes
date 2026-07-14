@@ -1425,7 +1425,13 @@ if ($isBanco && !$isAdmin) {
                                         <div class="col-md-6">
                                             <div class="mb-3">
                                                 <label for="promocion_evaluacion" class="form-label">Promoción</label>
-                                                <input type="text" class="form-control" id="promocion_evaluacion" name="promocion_evaluacion" placeholder="Ej: Tasa especial, descuento, etc." disabled>
+                                                <select class="form-select" id="promocion_evaluacion" name="promocion_evaluacion" disabled>
+                                                    <option value="">Seleccione una promoción...</option>
+                                                    <option value="Servicios de Mantenimiento">Servicios de Mantenimiento</option>
+                                                    <option value="Cash Back para abono">Cash Back para abono</option>
+                                                    <option value="Cargo en Cta de Ahorro">Cargo en Cta de Ahorro</option>
+                                                    <option value="Póliza de Auto (1er año)">Póliza de Auto (1er año)</option>
+                                                </select>
                                             </div>
                                         </div>
                                         <div class="col-md-6">
