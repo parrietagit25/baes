@@ -1643,11 +1643,13 @@ if ($isBanco && !$isAdmin) {
 
         function renderAprobacionSolicitudInfo(vehiculoId) {
             var solicitud = aprobacionSolicitudCache || {};
+            var perfil = solicitud.perfil_financiero || '—';
             var html = `
                 <div class="row">
                     <div class="col-md-6">
                         <strong>Cliente:</strong> ${aprobacionEsc(solicitud.nombre_cliente || '—')}<br>
                         <strong>Cédula:</strong> ${aprobacionEsc(solicitud.cedula || '—')}<br>
+                        <strong>Perfil:</strong> <span class="badge bg-secondary">${aprobacionEsc(perfil)}</span><br>
                         <strong>Gestor:</strong> ${aprobacionEsc((solicitud.gestor_nombre || '') + ' ' + (solicitud.gestor_apellido || '')).trim() || '—'}<br>
                         <strong>Estado:</strong> <span class="badge bg-info">${aprobacionEsc(solicitud.estado || '—')}</span>
                     </div>
@@ -1668,9 +1670,15 @@ if ($isBanco && !$isAdmin) {
                 var abonoPct = (veh.abono_porcentaje != null && veh.abono_porcentaje !== '')
                     ? aprobacionEsc(veh.abono_porcentaje) + '%'
                     : '—';
+                var estaReservada = parseInt(veh.apartado, 10) === 1;
+                var reservaHtml = estaReservada
+                    ? '<span class="badge bg-success">Sí — unidad reservada / apartada</span>'
+                    : '<span class="badge bg-warning text-dark">No — sin reserva aplicada</span>';
                 html += `
                         <div class="border rounded p-2 bg-light">
                             <div class="fw-semibold mb-1"><i class="fas fa-car me-1"></i>Vehículo seleccionado</div>
+                            <strong>Unidad:</strong> ${aprobacionEsc(veh.unidad || '—')}<br>
+                            <strong>¿Reservada?:</strong> ${reservaHtml}<br>
                             <strong>Marca:</strong> ${aprobacionEsc(veh.marca || '—')}<br>
                             <strong>Modelo:</strong> ${aprobacionEsc(veh.modelo || '—')}<br>
                             <strong>Año:</strong> ${aprobacionEsc(veh.anio || '—')}<br>
@@ -1737,8 +1745,12 @@ if ($isBanco && !$isAdmin) {
                         
                         if (aprobacionVehiculosCache.length > 0) {
                             aprobacionVehiculosCache.forEach(function(vehiculo) {
+                                const reservada = parseInt(vehiculo.apartado, 10) === 1 ? ' [Reservada]' : '';
+                                const unidadTxt = vehiculo.unidad ? ` · ${vehiculo.unidad}` : '';
                                 const text = `${vehiculo.marca || 'N/A'} ${vehiculo.modelo || ''}`.trim()
-                                    + (vehiculo.anio ? ` (${vehiculo.anio})` : '');
+                                    + (vehiculo.anio ? ` (${vehiculo.anio})` : '')
+                                    + unidadTxt
+                                    + reservada;
                                 $select.append(`<option value="${vehiculo.id}">${text}</option>`);
                             });
                         } else {
