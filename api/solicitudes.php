@@ -212,6 +212,8 @@ function obtenerSolicitudes() {
         
         $whereClause = "";
         $params = [];
+        $esHistorico = isset($_GET['historico']) && ($_GET['historico'] === '1' || $_GET['historico'] === 'true');
+        $estadosHistorico = ['Completada', 'Rechazada', 'Desistimiento'];
         
         if (in_array('ROLE_GESTOR', $userRoles)) {
             $whereClause = " WHERE s.gestor_id = ?";
@@ -230,6 +232,16 @@ function obtenerSolicitudes() {
             http_response_code(403);
             echo json_encode(['success' => false, 'message' => 'Acceso denegado']);
             return;
+        }
+
+        $placeholders = implode(',', array_fill(0, count($estadosHistorico), '?'));
+        if ($esHistorico) {
+            $whereClause .= ($whereClause === '' ? ' WHERE ' : ' AND ') . "s.estado IN ($placeholders)";
+        } else {
+            $whereClause .= ($whereClause === '' ? ' WHERE ' : ' AND ') . "s.estado NOT IN ($placeholders)";
+        }
+        foreach ($estadosHistorico as $est) {
+            $params[] = $est;
         }
         
         $sql .= $whereClause . " GROUP BY s.id, u.nombre, u.apellido, ev.nombre, ub.nombre, ub.apellido, b.nombre ORDER BY (s.estado = 'Nueva') DESC, s.id DESC";

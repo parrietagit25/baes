@@ -29,6 +29,9 @@ $isVendedor = in_array('ROLE_VENDEDOR', $_SESSION['user_roles']);
         <a class="nav-link <?php echo ($current_page == 'solicitudes.php') ? 'active' : ''; ?>" href="solicitudes.php">
             <i class="fas fa-file-alt me-2"></i>Solicitudes de Crédito
         </a>
+        <a class="nav-link <?php echo ($current_page == 'historico_solicitudes.php') ? 'active' : ''; ?>" href="historico_solicitudes.php">
+            <i class="fas fa-archive me-2"></i>Histórico de Solicitudes
+        </a>
         <?php endif; ?>
 
         <?php if ($isBanco): ?>
@@ -87,8 +90,8 @@ $isVendedor = in_array('ROLE_VENDEDOR', $_SESSION['user_roles']);
         </a>
         <?php endif; ?>
         
-        <!-- Integración Pipedrive - Solo administrador -->
-        <?php if ($isAdmin): ?>
+        <!-- Integración Pipedrive - oculto del menú (la página sigue existiendo si se accede por URL) -->
+        <?php if (false && $isAdmin): ?>
         <a class="nav-link <?php echo ($current_page == 'pipedrive.php') ? 'active' : ''; ?>" href="pipedrive.php">
             <i class="fas fa-plug me-2"></i>Integración Pipedrive
         </a>

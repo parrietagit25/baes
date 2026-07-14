@@ -10,6 +10,10 @@ require_once 'config/database.php';
 require_once 'includes/validar_acceso.php';
 require_once 'includes/solicitud_vehiculo_helper.php';
 
+// Vista histórica: Completada, Rechazada, Desistimiento
+$esHistorico = defined('MOTUS_VISTA_HISTORICO') && MOTUS_VISTA_HISTORICO;
+$estadosHistoricoSql = "'Completada', 'Rechazada', 'Desistimiento'";
+
 // Obtener roles del usuario para restricciones
 $userRoles = $_SESSION['user_roles'] ?? [];
 $isAdmin = in_array('ROLE_ADMIN', $userRoles);
@@ -31,6 +35,11 @@ try {
     }
 }
 
+// Filtro de estado (activas vs histórico)
+$filtroEstadoLista = $esHistorico
+    ? "estado IN ($estadosHistoricoSql)"
+    : "estado NOT IN ($estadosHistoricoSql)";
+
 // Obtener estadísticas (filtrar por usuario banco si aplica)
 if ($isBanco && !$isAdmin) {
     // Usuario banco solo ve sus solicitudes asignadas
@@ -41,45 +50,72 @@ if ($isBanco && !$isAdmin) {
         AND ubs.estado = 'activo'
     )";
     
-    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE 1=1 $filtroBanco");
+    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE $filtroEstadoLista $filtroBanco");
     $totalSolicitudes = $stmt->fetch()['total'];
 
     $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE estado = 'Nueva' $filtroBanco");
     $solicitudesNuevas = $stmt->fetch()['total'];
 
-    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE respuesta_banco = 'Aprobado' $filtroBanco");
+    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE respuesta_banco = 'Aprobado' AND $filtroEstadoLista $filtroBanco");
     $solicitudesAprobadas = $stmt->fetch()['total'];
 
-    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE respuesta_banco = 'Rechazado' $filtroBanco");
+    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE respuesta_banco = 'Rechazado' AND $filtroEstadoLista $filtroBanco");
+    $solicitudesRechazadasBanco = $stmt->fetch()['total'];
+
+    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE estado = 'Rechazada' $filtroBanco");
     $solicitudesRechazadas = $stmt->fetch()['total'];
+
+    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE estado = 'Completada' $filtroBanco");
+    $solicitudesCompletadas = $stmt->fetch()['total'];
+
+    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE estado = 'Desistimiento' $filtroBanco");
+    $solicitudesDesistimiento = $stmt->fetch()['total'];
 } elseif ($isGestor && !$isAdmin) {
     // Gestor solo ve sus solicitudes asignadas
     $filtroGestor = "AND gestor_id = " . $_SESSION['user_id'];
     
-    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE 1=1 $filtroGestor");
+    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE $filtroEstadoLista $filtroGestor");
     $totalSolicitudes = $stmt->fetch()['total'];
 
     $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE estado = 'Nueva' $filtroGestor");
     $solicitudesNuevas = $stmt->fetch()['total'];
 
-    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE respuesta_banco = 'Aprobado' $filtroGestor");
+    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE respuesta_banco = 'Aprobado' AND $filtroEstadoLista $filtroGestor");
     $solicitudesAprobadas = $stmt->fetch()['total'];
 
-    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE respuesta_banco = 'Rechazado' $filtroGestor");
+    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE respuesta_banco = 'Rechazado' AND $filtroEstadoLista $filtroGestor");
+    $solicitudesRechazadasBanco = $stmt->fetch()['total'];
+
+    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE estado = 'Rechazada' $filtroGestor");
     $solicitudesRechazadas = $stmt->fetch()['total'];
+
+    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE estado = 'Completada' $filtroGestor");
+    $solicitudesCompletadas = $stmt->fetch()['total'];
+
+    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE estado = 'Desistimiento' $filtroGestor");
+    $solicitudesDesistimiento = $stmt->fetch()['total'];
 } else {
     // Admin ve todas las solicitudes
-    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito");
+    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE $filtroEstadoLista");
     $totalSolicitudes = $stmt->fetch()['total'];
 
     $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE estado = 'Nueva'");
     $solicitudesNuevas = $stmt->fetch()['total'];
 
-    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE respuesta_banco = 'Aprobado'");
+    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE respuesta_banco = 'Aprobado' AND $filtroEstadoLista");
     $solicitudesAprobadas = $stmt->fetch()['total'];
 
-    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE respuesta_banco = 'Rechazado'");
+    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE respuesta_banco = 'Rechazado' AND $filtroEstadoLista");
+    $solicitudesRechazadasBanco = $stmt->fetch()['total'];
+
+    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE estado = 'Rechazada'");
     $solicitudesRechazadas = $stmt->fetch()['total'];
+
+    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE estado = 'Completada'");
+    $solicitudesCompletadas = $stmt->fetch()['total'];
+
+    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE estado = 'Desistimiento'");
+    $solicitudesDesistimiento = $stmt->fetch()['total'];
 }
 ?>
 
@@ -88,7 +124,7 @@ if ($isBanco && !$isAdmin) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Solicitudes de Crédito - Solicitud de Crédito</title>
+    <title><?php echo $esHistorico ? 'Histórico de Solicitudes' : 'Solicitudes de Crédito'; ?> - Solicitud de Crédito</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css" rel="stylesheet">
@@ -209,10 +245,12 @@ if ($isBanco && !$isAdmin) {
                     <!-- Header -->
                     <div class="d-flex justify-content-between align-items-center mb-4">
                         <div>
-                            <h2 class="mb-1">Solicitudes de Crédito</h2>
-                            <p class="text-muted mb-0">Gestión de solicitudes de crédito vehicular</p>
+                            <h2 class="mb-1"><?php echo $esHistorico ? 'Histórico de Solicitudes' : 'Solicitudes de Crédito'; ?></h2>
+                            <p class="text-muted mb-0"><?php echo $esHistorico
+                                ? 'Solicitudes completadas, rechazadas o en desistimiento'
+                                : 'Gestión de solicitudes de crédito vehicular'; ?></p>
                         </div>
-                        <?php if (in_array('ROLE_GESTOR', $userRoles) || in_array('ROLE_ADMIN', $userRoles)): ?>
+                        <?php if (!$esHistorico && (in_array('ROLE_GESTOR', $userRoles) || in_array('ROLE_ADMIN', $userRoles))): ?>
                         <div class="btn-group">
                             <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#solicitudModal" onclick="limpiarFormularioSolicitud()">
                                 <i class="fas fa-plus me-2"></i>Nueva Solicitud
@@ -228,6 +266,34 @@ if ($isBanco && !$isAdmin) {
                     </div>
 
                     <!-- Estadísticas -->
+                    <?php if ($esHistorico): ?>
+                    <div class="row mb-4">
+                        <div class="col-md-3">
+                            <div class="stats-card text-center">
+                                <div class="stats-number"><?php echo $totalSolicitudes; ?></div>
+                                <div class="stats-label">Total en histórico</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="stats-card text-center" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+                                <div class="stats-number"><?php echo $solicitudesCompletadas; ?></div>
+                                <div class="stats-label">Completadas</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="stats-card text-center" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);">
+                                <div class="stats-number"><?php echo $solicitudesRechazadas; ?></div>
+                                <div class="stats-label">Rechazadas</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="stats-card text-center" style="background: linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%);">
+                                <div class="stats-number"><?php echo $solicitudesDesistimiento; ?></div>
+                                <div class="stats-label">Desistimiento</div>
+                            </div>
+                        </div>
+                    </div>
+                    <?php else: ?>
                     <div class="row mb-4">
                         <div class="col-md-3">
                             <div class="stats-card text-center">
@@ -249,11 +315,12 @@ if ($isBanco && !$isAdmin) {
                         </div>
                         <div class="col-md-3">
                             <div class="stats-card text-center" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
-                                <div class="stats-number"><?php echo $solicitudesRechazadas; ?></div>
-                                <div class="stats-label">Rechazadas</div>
+                                <div class="stats-number"><?php echo $solicitudesRechazadasBanco; ?></div>
+                                <div class="stats-label">Rechazadas banco</div>
                             </div>
                         </div>
                     </div>
+                    <?php endif; ?>
 
                     <!-- Tabla de Solicitudes -->
                     <div class="card">
@@ -302,18 +369,29 @@ if ($isBanco && !$isAdmin) {
                                               LEFT JOIN ejecutivos_ventas ev ON s.ejecutivo_ventas_id = ev.id
                                           ";
                                         
-                                                                                  // Aplicar filtro según el rol del usuario
+                                          // Aplicar filtro según el rol del usuario
+                                          $whereParts = [];
                                           if (in_array('ROLE_BANCO', $userRoles) && !in_array('ROLE_ADMIN', $userRoles)) {
                                               // Usuario banco solo ve sus solicitudes asignadas
-                                              $sql .= " WHERE EXISTS (
+                                              $whereParts[] = "EXISTS (
                                                   SELECT 1 FROM usuarios_banco_solicitudes ubs 
                                                   WHERE ubs.solicitud_id = s.id 
-                                                  AND ubs.usuario_banco_id = " . $_SESSION['user_id'] . "
+                                                  AND ubs.usuario_banco_id = " . (int) $_SESSION['user_id'] . "
                                                   AND ubs.estado = 'activo'
                                               )";
                                           } elseif (in_array('ROLE_GESTOR', $userRoles) && !in_array('ROLE_ADMIN', $userRoles)) {
                                               // Gestor solo ve sus solicitudes asignadas
-                                              $sql .= " WHERE s.gestor_id = " . $_SESSION['user_id'];
+                                              $whereParts[] = "s.gestor_id = " . (int) $_SESSION['user_id'];
+                                          }
+
+                                          if ($esHistorico) {
+                                              $whereParts[] = "s.estado IN ($estadosHistoricoSql)";
+                                          } else {
+                                              $whereParts[] = "s.estado NOT IN ($estadosHistoricoSql)";
+                                          }
+
+                                          if (!empty($whereParts)) {
+                                              $sql .= " WHERE " . implode(' AND ', $whereParts);
                                           }
                                         
                                         $sql .= " ORDER BY (s.estado = 'Nueva') DESC, s.id DESC";
@@ -1471,16 +1549,6 @@ if ($isBanco && !$isAdmin) {
                             <div class="form-text">Seleccione el nuevo estado para esta solicitud</div>
                         </div>
                         
-                        <!-- Nota para estado Completada -->
-                        <div id="nota_completada" class="alert alert-info d-none" role="alert">
-                            <h6 class="alert-heading">
-                                <i class="fas fa-info-circle me-2"></i>Importante
-                            </h6>
-                            <p class="mb-0">
-                                <strong>Los datos viajarán a OCTO para su facturación</strong> y el proceso en MOTUS para esta solicitud será culminado.
-                            </p>
-                        </div>
-                        
                         <!-- Campo de Nota -->
                         <div class="mb-3">
                             <label for="nota_cambio_estado" class="form-label">Nota del Cambio *</label>
@@ -1506,6 +1574,7 @@ if ($isBanco && !$isAdmin) {
 
     <script>
     window.AUTOS_DISPONIBLES_API = '<?php echo htmlspecialchars((rtrim(dirname($_SERVER["SCRIPT_NAME"]), "/") ?: "") . "/api/autos_disponibles.php"); ?>';
+    window.MOTUS_ES_HISTORICO = <?php echo $esHistorico ? 'true' : 'false'; ?>;
     </script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
@@ -2049,9 +2118,13 @@ if ($isBanco && !$isAdmin) {
                 dataType: 'json',
                 success: function(response) {
                     if (response.success) {
-                        alert(response.message);
+                        var estadosHistorico = ['Completada', 'Rechazada', 'Desistimiento'];
+                        var msg = response.message;
+                        if (estadosHistorico.indexOf(nuevoEstado) !== -1 && !window.MOTUS_ES_HISTORICO) {
+                            msg += '\n\nLa solicitud se movió al Histórico de Solicitudes.';
+                        }
+                        alert(msg);
                         $('#cambioEstadoModal').modal('hide');
-                        // Recargar la tabla
                         location.reload();
                     } else {
                         alert('Error: ' + response.message);

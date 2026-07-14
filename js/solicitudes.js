@@ -248,21 +248,8 @@ $(document).ready(function() {
         }
     });
     
-    // Event listener para mostrar/ocultar nota cuando se selecciona "Completada"
-    $(document).on('change', '#nuevo_estado', function() {
-        const estadoSeleccionado = $(this).val();
-        const notaCompletada = $('#nota_completada');
-        
-        if (estadoSeleccionado === 'Completada') {
-            notaCompletada.removeClass('d-none');
-        } else {
-            notaCompletada.addClass('d-none');
-        }
-    });
-    
-    // Limpiar la nota cuando se cierre el modal
+    // Limpiar al cerrar el modal de cambio de estado
     $('#cambioEstadoModal').on('hidden.bs.modal', function() {
-        $('#nota_completada').addClass('d-none');
         $('#nuevo_estado').val('');
     });
     
@@ -403,6 +390,7 @@ function cargarSolicitudes() {
     $.ajax({
         url: 'api/solicitudes.php',
         type: 'GET',
+        data: window.MOTUS_ES_HISTORICO ? { historico: 1 } : {},
         dataType: 'json',
         success: function(response) {
             console.log('Respuesta de la API:', response);
