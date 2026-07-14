@@ -277,8 +277,13 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
                                                 <th>Id</th>
                                                 <th>Cliente</th>
                                                 <th>Banco</th>
-                                                <th>Fecha asignación</th>
-                                                <th>Fecha respuesta</th>
+                                                <th>Fecha envío Solicitud a Banco</th>
+                                                <th>Fecha Respuesta de entidad</th>
+                                                <th>Fecha de Aceptacion</th>
+                                                <th>Fecha envío Proforma y Ruv</th>
+                                                <th>Fecha cita de firma</th>
+                                                <th>Fecha liberación CCP</th>
+                                                <th>Fecha de reserva</th>
                                                 <th>Tiempo de respuesta</th>
                                             </tr>
                                         </thead>
@@ -941,11 +946,15 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
     }
 
     function loadReporteBanco() {
+        function fmtFechaBanco(v) {
+            if (!v) return '-';
+            return String(v).replace('T', ' ').substring(0, 19);
+        }
         fetch('api/reportes.php?action=reporte_banco')
             .then(r => r.json())
             .then(data => {
                 const tbody = document.querySelector('#tabla-banco tbody');
-                if (!data.success) { tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Sin datos</td></tr>'; return; }
+                if (!data.success) { tbody.innerHTML = '<tr><td colspan="11" class="text-center text-muted">Sin datos</td></tr>'; return; }
                 const porBanco = {};
                 let html = '';
                 data.data.forEach(row => {
@@ -956,12 +965,23 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
                         if (row.dias_respuesta > 0) tiempo = row.dias_respuesta + ' día(s)';
                         else tiempo = (row.horas_respuesta || 0) + ' hora(s)';
                     }
-                    const fechaResp = row.fecha_respuesta ? row.fecha_respuesta : '-';
                     const bancoNombre = (row.banco_nombre && String(row.banco_nombre).trim() !== '') ? String(row.banco_nombre) : 'Sin banco';
                     porBanco[bancoNombre] = (porBanco[bancoNombre] || 0) + 1;
-                    html += '<tr><td>' + row.solicitud_id + '</td><td>' + escapeHtml(row.nombre_cliente || '') + '</td><td>' + escapeHtml(row.banco_nombre || '-') + '</td><td>' + (row.fecha_asignacion || '-') + '</td><td>' + fechaResp + '</td><td>' + tiempo + '</td></tr>';
+                    html += '<tr>'
+                        + '<td>' + row.solicitud_id + '</td>'
+                        + '<td>' + escapeHtml(row.nombre_cliente || '') + '</td>'
+                        + '<td>' + escapeHtml(row.banco_nombre || '-') + '</td>'
+                        + '<td>' + fmtFechaBanco(row.fecha_envio_solicitud_banco || row.fecha_asignacion) + '</td>'
+                        + '<td>' + fmtFechaBanco(row.fecha_respuesta_entidad || row.fecha_respuesta) + '</td>'
+                        + '<td>' + fmtFechaBanco(row.fecha_aceptacion) + '</td>'
+                        + '<td>' + fmtFechaBanco(row.fecha_envio_proforma_ruv) + '</td>'
+                        + '<td>' + fmtFechaBanco(row.fecha_cita_firma) + '</td>'
+                        + '<td>' + fmtFechaBanco(row.fecha_liberacion_ccp) + '</td>'
+                        + '<td>' + fmtFechaBanco(row.fecha_reserva) + '</td>'
+                        + '<td>' + tiempo + '</td>'
+                        + '</tr>';
                 });
-                if (!html) html = '<tr><td colspan="6" class="text-center text-muted">Sin datos</td></tr>';
+                if (!html) html = '<tr><td colspan="11" class="text-center text-muted">Sin datos</td></tr>';
                 tbody.innerHTML = html;
 
                 if (bancoSolicitudesChart) {
@@ -998,7 +1018,7 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
                     });
                 }
             })
-            .catch(() => { document.querySelector('#tabla-banco tbody').innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error al cargar</td></tr>'; });
+            .catch(() => { document.querySelector('#tabla-banco tbody').innerHTML = '<tr><td colspan="11" class="text-center text-danger">Error al cargar</td></tr>'; });
     }
 
     function loadReporteEmails() {

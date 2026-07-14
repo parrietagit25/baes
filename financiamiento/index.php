@@ -1024,8 +1024,8 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           </div>
           <div class="col-3">
             <label for="cliente_nacimiento">Fecha de nacimiento *</label>
-            <input id="cliente_nacimiento" name="cliente_nacimiento" type="text" inputmode="numeric" autocomplete="bday" maxlength="10" placeholder="MM/DD/YYYY" required />
-            <p id="clienteNacimientoHint" class="nacimiento-hint">Digite solo números; formato MM/DD/YYYY (mes/día/año). La edad debe estar entre 18 y 100 años.</p>
+            <input id="cliente_nacimiento" name="cliente_nacimiento" type="text" inputmode="numeric" autocomplete="bday" maxlength="10" placeholder="DD/MM/YYYY" required />
+            <p id="clienteNacimientoHint" class="nacimiento-hint">Digite solo números; formato DD/MM/YYYY (día/mes/año). La edad debe estar entre 18 y 100 años.</p>
             <div class="error" data-error-for="cliente_nacimiento"></div>
           </div>
           <div class="col-3">
@@ -1286,8 +1286,8 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           </div>
           <div class="col-3">
             <label for="con_nacimiento">Fecha de nacimiento</label>
-            <input id="con_nacimiento" name="con_nacimiento" type="text" inputmode="numeric" autocomplete="off" maxlength="10" placeholder="MM/DD/YYYY (opcional)" />
-            <p id="conNacimientoHint" class="nacimiento-hint">Opcional. Formato MM/DD/YYYY (mes/día/año). La edad se calcula sola; sin límite de edad.</p>
+            <input id="con_nacimiento" name="con_nacimiento" type="text" inputmode="numeric" autocomplete="off" maxlength="10" placeholder="DD/MM/YYYY (opcional)" />
+            <p id="conNacimientoHint" class="nacimiento-hint">Opcional. Formato DD/MM/YYYY (día/mes/año). La edad se calcula sola; sin límite de edad.</p>
             <div class="error" data-error-for="con_nacimiento"></div>
           </div>
           <div class="col-3">
@@ -1364,7 +1364,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
         <div class="sectionTitle">
           <div>
             <h2>E. Referencias</h2>
-            <p>2 personales (no parientes) y 2 familiares (que no vivan con usted). Para adjuntar PDF u otros documentos use la solapa <strong>Adjuntos</strong> (icono de clip). Para bajar una copia local del mismo PDF que recibe el vendedor, use la solapa <strong>PDF</strong> (icono de documento).</p>
+            <p>2 personales (no parientes) y 2 familiares (que no vivan con usted). Para adjuntar PDFs u otros documentos, seleccione la pestaña <strong>Adjuntos</strong> (ícono de clip). Si desea descargar una copia del PDF que recibe el vendedor, seleccione la pestaña <strong>PDF</strong> (ícono de documento).</p>
           </div>
         </div>
         <div class="grid">
@@ -2266,7 +2266,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
         if (nacEl && data.cliente_nacimiento != null && data.cliente_nacimiento !== undefined){
           var rawN = String(data.cliente_nacimiento).trim();
           if (/^\d{4}-\d{2}-\d{2}$/.test(rawN)){
-            nacEl.value = rawN.slice(5, 7) + "/" + rawN.slice(8, 10) + "/" + rawN.slice(0, 4);
+            nacEl.value = rawN.slice(8, 10) + "/" + rawN.slice(5, 7) + "/" + rawN.slice(0, 4);
           }
         }
         syncClienteNacimientoVisual();
@@ -2274,7 +2274,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
         if (conNacEl && data.con_nacimiento != null && data.con_nacimiento !== undefined){
           var rawC = String(data.con_nacimiento).trim();
           if (/^\d{4}-\d{2}-\d{2}$/.test(rawC)){
-            conNacEl.value = rawC.slice(5, 7) + "/" + rawC.slice(8, 10) + "/" + rawC.slice(0, 4);
+            conNacEl.value = rawC.slice(8, 10) + "/" + rawC.slice(5, 7) + "/" + rawC.slice(0, 4);
           }
         }
         syncConyugeNacimientoVisual();
@@ -2372,8 +2372,8 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
         });
       }
 
-      var NACIMIENTO_HINT_DEFAULT = "Digite solo números; formato MM/DD/YYYY (mes/día/año). La edad debe estar entre 18 y 100 años.";
-      var CON_NACIMIENTO_HINT_DEFAULT = "Opcional. Formato MM/DD/YYYY (mes/día/año). La edad se calcula sola; sin límite de edad.";
+      var NACIMIENTO_HINT_DEFAULT = "Digite solo números; formato DD/MM/YYYY (día/mes/año). La edad debe estar entre 18 y 100 años.";
+      var CON_NACIMIENTO_HINT_DEFAULT = "Opcional. Formato DD/MM/YYYY (día/mes/año). La edad se calcula sola; sin límite de edad.";
 
       function formatNacimientoDigits(digits){
         digits = String(digits || "").replace(/\D/g, "").slice(0, 8);
@@ -2385,8 +2385,8 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
       function parseUsDateFromString(str){
         var m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(str || "").trim());
         if (!m) return null;
-        var month = parseInt(m[1], 10);
-        var day = parseInt(m[2], 10);
+        var day = parseInt(m[1], 10);
+        var month = parseInt(m[2], 10);
         var year = parseInt(m[3], 10);
         if (month < 1 || month > 12) return null;
         var d = new Date(year, month - 1, day);
@@ -2450,10 +2450,10 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
         var ok = st.status === "ok";
         nextBtn.disabled = !ok;
         if (!ok){
-          var t = "Indique una fecha válida (MM/DD/YYYY): entre 18 y 100 años.";
-          if (st.status === "empty") t = "Indique la fecha de nacimiento (MM/DD/YYYY).";
-          if (st.status === "partial") t = "Complete la fecha en formato MM/DD/YYYY (mes/día/año).";
-          if (st.status === "bad") t = "Fecha inválida. Use MM/DD/YYYY (mes/día/año).";
+          var t = "Indique una fecha válida (DD/MM/YYYY): entre 18 y 100 años.";
+          if (st.status === "empty") t = "Indique la fecha de nacimiento (DD/MM/YYYY).";
+          if (st.status === "partial") t = "Complete la fecha en formato DD/MM/YYYY (día/mes/año).";
+          if (st.status === "bad") t = "Fecha inválida. Use DD/MM/YYYY (día/mes/año).";
           if (st.status === "future") t = "La fecha no puede ser futura.";
           if (st.status === "minor") t = "Debe ser mayor de 18 años.";
           if (st.status === "senior") t = "La edad no puede superar 100 años.";
@@ -2493,7 +2493,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           else edadEl.value = "";
           if (hint){
             hint.classList.add("err");
-            if (st.status === "bad") hint.textContent = "Use el formato MM/DD/YYYY (mes/día/año) y una fecha válida.";
+            if (st.status === "bad") hint.textContent = "Use el formato DD/MM/YYYY (día/mes/año) y una fecha válida.";
             if (st.status === "future") hint.textContent = "La fecha de nacimiento no puede ser futura.";
             if (st.status === "minor") hint.textContent = "El cliente no posee la mayoría de edad (debe tener al menos 18 años).";
             if (st.status === "senior") hint.textContent = "La edad no puede superar 100 años. Verifique la fecha.";
@@ -2507,7 +2507,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           edadEl.classList.add("input-format-ok");
           if (hint){
             hint.classList.add("ok");
-            hint.textContent = "Fecha correcta (MM/DD/YYYY).";
+            hint.textContent = "Fecha correcta (DD/MM/YYYY).";
           }
         }
         updateStep0NextButtonState();
@@ -2532,16 +2532,16 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           return false;
         }
         if (st.status === "partial"){
-          setError("cliente_nacimiento", "Complete la fecha en formato MM/DD/YYYY (mes/día/año).");
+          setError("cliente_nacimiento", "Complete la fecha en formato DD/MM/YYYY (día/mes/año).");
           inp.classList.add("input-format-bad");
           edadEl.value = "";
           return false;
         }
         if (st.status === "bad"){
-          setError("cliente_nacimiento", "Formato o fecha inválida. Use MM/DD/YYYY (mes/día/año).");
+          setError("cliente_nacimiento", "Formato o fecha inválida. Use DD/MM/YYYY (día/mes/año).");
           inp.classList.add("input-format-bad");
           edadEl.value = "";
-          if (hint){ hint.classList.add("err"); hint.textContent = "Use el formato MM/DD/YYYY (mes/día/año) y una fecha válida."; }
+          if (hint){ hint.classList.add("err"); hint.textContent = "Use el formato DD/MM/YYYY (día/mes/año) y una fecha válida."; }
           return false;
         }
         if (st.status === "future"){
@@ -2574,7 +2574,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
         edadEl.classList.add("input-format-ok");
         if (hint){
           hint.classList.add("ok");
-          hint.textContent = "Fecha correcta (MM/DD/YYYY).";
+          hint.textContent = "Fecha correcta (DD/MM/YYYY).";
         }
         return true;
       }
@@ -2637,7 +2637,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           edadEl.value = "";
           if (hint){
             hint.classList.add("err");
-            if (st.status === "bad") hint.textContent = "Use el formato MM/DD/YYYY (mes/día/año) y una fecha válida.";
+            if (st.status === "bad") hint.textContent = "Use el formato DD/MM/YYYY (día/mes/año) y una fecha válida.";
             if (st.status === "future") hint.textContent = "La fecha de nacimiento no puede ser futura.";
           }
           return;
@@ -2648,7 +2648,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           edadEl.classList.add("input-format-ok");
           if (hint){
             hint.classList.add("ok");
-            hint.textContent = "Fecha correcta (MM/DD/YYYY). Edad: " + st.age + " años.";
+            hint.textContent = "Fecha correcta (DD/MM/YYYY). Edad: " + st.age + " años.";
           }
         }
       }
@@ -2672,17 +2672,17 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           return true;
         }
         if (st.status === "partial"){
-          setError("con_nacimiento", "Complete la fecha en formato MM/DD/YYYY (mes/día/año), o deje el campo vacío.");
+          setError("con_nacimiento", "Complete la fecha en formato DD/MM/YYYY (día/mes/año), o deje el campo vacío.");
           inp.classList.add("input-format-bad");
           edadEl.value = "";
-          if (hint){ hint.classList.add("err"); hint.textContent = "Complete MM/DD/YYYY o vacíe el campo."; }
+          if (hint){ hint.classList.add("err"); hint.textContent = "Complete DD/MM/YYYY o vacíe el campo."; }
           return false;
         }
         if (st.status === "bad"){
-          setError("con_nacimiento", "Formato o fecha inválida. Use MM/DD/YYYY (mes/día/año), o deje el campo vacío.");
+          setError("con_nacimiento", "Formato o fecha inválida. Use DD/MM/YYYY (día/mes/año), o deje el campo vacío.");
           inp.classList.add("input-format-bad");
           edadEl.value = "";
-          if (hint){ hint.classList.add("err"); hint.textContent = "Fecha inválida. Use MM/DD/YYYY (mes/día/año)."; }
+          if (hint){ hint.classList.add("err"); hint.textContent = "Fecha inválida. Use DD/MM/YYYY (día/mes/año)."; }
           return false;
         }
         if (st.status === "future"){
@@ -2697,7 +2697,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
         edadEl.classList.add("input-format-ok");
         if (hint){
           hint.classList.add("ok");
-          hint.textContent = "Fecha correcta (MM/DD/YYYY). Edad: " + st.age + " años.";
+          hint.textContent = "Fecha correcta (DD/MM/YYYY). Edad: " + st.age + " años.";
         }
         return true;
       }

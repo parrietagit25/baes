@@ -1035,7 +1035,17 @@ function cambiarEstadoSolicitud() {
         }
         
         // Validar que el estado sea válido
-        $estados_validos = ['Aprobada', 'Rechazada', 'Completada', 'Desistimiento'];
+        $estados_validos = [
+            'Aprobada',
+            'Rechazada',
+            'Completada',
+            'Desistimiento',
+            'Evaluacion',
+            'Comité',
+            'Reconsideración',
+            'Pre Aprobado',
+            'Aprobado con Condición',
+        ];
         if (!in_array($nuevo_estado, $estados_validos)) {
             echo json_encode(['success' => false, 'message' => 'Estado no válido']);
             return;

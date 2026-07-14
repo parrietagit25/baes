@@ -178,15 +178,23 @@ function exportarReporteCsv(string $action): void {
                 $r['cedula'] ?? '',
                 $r['estado'] ?? '',
                 $r['banco_nombre'] ?? '',
-                $r['fecha_asignacion'] ?? '',
-                $r['fecha_respuesta'] ?? '',
+                $r['fecha_envio_solicitud_banco'] ?? ($r['fecha_asignacion'] ?? ''),
+                $r['fecha_respuesta_entidad'] ?? ($r['fecha_respuesta'] ?? ''),
+                $r['fecha_aceptacion'] ?? '',
+                $r['fecha_envio_proforma_ruv'] ?? '',
+                $r['fecha_cita_firma'] ?? '',
+                $r['fecha_liberacion_ccp'] ?? '',
+                $r['fecha_reserva'] ?? '',
                 !empty($r['pendiente']) ? 'Si' : 'No',
                 $r['dias_respuesta'] ?? '',
                 $r['horas_respuesta'] ?? '',
             ];
         }, _dataReporteBanco($pdo));
         _outputXlsxDownload('reporte_banco.xlsx', 'Rep Banco', [
-            'Solicitud ID', 'Cliente', 'Cedula', 'Estado Solicitud', 'Banco', 'Fecha Asignacion', 'Fecha Respuesta', 'Pendiente', 'Dias Respuesta', 'Horas Respuesta'
+            'Solicitud ID', 'Cliente', 'Cedula', 'Estado Solicitud', 'Banco',
+            'Fecha envío Solicitud a Banco', 'Fecha Respuesta de entidad', 'Fecha de Aceptacion',
+            'Fecha de envío de Proforma y Ruv', 'Fecha cita de firma', 'Fecha de liberación de CCP', 'Fecha de reserva',
+            'Pendiente', 'Dias Respuesta', 'Horas Respuesta'
         ], $rows);
         return;
     }
@@ -612,7 +620,10 @@ function exportarTodosReportesExcel() {
 
     $banco = _dataReporteBanco($pdo);
     _zipAddCsv($zip, 'reporte_banco.csv', [
-        'Solicitud ID', 'Cliente', 'Cedula', 'Estado Solicitud', 'Banco', 'Fecha Asignacion', 'Fecha Respuesta', 'Pendiente', 'Dias Respuesta', 'Horas Respuesta'
+        'Solicitud ID', 'Cliente', 'Cedula', 'Estado Solicitud', 'Banco',
+        'Fecha envío Solicitud a Banco', 'Fecha Respuesta de entidad', 'Fecha de Aceptacion',
+        'Fecha de envío de Proforma y Ruv', 'Fecha cita de firma', 'Fecha de liberación de CCP', 'Fecha de reserva',
+        'Pendiente', 'Dias Respuesta', 'Horas Respuesta'
     ], array_map(static function(array $r): array {
         return [
             $r['solicitud_id'] ?? '',
@@ -620,8 +631,13 @@ function exportarTodosReportesExcel() {
             $r['cedula'] ?? '',
             $r['estado'] ?? '',
             $r['banco_nombre'] ?? '',
-            $r['fecha_asignacion'] ?? '',
-            $r['fecha_respuesta'] ?? '',
+            $r['fecha_envio_solicitud_banco'] ?? ($r['fecha_asignacion'] ?? ''),
+            $r['fecha_respuesta_entidad'] ?? ($r['fecha_respuesta'] ?? ''),
+            $r['fecha_aceptacion'] ?? '',
+            $r['fecha_envio_proforma_ruv'] ?? '',
+            $r['fecha_cita_firma'] ?? '',
+            $r['fecha_liberacion_ccp'] ?? '',
+            $r['fecha_reserva'] ?? '',
             !empty($r['pendiente']) ? 'Si' : 'No',
             $r['dias_respuesta'] ?? '',
             $r['horas_respuesta'] ?? '',
@@ -837,13 +853,21 @@ function _dataReporteBanco(PDO $pdo): array {
             b.id AS banco_id,
             b.nombre AS banco_nombre,
             ubs.fecha_asignacion,
-            MIN(eb.fecha_evaluacion) AS fecha_respuesta
+            ubs.fecha_asignacion AS fecha_envio_solicitud_banco,
+            MIN(eb.fecha_evaluacion) AS fecha_respuesta,
+            MIN(eb.fecha_evaluacion) AS fecha_respuesta_entidad,
+            s.fecha_aprobacion_propuesta AS fecha_aceptacion,
+            s.fecha_envio_proforma AS fecha_envio_proforma_ruv,
+            (SELECT MIN(cf.fecha_cita) FROM citas_firma cf WHERE cf.solicitud_id = s.id) AS fecha_cita_firma,
+            s.fecha_carta_promesa AS fecha_liberacion_ccp,
+            (SELECT MIN(vs.apartado_en) FROM vehiculos_solicitud vs WHERE vs.solicitud_id = s.id AND IFNULL(vs.apartado, 0) = 1) AS fecha_reserva
         FROM solicitudes_credito s
         INNER JOIN usuarios_banco_solicitudes ubs ON ubs.solicitud_id = s.id
         INNER JOIN usuarios u ON u.id = ubs.usuario_banco_id
         LEFT JOIN bancos b ON b.id = u.banco_id
         LEFT JOIN evaluaciones_banco eb ON eb.solicitud_id = s.id AND eb.usuario_banco_id = ubs.id
-        GROUP BY s.id, s.nombre_cliente, s.cedula, s.estado, b.id, b.nombre, ubs.id, ubs.fecha_asignacion
+        GROUP BY s.id, s.nombre_cliente, s.cedula, s.estado, b.id, b.nombre, ubs.id, ubs.fecha_asignacion,
+                 s.fecha_aprobacion_propuesta, s.fecha_envio_proforma, s.fecha_carta_promesa
         ORDER BY ubs.fecha_asignacion DESC
     ";
     $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);

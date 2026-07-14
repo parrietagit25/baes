@@ -195,6 +195,7 @@ if ($isBanco && !$isAdmin) {
         .estado-aprobada { background: linear-gradient(135deg, #00b894 0%, #00cec9 100%); }
         .estado-rechazada { background: linear-gradient(135deg, #e84393 0%, #fd79a8 100%); }
         .estado-completada { background: linear-gradient(135deg, #2d3436 0%, #636e72 100%); }
+        .estado-desistimiento { background: linear-gradient(135deg, #636e72 0%, #b2bec3 100%); }
         
         /* Estilos para adjuntos */
         .adjunto-item {
@@ -403,10 +404,18 @@ if ($isBanco && !$isAdmin) {
                                             $estadoClass = '';
                                             switch($solicitud['estado']) {
                                                 case 'Nueva': $estadoClass = 'estado-nueva'; break;
-                                                case 'En Revisión Banco': $estadoClass = 'estado-revision'; break;
+                                                case 'En Revisión Banco':
+                                                case 'Evaluacion':
+                                                case 'Comité':
+                                                case 'Reconsideración':
+                                                    $estadoClass = 'estado-revision'; break;
+                                                case 'Pre Aprobado':
+                                                case 'Aprobado con Condición':
                                                 case 'Aprobada': $estadoClass = 'estado-aprobada'; break;
                                                 case 'Rechazada': $estadoClass = 'estado-rechazada'; break;
                                                 case 'Completada': $estadoClass = 'estado-completada'; break;
+                                                case 'Desistimiento': $estadoClass = 'estado-desistimiento'; break;
+                                                default: $estadoClass = 'estado-revision'; break;
                                             }
                                             
                                             $respuestaClass = '';
@@ -1541,6 +1550,11 @@ if ($isBanco && !$isAdmin) {
                             <label for="nuevo_estado" class="form-label">Nuevo Estado *</label>
                             <select class="form-select" id="nuevo_estado" name="nuevo_estado" required>
                                 <option value="">Seleccionar nuevo estado...</option>
+                                <option value="Evaluacion">Evaluacion</option>
+                                <option value="Comité">Comité</option>
+                                <option value="Reconsideración">Reconsideración</option>
+                                <option value="Pre Aprobado">Pre Aprobado</option>
+                                <option value="Aprobado con Condición">Aprobado con Condición</option>
                                 <option value="Aprobada">✅ Aprobada</option>
                                 <option value="Rechazada">❌ Rechazada</option>
                                 <option value="Completada">🎉 Completada</option>

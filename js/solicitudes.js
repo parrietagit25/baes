@@ -542,11 +542,17 @@ function getEstadoClass(estado) {
     const clases = {
         'Nueva': 'estado-nueva',
         'En Revisión Banco': 'estado-revision',
+        'Evaluacion': 'estado-revision',
+        'Comité': 'estado-revision',
+        'Reconsideración': 'estado-revision',
+        'Pre Aprobado': 'estado-aprobada',
+        'Aprobado con Condición': 'estado-aprobada',
         'Aprobada': 'estado-aprobada',
         'Rechazada': 'estado-rechazada',
-        'Completada': 'estado-completada'
+        'Completada': 'estado-completada',
+        'Desistimiento': 'estado-desistimiento'
     };
-    return clases[estado] || 'estado-nueva';
+    return clases[estado] || 'estado-revision';
 }
 
 // Función para obtener clase CSS de la respuesta del banco

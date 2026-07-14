@@ -185,11 +185,17 @@ function normalizeDateToSql($v) {
     }
 
     if (preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $x)) {
-        $m = DateTime::createFromFormat('m/d/Y', $x);
-        if ($m && $m->format('m/d/Y') === $x) return $m->format('Y-m-d');
-
+        // Preferir DD/MM/YYYY (formato del formulario público)
         $d = DateTime::createFromFormat('d/m/Y', $x);
-        if ($d && $d->format('d/m/Y') === $x) return $d->format('Y-m-d');
+        if ($d && $d->format('d/m/Y') === $x) {
+            return $d->format('Y-m-d');
+        }
+
+        // Fallback legacy MM/DD/YYYY
+        $m = DateTime::createFromFormat('m/d/Y', $x);
+        if ($m && $m->format('m/d/Y') === $x) {
+            return $m->format('Y-m-d');
+        }
     }
 
     return null;
