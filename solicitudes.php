@@ -441,7 +441,7 @@ if ($isBanco && !$isAdmin) {
                                                           </button>
                                                       </div>
                                                       <div class="btn-group btn-group-sm mb-1" role="group">
-                                                          <button class="btn btn-success btn-action" onclick="verMuro(<?php echo $solicitud['id']; ?>)" title="Ver Muro">
+                                                          <button class="btn btn-success btn-action" onclick="verMuro(<?php echo $solicitud['id']; ?>)" title="Muro de comunicación">
                                                               <i class="fas fa-comments"></i>
                                                           </button>
                                                           <button class="btn btn-warning btn-action" onclick="abrirModalAdjuntosDesdeTabla(<?php echo $solicitud['id']; ?>)" title="Gestionar Adjuntos">
@@ -1193,13 +1193,13 @@ if ($isBanco && !$isAdmin) {
         </div>
     </div>
 
-    <!-- Modal del Muro de Tiempo -->
+    <!-- Modal del Muro de comunicación -->
     <div class="modal fade" id="muroModal" tabindex="-1">
         <div class="modal-dialog modal-xl">
             <div class="modal-content">
                 <div class="modal-header" style="background: linear-gradient(135deg, #6c5ce7 0%, #a29bfe 100%);">
                     <h5 class="modal-title">
-                        <i class="fas fa-comments me-2"></i>Muro de Tiempo
+                        <i class="fas fa-comments me-2"></i>Muro de comunicación
                     </h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>

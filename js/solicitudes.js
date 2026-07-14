@@ -440,7 +440,7 @@ function cargarSolicitudes() {
                                         </button>
                                     </div>
                                     <div class="btn-group btn-group-sm mb-1" role="group">
-                                        <button class="btn btn-success btn-action" onclick="verMuro(${solicitud.id})" title="Ver Muro">
+                                        <button class="btn btn-success btn-action" onclick="verMuro(${solicitud.id})" title="Muro de comunicación">
                                             <i class="fas fa-comments"></i>
                                         </button>
                                         <button class="btn btn-warning btn-action" onclick="abrirModalAdjuntosDesdeTabla(${solicitud.id})" title="Gestionar Adjuntos">
@@ -1250,7 +1250,131 @@ function llenarFormularioEdicion(solicitud) {
     $('#solicitudModal').modal('show');
 }
 
-// Función para ver muro de tiempo
+// Formato auxiliar muro
+function muroFmtMoney(v) {
+    if (v === null || v === undefined || v === '') return '—';
+    var n = parseFloat(v);
+    if (!isFinite(n)) return '—';
+    return '$' + n.toLocaleString('es-PA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function muroFmtDecision(d) {
+    if (!d) return '—';
+    return String(d).toUpperCase().replace(/_/g, ' ');
+}
+
+function muroEsc(s) {
+    if (s == null || s === '') return '';
+    return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function htmlDatosAutoVehiculo(vehiculo, titulo) {
+    if (!vehiculo) {
+        return '<p class="text-muted mb-0">Sin vehículo</p>';
+    }
+    var apartadoBadge = parseInt(vehiculo.apartado, 10) === 1
+        ? ' <span class="badge bg-warning text-dark">Apartado</span>'
+        : '';
+    return `
+        <div class="row g-2">
+            <div class="col-md-4"><strong>Unidad:</strong> ${muroEsc(vehiculo.unidad || '—')}${apartadoBadge}</div>
+            <div class="col-md-4"><strong>Marca:</strong> ${muroEsc(vehiculo.marca || '—')}</div>
+            <div class="col-md-4"><strong>Modelo:</strong> ${muroEsc(vehiculo.modelo || '—')}</div>
+            <div class="col-md-4"><strong>Año:</strong> ${muroEsc(vehiculo.anio || '—')}</div>
+            <div class="col-md-4"><strong>Kilometraje:</strong> ${muroEsc(vehiculo.kilometraje || '—')}</div>
+            <div class="col-md-4"><strong>Precio:</strong> ${muroFmtMoney(vehiculo.precio)}</div>
+            <div class="col-md-4"><strong>Abono (%):</strong> ${vehiculo.abono_porcentaje != null && vehiculo.abono_porcentaje !== '' ? muroEsc(vehiculo.abono_porcentaje) + '%' : '—'}</div>
+            <div class="col-md-4"><strong>Monto abono:</strong> ${muroFmtMoney(vehiculo.abono_monto)}</div>
+        </div>
+    `;
+}
+
+function htmlTarjetaVehiculoApartado(vehiculos) {
+    var list = Array.isArray(vehiculos) ? vehiculos : [];
+    var apartado = null;
+    for (var i = 0; i < list.length; i++) {
+        if (parseInt(list[i].apartado, 10) === 1) {
+            apartado = list[i];
+            break;
+        }
+    }
+    if (!apartado) {
+        return '<p class="text-muted mb-0">No hay vehículo apartado en esta solicitud.</p>';
+    }
+    return htmlDatosAutoVehiculo(apartado);
+}
+
+function htmlRespuestaBancoCard(evaluacion, bancoLabel) {
+    if (!evaluacion) {
+        return '<div class="alert alert-secondary mb-0 py-2 small">Este agente aún no ha registrado respuesta (martillo / evaluación).</div>';
+    }
+    var veh = [evaluacion.vehiculo_marca, evaluacion.vehiculo_modelo, evaluacion.vehiculo_anio]
+        .filter(Boolean).join(' ').trim() || '—';
+    var fecha = evaluacion.fecha_evaluacion
+        ? new Date(String(evaluacion.fecha_evaluacion).replace(' ', 'T')).toLocaleString('es-PA')
+        : '—';
+    return `
+        <div class="card border-info mb-3">
+            <div class="card-header bg-info text-white py-2">
+                <h6 class="mb-0"><i class="fas fa-gavel me-2"></i>Respuesta del banco${bancoLabel ? ': ' + muroEsc(bancoLabel) : ''}</h6>
+            </div>
+            <div class="card-body py-2">
+                <div class="row g-2 small">
+                    <div class="col-md-4"><strong>Fecha:</strong> ${muroEsc(fecha)}</div>
+                    <div class="col-md-4"><strong>Decisión:</strong> <span class="badge bg-primary">${muroEsc(muroFmtDecision(evaluacion.decision))}</span></div>
+                    <div class="col-md-4"><strong>Tasa:</strong> ${evaluacion.tasa_bancaria != null && evaluacion.tasa_bancaria !== '' ? muroEsc(parseFloat(evaluacion.tasa_bancaria).toFixed(2)) + '%' : '—'}</div>
+                    <div class="col-md-4"><strong>Vehículo evaluado:</strong> ${muroEsc(veh)}</div>
+                    <div class="col-md-4"><strong>Valor a financiar:</strong> ${muroFmtMoney(evaluacion.valor_financiar)}</div>
+                    <div class="col-md-4"><strong>Abono:</strong> ${muroFmtMoney(evaluacion.abono)}</div>
+                    <div class="col-md-4"><strong>Plazo:</strong> ${evaluacion.plazo ? muroEsc(evaluacion.plazo) + ' meses' : '—'}</div>
+                    <div class="col-md-4"><strong>Letra:</strong> ${muroFmtMoney(evaluacion.letra)}</div>
+                    <div class="col-md-4"><strong>Promoción:</strong> ${muroEsc(evaluacion.promocion || '—')}</div>
+                    <div class="col-12"><strong>Comentarios:</strong> ${muroEsc(evaluacion.comentarios || '—')}</div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function cargarRespuestasBancoEnMuro(solicitudId, ubsId, containerSelector, bancoLabel) {
+    var $box = $(containerSelector);
+    if (!$box.length) return;
+    $box.html('<p class="text-muted small mb-0"><i class="fas fa-spinner fa-spin me-1"></i>Cargando respuesta del banco...</p>');
+    $.ajax({
+        url: 'api/evaluaciones_banco.php',
+        type: 'GET',
+        data: { solicitud_id: solicitudId },
+        dataType: 'json'
+    }).done(function (res) {
+        if (!res || !res.success) {
+            $box.html('<div class="alert alert-warning mb-0 py-2 small">No se pudieron cargar las respuestas del banco.</div>');
+            return;
+        }
+        var rows = Array.isArray(res.data) ? res.data : [];
+        // evaluaciones_banco.usuario_banco_id = id de usuarios_banco_solicitudes
+        var propias = rows.filter(function (e) {
+            return String(e.usuario_banco_id) === String(ubsId);
+        });
+        if (!propias.length) {
+            $box.html(htmlRespuestaBancoCard(null, bancoLabel));
+            return;
+        }
+        // Mostrar la más reciente primero (API ya ordena DESC)
+        var html = '';
+        propias.forEach(function (ev) {
+            html += htmlRespuestaBancoCard(ev, bancoLabel);
+        });
+        $box.html(html);
+    }).fail(function () {
+        $box.html('<div class="alert alert-danger mb-0 py-2 small">Error al cargar respuestas del banco.</div>');
+    });
+}
+
+// Función para ver muro de comunicación
 function verMuro(id) {
     // Cargar información de la solicitud
     cargarInfoSolicitud(id);
@@ -1366,16 +1490,10 @@ function generarContenidoTab(solicitudId, tabId, vehiculo, usuariosBanco, isFirs
                 ${vehiculo ? `
                     <div class="card mb-4">
                         <div class="card-header bg-success text-white">
-                            <h6 class="mb-0"><i class="fas fa-car me-2"></i>Vehículo</h6>
+                            <h6 class="mb-0"><i class="fas fa-car me-2"></i>Datos del auto</h6>
                         </div>
                         <div class="card-body">
-                            <div class="row">
-                                <div class="col-md-4"><strong>Marca:</strong> ${vehiculo.marca || '-'}</div>
-                                <div class="col-md-4"><strong>Modelo:</strong> ${vehiculo.modelo || '-'}</div>
-                                <div class="col-md-4"><strong>Año:</strong> ${vehiculo.anio || '-'}</div>
-                                <div class="col-md-4 mt-2"><strong>Precio:</strong> $${vehiculo.precio || '-'}</div>
-                                <div class="col-md-4 mt-2"><strong>Kilometraje:</strong> ${vehiculo.kilometraje || '-'}</div>
-                            </div>
+                            ${htmlDatosAutoVehiculo(vehiculo)}
                         </div>
                     </div>
                 ` : ''}
@@ -1394,11 +1512,12 @@ function generarContenidoTab(solicitudId, tabId, vehiculo, usuariosBanco, isFirs
         usuariosBanco.forEach((usuario, index) => {
             const activoUsuario = index === 0 ? 'active' : '';
             const usuarioId = `usuario_${usuario.id}`;
+            const bancoTxt = usuario.banco_nombre ? ` · ${usuario.banco_nombre}` : '';
             
             contenidoHTML += `
                     <li class="nav-item" role="presentation">
                         <button class="nav-link ${activoUsuario}" data-bs-toggle="tab" data-bs-target="#${tabId}_${usuarioId}" type="button">
-                            ${usuario.usuario_nombre || ''} ${usuario.usuario_apellido || ''}
+                            ${muroEsc(usuario.usuario_nombre || '')} ${muroEsc(usuario.usuario_apellido || '')}${muroEsc(bancoTxt)}
                         </button>
                     </li>
             `;
@@ -1412,9 +1531,15 @@ function generarContenidoTab(solicitudId, tabId, vehiculo, usuariosBanco, isFirs
         usuariosBanco.forEach((usuario, index) => {
             const activoUsuario = index === 0 ? 'show active' : '';
             const usuarioId = `usuario_${usuario.id}`;
+            const respBoxId = `resp_banco_${tabId}_${usuario.id}`;
+            const bancoLabel = [usuario.banco_nombre, ((usuario.usuario_nombre || '') + ' ' + (usuario.usuario_apellido || '')).trim()]
+                .filter(Boolean).join(' — ');
             
             contenidoHTML += `
                     <div class="tab-pane fade ${activoUsuario}" id="${tabId}_${usuarioId}" role="tabpanel">
+                        <div id="${respBoxId}" class="mb-3" data-ubs-id="${usuario.id}" data-banco-label="${muroEsc(bancoLabel)}" data-solicitud="${solicitudId}">
+                            <p class="text-muted small mb-0"><i class="fas fa-spinner fa-spin me-1"></i>Cargando respuesta del banco...</p>
+                        </div>
             `;
             
             contenidoHTML += generarFormularioNota(solicitudId, usuario.id, vehiculo ? vehiculo.id : null);
@@ -1436,6 +1561,16 @@ function generarContenidoTab(solicitudId, tabId, vehiculo, usuariosBanco, isFirs
     `;
     
     $('#vehiculosTabContent').append(contenidoHTML);
+
+    // Cargar respuestas banco por agente (después de insertar HTML)
+    if (usuariosBanco && usuariosBanco.length) {
+        usuariosBanco.forEach(function (usuario) {
+            const respBoxId = `resp_banco_${tabId}_${usuario.id}`;
+            const bancoLabel = [usuario.banco_nombre, ((usuario.usuario_nombre || '') + ' ' + (usuario.usuario_apellido || '')).trim()]
+                .filter(Boolean).join(' — ');
+            cargarRespuestasBancoEnMuro(solicitudId, usuario.id, '#' + respBoxId, bancoLabel);
+        });
+    }
 }
 
 // Función para cargar las notas del primer tab activo
@@ -1532,26 +1667,37 @@ function cargarInfoSolicitud(id) {
                                 <h6 class="mb-0"><i class="fas fa-user me-2"></i>Cliente</h6>
                             </div>
                             <div class="card-body">
-                                <p class="mb-1"><strong>Nombre:</strong> ${solicitud.nombre_cliente}</p>
-                                <p class="mb-1"><strong>Cédula:</strong> ${solicitud.cedula}</p>
-                                <p class="mb-0"><strong>Teléfono:</strong> ${solicitud.telefono || '-'}</p>
+                                <p class="mb-1"><strong>Nombre:</strong> ${muroEsc(solicitud.nombre_cliente)}</p>
+                                <p class="mb-1"><strong>Cédula:</strong> ${muroEsc(solicitud.cedula)}</p>
+                                <p class="mb-1"><strong>Teléfono:</strong> ${muroEsc(solicitud.telefono || '—')}</p>
+                                <p class="mb-0"><strong>Correo:</strong> ${muroEsc(solicitud.email || '—')}</p>
                             </div>
                         </div>
                     </div>
                     <div class="col-md-6">
                         <div class="card">
                             <div class="card-header bg-success text-white">
-                                <h6 class="mb-0"><i class="fas fa-car me-2"></i>Vehículo</h6>
+                                <h6 class="mb-0"><i class="fas fa-car me-2"></i>Vehículo (apartado)</h6>
                             </div>
-                            <div class="card-body">
-                                <p class="mb-1"><strong>Marca:</strong> ${solicitud.marca_auto || '-'}</p>
-                                <p class="mb-1"><strong>Modelo:</strong> ${solicitud.modelo_auto || '-'}</p>
-                                <p class="mb-0"><strong>Año:</strong> ${solicitud.año_auto || '-'}</p>
+                            <div class="card-body" id="muroVehiculoApartadoBody">
+                                <p class="text-muted mb-0"><i class="fas fa-spinner fa-spin me-1"></i>Cargando...</p>
                             </div>
                         </div>
                     </div>
                 `;
                 $('#muroSolicitudInfo').html(infoHtml);
+
+                $.ajax({
+                    url: 'api/vehiculos_solicitud.php',
+                    type: 'GET',
+                    data: { solicitud_id: id },
+                    dataType: 'json'
+                }).done(function (rv) {
+                    var vehiculos = (rv && rv.success && Array.isArray(rv.data)) ? rv.data : [];
+                    $('#muroVehiculoApartadoBody').html(htmlTarjetaVehiculoApartado(vehiculos));
+                }).fail(function () {
+                    $('#muroVehiculoApartadoBody').html('<p class="text-danger mb-0">No se pudo cargar el vehículo apartado.</p>');
+                });
             }
         },
         error: function() {
