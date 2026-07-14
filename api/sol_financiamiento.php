@@ -562,6 +562,114 @@ try {
         exit;
     }
 
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && (($postIn['action'] ?? '') === 'generar_solicitud_adjuntos')) {
+        if (!$isAdmin && !$isGestor) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Solo administrador o gestor pueden solicitar adjuntos.']);
+            exit;
+        }
+        if (!sol_fin_tabla_existe($pdo, 'financiamiento_adjuntos_token')) {
+            http_response_code(503);
+            echo json_encode(['success' => false, 'message' => 'Falta la tabla de tokens. Ejecute database/migracion_financiamiento_adjuntos_token.sql en la base de datos.']);
+            exit;
+        }
+        if (!sol_fin_tiene_tabla_adjuntos_fin_reg($pdo)) {
+            http_response_code(503);
+            echo json_encode(['success' => false, 'message' => 'Falta la tabla adjuntos_financiamiento_registros.']);
+            exit;
+        }
+        $id = isset($postIn['id']) ? trim((string) $postIn['id']) : '';
+        if ($id === '' || !ctype_digit($id)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'ID inválido.']);
+            exit;
+        }
+        $frId = (int) $id;
+        $st = $pdo->prepare('SELECT id, cliente_nombre, cliente_correo, email_vendedor FROM financiamiento_registros WHERE id = ?');
+        $st->execute([$frId]);
+        $fr = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$fr) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'message' => 'Registro no encontrado.']);
+            exit;
+        }
+        $emailCliente = isset($fr['cliente_correo']) ? trim((string) $fr['cliente_correo']) : '';
+        if ($emailCliente === '' || !filter_var($emailCliente, FILTER_VALIDATE_EMAIL)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'El registro no tiene un correo de cliente válido; no se puede enviar el enlace.']);
+            exit;
+        }
+        $emailVend = isset($fr['email_vendedor']) ? trim((string) $fr['email_vendedor']) : '';
+        $emailVend = ($emailVend !== '' && filter_var($emailVend, FILTER_VALIDATE_EMAIL)) ? $emailVend : null;
+
+        $token = strtolower(bin2hex(random_bytes(32)));
+        $expires = (new DateTimeImmutable('now'))->modify('+1 day');
+        $expiresSql = $expires->format('Y-m-d H:i:s');
+
+        $pdo->beginTransaction();
+        try {
+            $inv = $pdo->prepare('
+                UPDATE financiamiento_adjuntos_token SET revoked_at = NOW()
+                WHERE financiamiento_registro_id = ? AND revoked_at IS NULL
+            ');
+            $inv->execute([$frId]);
+            $ins = $pdo->prepare('
+                INSERT INTO financiamiento_adjuntos_token
+                (financiamiento_registro_id, token, expires_at, created_by_usuario_id)
+                VALUES (?, ?, ?, ?)
+            ');
+            $ins->execute([$frId, $token, $expiresSql, (int) ($_SESSION['user_id'] ?? 0)]);
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
+
+        $emailCfg = require __DIR__ . '/../config/email.php';
+        $baseUrl = rtrim((string) ($emailCfg['app_url'] ?? ''), '/');
+        $pathRel = '/financiamiento/solicitar_adjuntos.php?t=' . rawurlencode($token);
+        $linkAbs = ($baseUrl !== '' ? $baseUrl : '') . $pathRel;
+
+        $nombreCli = trim((string) ($fr['cliente_nombre'] ?? ''));
+        $asunto = 'Enlace para subir documentos de su solicitud de financiamiento';
+        $expLeg = $expires->format('d/m/Y H:i');
+        $cuerpoHtml = '<p>Estimado/a ' . htmlspecialchars($nombreCli !== '' ? $nombreCli : 'cliente', ENT_QUOTES, 'UTF-8') . ',</p>'
+            . '<p>Le pedimos que <strong>suba los documentos / adjuntos</strong> faltantes de su solicitud de financiamiento. Use el siguiente enlace. Es válido por <strong>1 día</strong> (hasta el <strong>' . htmlspecialchars($expLeg, ENT_QUOTES, 'UTF-8') . '</strong>) y, si lo abre de nuevo antes de caducar, verá los adjuntos que ya cargó.</p>'
+            . '<p><a href="' . htmlspecialchars($linkAbs, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($linkAbs, ENT_QUOTES, 'UTF-8') . '</a></p>'
+            . '<p>Si no solicitó este correo, puede ignorarlo.</p>'
+            . '<p style="font-size:13px;color:#555;">Este mensaje es automático.</p>';
+        $cuerpoTxt = "Estimado/a {$nombreCli},\n\n"
+            . "Use este enlace para subir documentos (válido 1 día, hasta {$expLeg}):\n{$linkAbs}\n";
+
+        require_once __DIR__ . '/../includes/EmailService.php';
+        $mail = new EmailService();
+        $resCliente = $mail->enviarCorreo($emailCliente, $asunto, $cuerpoHtml, '', $cuerpoTxt, [], [], [], '');
+        if ($emailVend !== null && strcasecmp($emailVend, $emailCliente) !== 0) {
+            $cuerpoV = '<p>Se generó un enlace para que el cliente <strong>' . htmlspecialchars($nombreCli, ENT_QUOTES, 'UTF-8') . '</strong> suba adjuntos (registro #' . (int) $frId . ').</p>'
+                . '<p>Enlace (caduca ' . htmlspecialchars($expLeg, ENT_QUOTES, 'UTF-8') . '):<br><a href="' . htmlspecialchars($linkAbs, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($linkAbs, ENT_QUOTES, 'UTF-8') . '</a></p>'
+                . '<p style="font-size:13px;color:#555;">Mensaje automático.</p>';
+            $mail->enviarCorreo($emailVend, $asunto . ' (notificación vendedor)', $cuerpoV, '', strip_tags($cuerpoV), [], [], [], '');
+        }
+        $okC = !empty($resCliente['success']);
+        if (!$okC) {
+            http_response_code(502);
+            echo json_encode([
+                'success' => false,
+                'message' => 'El token se generó pero no se pudo enviar el correo al cliente: ' . ($resCliente['message'] ?? 'error'),
+                'data' => ['expires_at' => $expiresSql, 'link' => $linkAbs],
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        echo json_encode([
+            'success' => true,
+            'message' => 'Enlace generado y enviado al cliente' . ($emailVend && strcasecmp($emailVend, $emailCliente) !== 0 ? ' y al vendedor' : '') . '. Válido 1 día.',
+            'data' => ['expires_at' => $expiresSql],
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
     if (isset($_GET['id']) && ctype_digit($_GET['id'])) {
         $stmt = $pdo->prepare("SELECT * FROM financiamiento_registros WHERE id = ?");
         $stmt->execute([$_GET['id']]);

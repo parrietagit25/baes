@@ -153,11 +153,38 @@ $puedeRefirma = $isAdmin || $isGestor;
                     <p class="text-muted">Cargando...</p>
                 </div>
                 <div class="modal-footer">
+                    <?php if ($puedeRefirma): ?>
+                    <button type="button" class="btn btn-primary me-auto" id="btnSolicitarAdjuntos">
+                        <i class="fas fa-envelope-open-text me-1"></i>Solicitar adjuntos
+                    </button>
+                    <?php endif; ?>
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
                 </div>
             </div>
         </div>
     </div>
+
+    <?php if ($puedeRefirma): ?>
+    <div class="modal fade" id="solicitarAdjuntosModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header" style="background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);">
+                    <h5 class="modal-title text-white"><i class="fas fa-envelope-open-text me-2"></i>Solicitar adjuntos</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Se enviará al <strong>cliente</strong> (correo del formulario) y al <strong>vendedor asociado</strong> (si hay correo distinto) un enlace para que el cliente <strong>suba documentos</strong>.</p>
+                    <p class="mb-0">El enlace <strong>caduca en 1 día</strong> y puede usarse varias veces mientras esté vigente: al abrirlo, el cliente verá los adjuntos ya cargados y podrá subir más.</p>
+                    <div id="solicitarAdjuntosAlert" class="alert d-none mt-3" role="alert"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" id="btnConfirmarSolicitarAdjuntos"><i class="fas fa-paper-plane me-1"></i>Enviar enlace</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
 
     <div class="modal fade" id="editarRegistroModal" tabindex="-1">
         <div class="modal-dialog modal-xl modal-dialog-scrollable">
@@ -227,6 +254,7 @@ $puedeRefirma = $isAdmin || $isGestor;
         var puedeRefirma = <?php echo $puedeRefirma ? 'true' : 'false'; ?>;
         var editarRegistroId = null;
         var refirmaRegistroId = null;
+        var adjuntosRegistroId = null;
 
         function enhanceSignatureForView(imgEl, base64) {
             try {
@@ -441,8 +469,11 @@ $puedeRefirma = $isAdmin || $isGestor;
 
         $(document).on('click', '.btn-ver-adjuntos', function() {
             var id = $(this).data('id');
+            adjuntosRegistroId = id;
             var $content = $('#adjuntosContent');
             $content.html('<p class="text-muted">Cargando adjuntos...</p>');
+            $('#solicitarAdjuntosAlert').addClass('d-none').removeClass('alert-danger alert-success').text('');
+            $('#btnConfirmarSolicitarAdjuntos').removeClass('d-none').prop('disabled', false);
             $('#adjuntosModal').modal('show');
 
             $.get('api/sol_financiamiento.php?adjuntos_id=' + id)
@@ -480,6 +511,44 @@ $puedeRefirma = $isAdmin || $isGestor;
                 .fail(function() {
                     $content.html('<p class="text-danger">Error al cargar adjuntos.</p>');
                 });
+        });
+
+        $('#btnSolicitarAdjuntos').on('click', function() {
+            if (!puedeRefirma || !adjuntosRegistroId) return;
+            $('#solicitarAdjuntosAlert').addClass('d-none').removeClass('alert-danger alert-success').text('');
+            $('#btnConfirmarSolicitarAdjuntos').removeClass('d-none').prop('disabled', false);
+            $('#solicitarAdjuntosModal').modal('show');
+        });
+
+        $('#btnConfirmarSolicitarAdjuntos').on('click', function() {
+            if (!puedeRefirma || !adjuntosRegistroId) return;
+            var $btn = $(this);
+            if ($btn.prop('disabled')) return;
+            var $al = $('#solicitarAdjuntosAlert');
+            $al.addClass('d-none');
+            $btn.prop('disabled', true).addClass('d-none');
+            $.ajax({
+                url: 'api/sol_financiamiento.php',
+                method: 'POST',
+                contentType: 'application/json; charset=utf-8',
+                data: JSON.stringify({ action: 'generar_solicitud_adjuntos', id: String(adjuntosRegistroId) })
+            }).done(function(res) {
+                if (res && res.success) {
+                    $al.removeClass('d-none alert-danger').addClass('alert-success').text(res.message || 'Enlace enviado.');
+                    setTimeout(function() {
+                        $('#solicitarAdjuntosModal').modal('hide');
+                        $btn.prop('disabled', false).removeClass('d-none');
+                    }, 2000);
+                } else {
+                    $btn.prop('disabled', false).removeClass('d-none');
+                    $al.removeClass('d-none alert-success').addClass('alert-danger').text((res && res.message) ? res.message : 'No se pudo enviar el enlace.');
+                }
+            }).fail(function(xhr) {
+                var msg = 'Error en la solicitud.';
+                if (xhr && xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
+                $btn.prop('disabled', false).removeClass('d-none');
+                $al.removeClass('d-none alert-success').addClass('alert-danger').text(msg);
+            });
         });
 
         function finEscAttr(s) {
