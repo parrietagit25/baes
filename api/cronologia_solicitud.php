@@ -220,6 +220,9 @@ try {
             }
             $dec = strtoupper(str_replace('_', ' ', (string) ($e['decision'] ?? '')));
             $det = 'Decisión: ' . $dec;
+            if (!empty($e['razon'])) {
+                $det .= "\nRazón: " . $e['razon'];
+            }
             if (isset($e['tasa_bancaria']) && $e['tasa_bancaria'] !== '' && $e['tasa_bancaria'] !== null) {
                 $det .= '. Tasa: ' . $e['tasa_bancaria'] . '%';
             }

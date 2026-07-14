@@ -1060,7 +1060,8 @@ function construirResumenSolicitudHtml($solicitud, $vehiculos, $evaluaciones, $a
             if (isset($e['tasa_bancaria']) && $e['tasa_bancaria'] !== null && $e['tasa_bancaria'] !== '') {
                 $tasaStr = ' — <strong>Tasa:</strong> ' . $n($e['tasa_bancaria'], 2) . '%';
             }
-            $html .= '<p><strong>Evaluación:</strong> ' . $h($e['decision'] ?? '') . $tasaStr . ' — ' . $h($e['comentarios'] ?? '') . ' (Fecha: ' . $h($e['fecha_evaluacion'] ?? '') . ')</p>';
+            $razonStr = !empty($e['razon']) ? ' — <strong>Razón:</strong> ' . $h($e['razon']) : '';
+            $html .= '<p><strong>Evaluación:</strong> ' . $h($e['decision'] ?? '') . $razonStr . $tasaStr . ' — ' . $h($e['comentarios'] ?? '') . ' (Fecha: ' . $h($e['fecha_evaluacion'] ?? '') . ')</p>';
         }
         $html .= '</div>';
     }

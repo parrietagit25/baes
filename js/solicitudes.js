@@ -1318,6 +1318,7 @@ function htmlRespuestaBancoCard(evaluacion, bancoLabel) {
                 <div class="row g-2 small">
                     <div class="col-md-4"><strong>Fecha:</strong> ${muroEsc(fecha)}</div>
                     <div class="col-md-4"><strong>Decisión:</strong> <span class="badge bg-primary">${muroEsc(muroFmtDecision(evaluacion.decision))}</span></div>
+                    <div class="col-md-8"><strong>Razón:</strong> ${muroEsc(evaluacion.razon || '—')}</div>
                     <div class="col-md-4"><strong>Tasa:</strong> ${evaluacion.tasa_bancaria != null && evaluacion.tasa_bancaria !== '' ? muroEsc(parseFloat(evaluacion.tasa_bancaria).toFixed(2)) + '%' : '—'}</div>
                     <div class="col-md-4"><strong>Vehículo evaluado:</strong> ${muroEsc(veh)}</div>
                     <div class="col-md-4"><strong>Valor a financiar:</strong> ${muroFmtMoney(evaluacion.valor_financiar)}</div>

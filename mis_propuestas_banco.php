@@ -56,6 +56,7 @@ if (!in_array('ROLE_BANCO', $userRoles, true)) {
                                         <th>Estado</th>
                                         <th>Vehículo</th>
                                         <th>Decisión</th>
+                                        <th>Razón</th>
                                         <th>Tasa %</th>
                                         <th>Valor financiar</th>
                                         <th>Abono</th>
@@ -140,6 +141,7 @@ if (!in_array('ROLE_BANCO', $userRoles, true)) {
                         return esc((d || '').toUpperCase().replace(/_/g, ' '));
                     }
                 },
+                { data: 'razon', defaultContent: '-', render: function (d) { return esc(d || '-'); } },
                 { data: 'tasa_bancaria', render: function (d) { return fmtPct(d); } },
                 { data: 'valor_financiar', render: function (d) { return fmtMoney(d); } },
                 { data: 'abono', render: function (d) { return fmtMoney(d); } },

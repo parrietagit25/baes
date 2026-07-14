@@ -1397,6 +1397,11 @@ if ($isBanco && !$isAdmin) {
                             </select>
                         </div>
 
+                        <div class="mb-4" id="wrap_razon_evaluacion" style="display: none;">
+                            <label for="razon_evaluacion" class="form-label">Razón</label>
+                            <textarea class="form-control" id="razon_evaluacion" name="razon_evaluacion" rows="2" placeholder="Indique la razón de la decisión..." disabled></textarea>
+                        </div>
+
                         <div class="mb-4">
                             <label for="tasa_bancaria_evaluacion" class="form-label">Tasa bancaria (%) *</label>
                             <div class="input-group">
@@ -1875,18 +1880,30 @@ if ($isBanco && !$isAdmin) {
             }
         };
 
+        window.actualizarCampoRazonDecision = function(decision) {
+            var tieneDecision = (decision || '').trim() !== '';
+            if (tieneDecision) {
+                $('#wrap_razon_evaluacion').show();
+                $('#razon_evaluacion').prop('disabled', false);
+            } else {
+                $('#wrap_razon_evaluacion').hide();
+                $('#razon_evaluacion').prop('disabled', true).val('');
+            }
+        };
+
         $(document).on('change', '#promocion_evaluacion', function() {
             actualizarCampoCuantiaPromocion();
         });
 
         window.mostrarCamposDecision = function(decision) {
-            const campos = ['#valor_financiar', '#abono_pct_evaluacion', '#abono_evaluacion', '#plazo_evaluacion', '#letra_evaluacion', '#letra_quincenal_evaluacion', '#promocion_evaluacion', '#cuantia_evaluacion', '#comentarios_evaluacion'];
+            const campos = ['#valor_financiar', '#abono_pct_evaluacion', '#abono_evaluacion', '#plazo_evaluacion', '#letra_evaluacion', '#letra_quincenal_evaluacion', '#promocion_evaluacion', '#cuantia_evaluacion', '#comentarios_evaluacion', '#razon_evaluacion'];
             campos.forEach(function(campo) {
                 $(campo).prop('disabled', true);
                 $(campo).prop('required', false);
             });
 
             $('#camposDecision').show();
+            actualizarCampoRazonDecision(decision);
 
             if (decision === 'rechazado') {
                 $('#comentarios_evaluacion').prop('disabled', false);
@@ -2465,7 +2482,7 @@ if ($isBanco && !$isAdmin) {
                     destruirDataTableRespuestas('#tablaRespuestasBanco');
                     if (response.data.length > 0) {
                         let html = '<div class="table-responsive"><table id="tablaRespuestasBanco" class="table table-striped table-hover w-100">';
-                        html += '<thead><tr><th>Fecha</th><th>Vehículo</th><th>Decisión</th><th>Tasa %</th><th>Valor a Financiar</th><th>Abono</th><th>Plazo</th><th>Letra mensual</th><th>Letra quincenal</th><th>Promoción</th><th>Cuantía</th><th>Comentarios</th><th>Comentario al seleccionar</th><th>Motivo reevaluación</th><th>Selección</th></tr></thead>';
+                        html += '<thead><tr><th>Fecha</th><th>Vehículo</th><th>Decisión</th><th>Razón</th><th>Tasa %</th><th>Valor a Financiar</th><th>Abono</th><th>Plazo</th><th>Letra mensual</th><th>Letra quincenal</th><th>Promoción</th><th>Cuantía</th><th>Comentarios</th><th>Comentario al seleccionar</th><th>Motivo reevaluación</th><th>Selección</th></tr></thead>';
                         html += '<tbody>';
                         
                         response.data.forEach(function(evaluacion) {
@@ -2473,6 +2490,7 @@ if ($isBanco && !$isAdmin) {
                             html += '<td data-order="' + escapeHtmlText(evaluacion.fecha_evaluacion || '') + '">' + new Date(evaluacion.fecha_evaluacion).toLocaleString('es-PA') + '</td>';
                             html += '<td>' + (evaluacion.vehiculo_marca ? `${evaluacion.vehiculo_marca} ${evaluacion.vehiculo_modelo || ''}`.trim() : '-') + '</td>';
                             html += '<td><span class="badge badge-estado estado-revision">' + evaluacion.decision.toUpperCase().replace('_', ' ') + '</span></td>';
+                            html += '<td>' + celdaComentarioGestor(evaluacion.razon) + '</td>';
                             html += '<td>' + (evaluacion.tasa_bancaria != null && evaluacion.tasa_bancaria !== '' ? parseFloat(evaluacion.tasa_bancaria).toLocaleString('es-PA', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%' : '-') + '</td>';
                             html += '<td>' + (evaluacion.valor_financiar ? '$' + parseFloat(evaluacion.valor_financiar).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
                             html += '<td>' + (evaluacion.abono ? '$' + parseFloat(evaluacion.abono).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
@@ -2553,7 +2571,7 @@ if ($isBanco && !$isAdmin) {
                           }
 
                           html += '<div class="table-responsive"><table id="tablaRespuestasBancoAdmin" class="table table-striped table-hover w-100">';
-                          html += '<thead><tr><th>Fecha</th><th>Banco</th><th>Vehículo</th><th>Decisión</th><th>Tasa %</th><th>Valor a Financiar</th><th>Abono</th><th>Plazo</th><th>Letra mensual</th><th>Letra quincenal</th><th>Promoción</th><th>Cuantía</th><th>Comentarios</th><th>Comentario al seleccionar</th><th>Motivo reevaluación</th>';
+                          html += '<thead><tr><th>Fecha</th><th>Banco</th><th>Vehículo</th><th>Decisión</th><th>Razón</th><th>Tasa %</th><th>Valor a Financiar</th><th>Abono</th><th>Plazo</th><th>Letra mensual</th><th>Letra quincenal</th><th>Promoción</th><th>Cuantía</th><th>Comentarios</th><th>Comentario al seleccionar</th><th>Motivo reevaluación</th>';
                           if (mostrarAcciones) {
                               html += '<th>Acciones</th>';
                           } else {
@@ -2568,6 +2586,7 @@ if ($isBanco && !$isAdmin) {
                               html += '<td>' + (evaluacion.nombre ? `${evaluacion.nombre} ${evaluacion.apellido || ''}`.trim() : '-') + '</td>';
                               html += '<td>' + (evaluacion.vehiculo_marca ? `${evaluacion.vehiculo_marca} ${evaluacion.vehiculo_modelo || ''}`.trim() : '-') + '</td>';
                               html += '<td><span class="badge badge-estado estado-revision">' + evaluacion.decision.toUpperCase().replace('_', ' ') + '</span></td>';
+                              html += '<td>' + celdaComentarioGestor(evaluacion.razon) + '</td>';
                               html += '<td>' + (evaluacion.tasa_bancaria != null && evaluacion.tasa_bancaria !== '' ? parseFloat(evaluacion.tasa_bancaria).toLocaleString('es-PA', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%' : '-') + '</td>';
                               html += '<td>' + (evaluacion.valor_financiar ? '$' + parseFloat(evaluacion.valor_financiar).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
                               html += '<td>' + (evaluacion.abono ? '$' + parseFloat(evaluacion.abono).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';

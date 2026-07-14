@@ -56,6 +56,26 @@ function evaluaciones_tiene_cuantia(PDO $pdo): bool
     return $cache;
 }
 
+function evaluaciones_tiene_razon(PDO $pdo): bool
+{
+    static $cache = null;
+    if ($cache !== null) {
+        return $cache;
+    }
+    try {
+        $db = $pdo->query('SELECT DATABASE()')->fetchColumn();
+        $st = $pdo->prepare("
+            SELECT COUNT(*) FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'evaluaciones_banco' AND COLUMN_NAME = 'razon'
+        ");
+        $st->execute([$db]);
+        $cache = ((int) $st->fetchColumn()) > 0;
+    } catch (Throwable $e) {
+        $cache = false;
+    }
+    return $cache;
+}
+
 $method = $_SERVER['REQUEST_METHOD'];
 
 switch ($method) {
@@ -282,23 +302,37 @@ function guardarEvaluacion() {
             $cuantia = null;
         }
 
+        $razon = trim((string) ($_POST['razon_evaluacion'] ?? ''));
+        if ($razon === '') {
+            $razon = null;
+        }
+
         $hasLetraQ = evaluaciones_tiene_letra_quincenal($pdo);
         $hasCuantia = evaluaciones_tiene_cuantia($pdo);
+        $hasRazon = evaluaciones_tiene_razon($pdo);
 
         $cols = [
             'solicitud_id', 'vehiculo_id', 'usuario_banco_id', 'decision',
-            'valor_financiar', 'abono', 'plazo', 'letra',
         ];
         $vals = [
             $solicitudId,
             !empty($_POST['vehiculo_evaluacion']) ? $_POST['vehiculo_evaluacion'] : null,
             $asignacion['id'],
             $decision,
+        ];
+
+        if ($hasRazon) {
+            $cols[] = 'razon';
+            $vals[] = $razon;
+        }
+
+        $cols = array_merge($cols, ['valor_financiar', 'abono', 'plazo', 'letra']);
+        $vals = array_merge($vals, [
             $_POST['valor_financiar'] ?? null,
             $_POST['abono_evaluacion'] ?? null,
             $_POST['plazo_evaluacion'] ?? null,
             $_POST['letra_evaluacion'] ?? null,
-        ];
+        ]);
 
         if ($hasLetraQ) {
             $cols[] = 'letra_quincenal';
