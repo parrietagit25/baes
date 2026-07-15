@@ -92,14 +92,15 @@
         if (!wrap || !tbody) return;
         wrap.style.display = 'block';
         if (!filas || !filas.length) {
-            tbody.innerHTML = '<tr><td colspan="42" class="text-center text-muted">Sin registros con los filtros aplicados</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="43" class="text-center text-muted">Sin registros con los filtros aplicados</td></tr>';
             return;
         }
         var html = '';
         filas.forEach(function (r) {
             html += '<tr>';
             html += '<td>' + escapeHtml(r.id) + '</td>';
-            html += '<td>' + escapeHtml(r.fecha_creacion) + '</td>';
+            html += '<td>' + escapeHtml(r.fecha_creacion || '—') + '</td>';
+            html += '<td>' + escapeHtml(r.fecha_motus || '—') + '</td>';
             html += '<td>' + escapeHtml(r.cliente_nombre) + '</td>';
             html += '<td>' + escapeHtml(r.cliente_email || '—') + '</td>';
             html += '<td>' + escapeHtml(r.cliente_sexo) + '</td>';
@@ -161,7 +162,7 @@
         if (elSin) elSin.textContent = '…';
         if (elEnv) elEnv.textContent = '…';
         if (elNoEnv) elNoEnv.textContent = '…';
-        if (tbody) tbody.innerHTML = '<tr><td colspan="42" class="text-center text-muted">Filtrando…</td></tr>';
+        if (tbody) tbody.innerHTML = '<tr><td colspan="43" class="text-center text-muted">Filtrando…</td></tr>';
 
         var query = qs();
         if (elExport) {
@@ -178,7 +179,7 @@
             .then(function (data) {
                 if (!data || !data.success) {
                     if (tbody) {
-                        tbody.innerHTML = '<tr><td colspan="42" class="text-center text-danger">'
+                        tbody.innerHTML = '<tr><td colspan="43" class="text-center text-danger">'
                             + escapeHtml((data && data.message) || 'Error al filtrar') + '</td></tr>';
                     }
                     destroyCharts();
@@ -198,7 +199,7 @@
                 if (elFiltrosTxt) {
                     elFiltrosTxt.textContent = 'Filtros aplicados: '
                         + (f.fecha_desde || '—') + ' a ' + (f.fecha_hasta || '—')
-                        + ' · Vínculo: ' + vinculoLabel(f.vinculo || '')
+                        + ' (form. público O Motus) · Vínculo: ' + vinculoLabel(f.vinculo || '')
                         + ' · Resultados: ' + (k.total ?? 0);
                 }
 
@@ -209,7 +210,7 @@
             })
             .catch(function () {
                 if (tbody) {
-                    tbody.innerHTML = '<tr><td colspan="42" class="text-center text-danger">Error de conexión al filtrar</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="43" class="text-center text-danger">Error de conexión al filtrar</td></tr>';
                 }
                 destroyCharts();
             });

@@ -13,7 +13,7 @@ if (!$isAdmin && !$isGestor) {
     exit();
 }
 
-$segDesde = (new DateTimeImmutable('-365 days'))->format('Y-m-d');
+$segDesde = (new DateTimeImmutable('first day of this month'))->format('Y-m-d');
 $segHasta = (new DateTimeImmutable('today'))->format('Y-m-d');
 ?>
 <!DOCTYPE html>
@@ -52,6 +52,8 @@ $segHasta = (new DateTimeImmutable('today'))->format('Y-m-d');
                         <strong>ID Sol Digital</strong> = registro del formulario público (<code>financiamiento_registros</code>).
                         <strong>ID Sol MOTUS</strong> = solicitud de crédito vinculada, si existe.
                         Los datos de <strong>banco</strong> corresponden a la <strong>respuesta/propuesta seleccionada</strong>.
+                        <br><strong>Filtro de fechas:</strong> híbrido — muestra la fila si la <em>fecha del formulario público</em>
+                        o la <em>fecha de creación Motus</em> cae dentro de Desde/Hasta.
                     </div>
 
                     <div class="card mb-3">
@@ -170,7 +172,8 @@ $segHasta = (new DateTimeImmutable('today'))->format('Y-m-d');
                                     <thead class="table-light">
                                         <tr>
                                             <th>ID financ.</th>
-                                            <th>Fecha</th>
+                                            <th>Fecha form.</th>
+                                            <th>Fecha Motus</th>
                                             <th>Cliente</th>
                                             <th>Email cliente</th>
                                             <th>Sexo form.</th>
@@ -214,7 +217,7 @@ $segHasta = (new DateTimeImmutable('today'))->format('Y-m-d');
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <tr><td colspan="42" class="text-center text-muted">Cargando…</td></tr>
+                                        <tr><td colspan="43" class="text-center text-muted">Cargando…</td></tr>
                                     </tbody>
                                 </table>
                             </div>

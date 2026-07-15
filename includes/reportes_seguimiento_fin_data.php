@@ -13,12 +13,19 @@ require_once __DIR__ . '/solicitud_vehiculo_helper.php';
  */
 function rep_segfin_parse_filtros(): array
 {
-    $desde = isset($_GET['desde']) ? trim((string) $_GET['desde']) : '';
-    $hasta = isset($_GET['hasta']) ? trim((string) $_GET['hasta']) : '';
-    $vinculo = isset($_GET['vinculo']) ? trim((string) $_GET['vinculo']) : '';
+    $desde = isset($_GET['desde']) ? trim((string) $_GET['desde']) : (isset($_POST['desde']) ? trim((string) $_POST['desde']) : '');
+    $hasta = isset($_GET['hasta']) ? trim((string) $_GET['hasta']) : (isset($_POST['hasta']) ? trim((string) $_POST['hasta']) : '');
+    $vinculo = isset($_GET['vinculo']) ? trim((string) $_GET['vinculo']) : (isset($_POST['vinculo']) ? trim((string) $_POST['vinculo']) : '');
     if (!in_array($vinculo, ['', 'con', 'sin'], true)) {
         $vinculo = '';
     }
+    // Normalizar fechas a Y-m-d si llegan con hora u otro formato.
+    foreach (['desde' => &$desde, 'hasta' => &$hasta] as $_k => &$_v) {
+        if ($_v !== '' && preg_match('/^(\d{4}-\d{2}-\d{2})/', $_v, $m)) {
+            $_v = $m[1];
+        }
+    }
+    unset($_v);
 
     return ['desde' => $desde, 'hasta' => $hasta, 'vinculo' => $vinculo];
 }
@@ -135,10 +142,28 @@ function rep_segfin_fetch_raw(PDO $pdo, string $d1, string $d2): array
             {$enviadaExpr} AS enviada_a_banco";
     }
 
+    $sqlFechaMotus = $joinSc !== 'LEFT JOIN solicitudes_credito sc ON 1=0'
+        && rep_fin_columna_existe($pdo, 'solicitudes_credito', 'fecha_creacion')
+        ? 'sc.fecha_creacion AS fecha_motus'
+        : 'NULL AS fecha_motus';
+
+    $whereFecha = 'DATE(fr.fecha_creacion) BETWEEN ? AND ?';
+    $paramsFecha = [$d1, $d2];
+    if ($joinSc !== 'LEFT JOIN solicitudes_credito sc ON 1=0'
+        && rep_fin_columna_existe($pdo, 'solicitudes_credito', 'fecha_creacion')) {
+        // Híbrido: entra si el formulario público O la solicitud Motus cae en el rango.
+        $whereFecha = '(
+            (fr.fecha_creacion IS NOT NULL AND DATE(fr.fecha_creacion) BETWEEN ? AND ?)
+            OR (sc.fecha_creacion IS NOT NULL AND DATE(sc.fecha_creacion) BETWEEN ? AND ?)
+        )';
+        $paramsFecha = [$d1, $d2, $d1, $d2];
+    }
+
     $sql = "
         SELECT
             fr.id,
             fr.fecha_creacion,
+            {$sqlFechaMotus},
             fr.cliente_nombre,
             {$sqlClienteCorreo},
             {$sqlSolicitudEmail},
@@ -174,13 +199,13 @@ function rep_segfin_fetch_raw(PDO $pdo, string $d1, string $d2): array
         {$joinSc}
         {$joinEv}
         {$joinBanco}
-        WHERE DATE(fr.fecha_creacion) BETWEEN :d1 AND :d2
+        WHERE {$whereFecha}
         ORDER BY fr.fecha_creacion DESC
         LIMIT 20000
     ";
 
     $st = $pdo->prepare($sql);
-    $st->execute(['d1' => $d1, 'd2' => $d2]);
+    $st->execute($paramsFecha);
 
     return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
 }
@@ -201,6 +226,9 @@ function rep_segfin_enriquecer_fila(array $r): array
     $e['id_sol_motus'] = $sid;
     $e['tiene_solicitud_motus'] = $sid !== null && $sid > 0;
     $e['vinculo_label'] = $e['tiene_solicitud_motus'] ? 'Con solicitud Motus' : 'Sin solicitud Motus';
+    $e['fecha_motus'] = $sid ? (string) ($r['fecha_motus'] ?? '') : '';
+    // Normalizar fecha formulario para comparar en filtros PHP.
+    $e['fecha_formulario'] = (string) ($e['fecha_creacion'] ?? $r['fecha_creacion'] ?? '');
 
     $vNombre = trim((string) ($r['vendedor_nombre'] ?? ''));
     $e['vendedor'] = $vNombre !== '' ? $vNombre : trim((string) ($r['email_vendedor'] ?? ''));
@@ -274,6 +302,40 @@ function rep_segfin_enriquecer_fila(array $r): array
 }
 
 /**
+ * Extrae Y-m-d de un datetime/string.
+ */
+function rep_segfin_solo_dia(?string $fecha): string
+{
+    $t = trim((string) $fecha);
+    if ($t === '') {
+        return '';
+    }
+    if (preg_match('/^(\d{4}-\d{2}-\d{2})/', $t, $m)) {
+        return $m[1];
+    }
+    try {
+        return (new DateTimeImmutable($t))->format('Y-m-d');
+    } catch (Throwable $e) {
+        return '';
+    }
+}
+
+/**
+ * Híbrido: pasa si la fecha del formulario público O la de Motus caen en el rango.
+ *
+ * @param array{desde?:string,hasta?:string,vinculo?:string} $filt
+ */
+function rep_segfin_pasar_filtro_fechas(array $e, string $d1, string $d2): bool
+{
+    $fr = rep_segfin_solo_dia((string) ($e['fecha_creacion'] ?? $e['fecha_formulario'] ?? ''));
+    $motus = rep_segfin_solo_dia((string) ($e['fecha_motus'] ?? ''));
+    $okFr = ($fr !== '' && $fr >= $d1 && $fr <= $d2);
+    $okMotus = ($motus !== '' && $motus >= $d1 && $motus <= $d2);
+
+    return $okFr || $okMotus;
+}
+
+/**
  * @param array{desde:string,hasta:string,vinculo:string} $filt
  */
 function rep_segfin_pasar_filtro_vinculo(array $e, array $filt): bool
@@ -292,7 +354,8 @@ function rep_segfin_pasar_filtro_vinculo(array $e, array $filt): bool
 function rep_segfin_export_headers(): array
 {
     return [
-        'Fecha',
+        'Fecha form. público',
+        'Fecha Motus',
         'Cliente (público)',
         'Email del cliente',
         'Sexo formulario',
@@ -344,6 +407,7 @@ function rep_segfin_export_row(array $e): array
 {
     return [
         $e['fecha_creacion'] ?? '',
+        $e['fecha_motus'] ?? '',
         $e['cliente_nombre'] ?? '',
         $e['cliente_email'] ?? '',
         $e['cliente_sexo'] ?? '',
@@ -427,6 +491,9 @@ function rep_segfin_build_reporte(PDO $pdo, ?array $filtOverride = null): array
         $seenFr[$frId] = true;
 
         $e = rep_segfin_enriquecer_fila($row);
+        if (!rep_segfin_pasar_filtro_fechas($e, $d1, $d2)) {
+            continue;
+        }
         if (!rep_segfin_pasar_filtro_vinculo($e, $filt)) {
             continue;
         }
@@ -463,7 +530,7 @@ function rep_segfin_build_reporte(PDO $pdo, ?array $filtOverride = null): array
             ['label' => 'No enviadas a banco', 'total' => $noEnviadaBanco],
         ],
         'filas' => $filas,
-        'nota' => 'Incluye todos los envíos del formulario público (enlace). La solicitud Motus se detecta por financiamiento_registro_id o solicitud_credito_id. Datos de banco = respuesta seleccionada.',
+        'nota' => 'Filtro de fechas híbrido: incluye registros cuyo formulario público (fecha creación Sol Digital) o cuya solicitud Motus (fecha creación) caiga dentro del rango Desde/Hasta.',
     ];
 }
 
