@@ -1437,7 +1437,7 @@ if ($isBanco && !$isAdmin) {
                                                     <input type="number" class="form-control" id="abono_pct_evaluacion" name="abono_pct_evaluacion" step="0.01" min="0" max="100" disabled placeholder="0.00">
                                                     <span class="input-group-text">%</span>
                                                 </div>
-                                                <div class="form-text">Calcula el Abono $ según el precio del vehículo.</div>
+                                                <div class="form-text">Al ingresar el %, calcula el Abono $ según el Precio de venta.</div>
                                             </div>
                                         </div>
                                         <div class="col-md-4">
@@ -1464,7 +1464,7 @@ if ($isBanco && !$isAdmin) {
                                                     <span class="input-group-text">$</span>
                                                     <input type="number" class="form-control" id="letra_evaluacion" name="letra_evaluacion" step="0.01" min="0" disabled>
                                                 </div>
-                                                <div class="form-text">Ingrese el monto de la letra mensual.</div>
+                                                <div class="form-text">Al ingresarla, la letra quincenal se completa como la mitad.</div>
                                             </div>
                                         </div>
                                         <div class="col-md-4">
@@ -1863,7 +1863,39 @@ if ($isBanco && !$isAdmin) {
             }
         });
 
-        // Sin cálculo automático: el banco ingresa Valor a Financiar, Abono %, Abono $ y Letras a mano.
+        // Abono $ = Precio de venta × Abono % / 100; Letra quincenal = Letra mensual / 2.
+        window.calcularAbonoDesdePct = function() {
+            if ($('#abono_pct_evaluacion').prop('disabled') || $('#abono_evaluacion').prop('disabled')) {
+                return;
+            }
+            var precio = parseFloat($('#valor_financiar').val());
+            var pct = parseFloat($('#abono_pct_evaluacion').val());
+            if (!isFinite(precio) || precio <= 0 || !isFinite(pct) || pct < 0) {
+                return;
+            }
+            $('#abono_evaluacion').val((precio * pct / 100).toFixed(2));
+        };
+
+        window.calcularLetraQuincenalDesdeMensual = function() {
+            if ($('#letra_evaluacion').prop('disabled') || $('#letra_quincenal_evaluacion').prop('disabled')) {
+                return;
+            }
+            var mensual = parseFloat($('#letra_evaluacion').val());
+            if (!isFinite(mensual) || mensual < 0) {
+                return;
+            }
+            $('#letra_quincenal_evaluacion').val((mensual / 2).toFixed(2));
+        };
+
+        $(document).on('input change', '#abono_pct_evaluacion', function() {
+            calcularAbonoDesdePct();
+        });
+        $(document).on('input change', '#valor_financiar', function() {
+            calcularAbonoDesdePct();
+        });
+        $(document).on('input change', '#letra_evaluacion', function() {
+            calcularLetraQuincenalDesdeMensual();
+        });
 
         window.actualizarCampoCuantiaPromocion = function() {
             var tienePromo = (($('#promocion_evaluacion').val() || '').trim() !== '');
