@@ -51,30 +51,31 @@ $segHasta = (new DateTimeImmutable('today'))->format('Y-m-d');
                     <div class="alert alert-info small">
                         <strong>ID Sol Digital</strong> = registro del formulario público (<code>financiamiento_registros</code>).
                         <strong>ID Sol MOTUS</strong> = solicitud de crédito vinculada, si existe.
+                        Los datos de <strong>banco</strong> corresponden a la <strong>respuesta/propuesta seleccionada</strong>.
                     </div>
 
                     <div class="card mb-3">
                         <div class="card-body">
-                            <div class="row g-2 align-items-end flex-wrap">
+                            <form id="segFinFiltrosForm" class="row g-2 align-items-end flex-wrap">
                                 <div class="col-md-2">
-                                    <label class="form-label small mb-0">Desde</label>
-                                    <input type="date" id="segFinDesde" class="form-control form-control-sm" value="<?php echo htmlspecialchars($segDesde); ?>">
+                                    <label class="form-label small mb-0" for="segFinDesde">Desde</label>
+                                    <input type="date" id="segFinDesde" name="desde" class="form-control form-control-sm" value="<?php echo htmlspecialchars($segDesde); ?>">
                                 </div>
                                 <div class="col-md-2">
-                                    <label class="form-label small mb-0">Hasta</label>
-                                    <input type="date" id="segFinHasta" class="form-control form-control-sm" value="<?php echo htmlspecialchars($segHasta); ?>">
+                                    <label class="form-label small mb-0" for="segFinHasta">Hasta</label>
+                                    <input type="date" id="segFinHasta" name="hasta" class="form-control form-control-sm" value="<?php echo htmlspecialchars($segHasta); ?>">
                                 </div>
                                 <div class="col-md-3">
-                                    <label class="form-label small mb-0">Vínculo Motus</label>
-                                    <select id="segFinVinculo" class="form-select form-select-sm">
+                                    <label class="form-label small mb-0" for="segFinVinculo">Vínculo Motus</label>
+                                    <select id="segFinVinculo" name="vinculo" class="form-select form-select-sm">
                                         <option value="">Todos</option>
                                         <option value="con">Con solicitud Motus</option>
                                         <option value="sin">Sin solicitud Motus</option>
                                     </select>
                                 </div>
                                 <div class="col-md-2">
-                                    <button type="button" class="btn btn-primary btn-sm w-100" id="btnSegFinFiltrar">
-                                        <i class="fas fa-sync me-1"></i>Actualizar
+                                    <button type="submit" class="btn btn-primary btn-sm w-100" id="btnSegFinFiltrar">
+                                        <i class="fas fa-filter me-1"></i>Filtrar
                                     </button>
                                 </div>
                                 <div class="col-md-2">
@@ -82,12 +83,13 @@ $segHasta = (new DateTimeImmutable('today'))->format('Y-m-d');
                                         <i class="fas fa-file-excel me-1"></i>Exportar Excel
                                     </a>
                                 </div>
-                            </div>
+                            </form>
+                            <p class="small text-muted mb-0 mt-2" id="segFinFiltrosAplicados">Filtros: —</p>
                         </div>
                     </div>
 
                     <div class="row g-3 mb-3">
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <div class="card h-100">
                                 <div class="card-body text-center">
                                     <div class="text-muted small">Total envíos</div>
@@ -95,7 +97,7 @@ $segHasta = (new DateTimeImmutable('today'))->format('Y-m-d');
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <div class="card h-100">
                                 <div class="card-body text-center">
                                     <div class="text-muted small">Con solicitud Motus</div>
@@ -103,7 +105,7 @@ $segHasta = (new DateTimeImmutable('today'))->format('Y-m-d');
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <div class="card h-100">
                                 <div class="card-body text-center">
                                     <div class="text-muted small">Sin solicitud Motus</div>
@@ -111,7 +113,23 @@ $segHasta = (new DateTimeImmutable('today'))->format('Y-m-d');
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-2">
+                            <div class="card h-100">
+                                <div class="card-body text-center">
+                                    <div class="text-muted small">Enviadas a banco</div>
+                                    <div class="h4 mb-0 text-primary" id="segFinKpiEnviada">0</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="card h-100">
+                                <div class="card-body text-center">
+                                    <div class="text-muted small">No enviadas a banco</div>
+                                    <div class="h4 mb-0 text-warning" id="segFinKpiNoEnviada">0</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
                             <div class="card h-100">
                                 <div class="card-body text-center">
                                     <div class="text-muted small">Rango fechas</div>
@@ -122,7 +140,7 @@ $segHasta = (new DateTimeImmutable('today'))->format('Y-m-d');
                     </div>
 
                     <div class="row g-3 mb-3">
-                        <div class="col-md-5">
+                        <div class="col-md-6">
                             <div class="card h-100">
                                 <div class="card-body">
                                     <h6 class="text-center mb-3">Formulario público vs solicitud Motus</h6>
@@ -132,40 +150,19 @@ $segHasta = (new DateTimeImmutable('today'))->format('Y-m-d');
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-7">
+                        <div class="col-md-6">
                             <div class="card h-100">
                                 <div class="card-body">
-                                    <h6 class="mb-2">Resumen</h6>
-                                    <div class="seg-dt-wrap">
-                                        <table class="table table-sm table-bordered table-hover" id="tablaSegFin">
-                                            <thead class="table-light">
-                                                <tr>
-                                                    <th>ID Sol Digital</th>
-                                                    <th>Fecha</th>
-                                                    <th>Cliente</th>
-                                                    <th>Email del cliente</th>
-                                                    <th>Vínculo</th>
-                                                    <th>ID Sol MOTUS</th>
-                                                    <th>Estado Motus</th>
-                                                    <th>Vendedor</th>
-                                                    <th>Teléfono</th>
-                                                    <th>Unidad / Vehículo</th>
-                                                    <th>Rango edad</th>
-                                                    <th>Rango salario</th>
-                                                    <th>¿Perfil coincide?</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <tr><td colspan="13" class="text-center text-muted">Cargando…</td></tr>
-                                            </tbody>
-                                        </table>
+                                    <h6 class="text-center mb-3">Enviadas a banco vs no enviadas</h6>
+                                    <div class="seg-chart-wrap">
+                                        <canvas id="segFinChartEnviadaBanco"></canvas>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="card" id="segFinDetalleWrap" style="display:none">
+                    <div class="card" id="segFinDetalleWrap">
                         <div class="card-body">
                             <h6 class="mb-2">Detalle completo (todos los campos del reporte)</h6>
                             <div class="seg-dt-wrap">
@@ -199,9 +196,26 @@ $segHasta = (new DateTimeImmutable('today'))->format('Y-m-d');
                                             <th>Unidad/Veh.</th>
                                             <th>ID Sol Digital</th>
                                             <th>ID Sol MOTUS</th>
+                                            <th>Enviada a banco</th>
+                                            <th>Banco</th>
+                                            <th>Agente banco</th>
+                                            <th>Decisión sel.</th>
+                                            <th>Razón</th>
+                                            <th>Tasa %</th>
+                                            <th>Precio/valor</th>
+                                            <th>Abono</th>
+                                            <th>Plazo</th>
+                                            <th>Letra mens.</th>
+                                            <th>Letra quinc.</th>
+                                            <th>Promoción</th>
+                                            <th>Cuantía</th>
+                                            <th>Comentarios banco</th>
+                                            <th>Fecha eval. sel.</th>
                                         </tr>
                                     </thead>
-                                    <tbody></tbody>
+                                    <tbody>
+                                        <tr><td colspan="42" class="text-center text-muted">Cargando…</td></tr>
+                                    </tbody>
                                 </table>
                             </div>
                         </div>

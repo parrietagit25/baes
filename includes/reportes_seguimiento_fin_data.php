@@ -60,6 +60,81 @@ function rep_segfin_fetch_raw(PDO $pdo, string $d1, string $d2): array
         ? 'sc.email AS solicitud_email'
         : 'NULL AS solicitud_email';
 
+    $hasEvalSel = $joinSc !== 'LEFT JOIN solicitudes_credito sc ON 1=0'
+        && rep_fin_columna_existe($pdo, 'solicitudes_credito', 'evaluacion_seleccionada')
+        && rep_fin_tabla_existe($pdo, 'evaluaciones_banco');
+    $hasUbs = rep_fin_tabla_existe($pdo, 'usuarios_banco_solicitudes');
+    $hasBancos = rep_fin_tabla_existe($pdo, 'bancos');
+    $hasRazon = $hasEvalSel && rep_fin_columna_existe($pdo, 'evaluaciones_banco', 'razon');
+    $hasCuantia = $hasEvalSel && rep_fin_columna_existe($pdo, 'evaluaciones_banco', 'cuantia');
+    $hasLetraQ = $hasEvalSel && rep_fin_columna_existe($pdo, 'evaluaciones_banco', 'letra_quincenal');
+
+    $joinBanco = '';
+    $sqlBancoCampos = '
+            NULL AS banco_nombre,
+            NULL AS banco_agente_nombre,
+            NULL AS banco_agente_apellido,
+            NULL AS banco_decision,
+            NULL AS banco_razon,
+            NULL AS banco_tasa,
+            NULL AS banco_valor_financiar,
+            NULL AS banco_abono,
+            NULL AS banco_plazo,
+            NULL AS banco_letra,
+            NULL AS banco_letra_quincenal,
+            NULL AS banco_promocion,
+            NULL AS banco_cuantia,
+            NULL AS banco_comentarios,
+            NULL AS banco_fecha_evaluacion,
+            0 AS enviada_a_banco';
+
+    if ($hasEvalSel) {
+        $joinBanco = ' LEFT JOIN evaluaciones_banco eb_sel ON eb_sel.id = sc.evaluacion_seleccionada';
+        if ($hasUbs) {
+            $joinBanco .= ' LEFT JOIN usuarios_banco_solicitudes ubs_sel ON ubs_sel.id = eb_sel.usuario_banco_id';
+            $joinBanco .= ' LEFT JOIN usuarios u_banco ON u_banco.id = ubs_sel.usuario_banco_id';
+            if ($hasBancos) {
+                $joinBanco .= ' LEFT JOIN bancos b_sel ON b_sel.id = u_banco.banco_id';
+            }
+        }
+        $sqlRazon = $hasRazon ? 'eb_sel.razon' : 'NULL';
+        $sqlCuantia = $hasCuantia ? 'eb_sel.cuantia' : 'NULL';
+        $sqlLetraQ = $hasLetraQ ? 'eb_sel.letra_quincenal' : 'NULL';
+        $sqlBancoNombre = ($hasUbs && $hasBancos) ? 'b_sel.nombre' : 'NULL';
+        $sqlAgenteNom = $hasUbs ? 'u_banco.nombre' : 'NULL';
+        $sqlAgenteApe = $hasUbs ? 'u_banco.apellido' : 'NULL';
+
+        $enviadaExpr = '0';
+        if ($hasUbs) {
+            $enviadaExpr = '(CASE WHEN sc.id IS NOT NULL AND (
+                EXISTS (SELECT 1 FROM usuarios_banco_solicitudes ubsx WHERE ubsx.solicitud_id = sc.id)
+                OR EXISTS (SELECT 1 FROM evaluaciones_banco ebx WHERE ebx.solicitud_id = sc.id)
+            ) THEN 1 ELSE 0 END)';
+        } else {
+            $enviadaExpr = '(CASE WHEN sc.id IS NOT NULL AND EXISTS (
+                SELECT 1 FROM evaluaciones_banco ebx WHERE ebx.solicitud_id = sc.id
+            ) THEN 1 ELSE 0 END)';
+        }
+
+        $sqlBancoCampos = "
+            {$sqlBancoNombre} AS banco_nombre,
+            {$sqlAgenteNom} AS banco_agente_nombre,
+            {$sqlAgenteApe} AS banco_agente_apellido,
+            eb_sel.decision AS banco_decision,
+            {$sqlRazon} AS banco_razon,
+            eb_sel.tasa_bancaria AS banco_tasa,
+            eb_sel.valor_financiar AS banco_valor_financiar,
+            eb_sel.abono AS banco_abono,
+            eb_sel.plazo AS banco_plazo,
+            eb_sel.letra AS banco_letra,
+            {$sqlLetraQ} AS banco_letra_quincenal,
+            eb_sel.promocion AS banco_promocion,
+            {$sqlCuantia} AS banco_cuantia,
+            eb_sel.comentarios AS banco_comentarios,
+            eb_sel.fecha_evaluacion AS banco_fecha_evaluacion,
+            {$enviadaExpr} AS enviada_a_banco";
+    }
+
     $sql = "
         SELECT
             fr.id,
@@ -92,11 +167,13 @@ function rep_segfin_fetch_raw(PDO $pdo, string $d1, string $d2): array
             sc.edad AS edad_motus,
             sc.nombre_cliente AS nombre_motus,
             sc.cedula AS cedula_motus,
-            ev.nombre AS vendedor_nombre
+            ev.nombre AS vendedor_nombre,
+            {$sqlBancoCampos}
             {$sqlCamposReserva}
         FROM financiamiento_registros fr
         {$joinSc}
         {$joinEv}
+        {$joinBanco}
         WHERE DATE(fr.fecha_creacion) BETWEEN :d1 AND :d2
         ORDER BY fr.fecha_creacion DESC
         LIMIT 20000
@@ -165,6 +242,34 @@ function rep_segfin_enriquecer_fila(array $r): array
         $e['genero_coincide_txt'] = '—';
     }
 
+    $e['enviada_a_banco'] = !empty($r['enviada_a_banco']);
+    $e['enviada_a_banco_txt'] = $e['enviada_a_banco'] ? 'Sí' : 'No';
+
+    $bancoNombre = trim((string) ($r['banco_nombre'] ?? ''));
+    $agente = trim(((string) ($r['banco_agente_nombre'] ?? '')) . ' ' . ((string) ($r['banco_agente_apellido'] ?? '')));
+    $decisionRaw = trim((string) ($r['banco_decision'] ?? ''));
+    $decisionLabel = $decisionRaw !== ''
+        ? strtoupper(str_replace('_', ' ', $decisionRaw))
+        : '';
+
+    $e['banco_nombre'] = $bancoNombre;
+    $e['banco_agente'] = $agente;
+    $e['banco_decision'] = $decisionLabel;
+    $e['banco_razon'] = trim((string) ($r['banco_razon'] ?? ''));
+    $e['banco_tasa'] = $r['banco_tasa'] ?? null;
+    $e['banco_valor_financiar'] = $r['banco_valor_financiar'] ?? null;
+    $e['banco_abono'] = $r['banco_abono'] ?? null;
+    $e['banco_plazo'] = $r['banco_plazo'] ?? null;
+    $e['banco_letra'] = $r['banco_letra'] ?? null;
+    $e['banco_letra_quincenal'] = $r['banco_letra_quincenal'] ?? null;
+    $e['banco_promocion'] = trim((string) ($r['banco_promocion'] ?? ''));
+    $e['banco_cuantia'] = $r['banco_cuantia'] ?? null;
+    $e['banco_comentarios'] = trim((string) ($r['banco_comentarios'] ?? ''));
+    $e['banco_fecha_evaluacion'] = $r['banco_fecha_evaluacion'] ?? null;
+    $e['banco_respuesta_txt'] = $decisionLabel !== ''
+        ? ($bancoNombre !== '' ? $bancoNombre . ' — ' . $decisionLabel : $decisionLabel)
+        : ($e['enviada_a_banco'] ? 'Enviada (sin propuesta seleccionada)' : '—');
+
     return $e;
 }
 
@@ -213,6 +318,21 @@ function rep_segfin_export_headers(): array
         'ID Sol Digital',
         'ID Sol MOTUS',
         'Vínculo Motus',
+        'Enviada a banco',
+        'Banco (seleccionado)',
+        'Agente banco',
+        'Decisión seleccionada',
+        'Razón banco',
+        'Tasa %',
+        'Precio/valor',
+        'Abono banco',
+        'Plazo',
+        'Letra mensual',
+        'Letra quincenal',
+        'Promoción',
+        'Cuantía',
+        'Comentarios banco',
+        'Fecha evaluación sel.',
     ];
 }
 
@@ -249,6 +369,21 @@ function rep_segfin_export_row(array $e): array
         $e['id_sol_digital'] ?? '',
         $e['id_sol_motus'] ?? '',
         $e['vinculo_label'] ?? '',
+        $e['enviada_a_banco_txt'] ?? '',
+        $e['banco_nombre'] ?? '',
+        $e['banco_agente'] ?? '',
+        $e['banco_decision'] ?? '',
+        $e['banco_razon'] ?? '',
+        $e['banco_tasa'] ?? '',
+        $e['banco_valor_financiar'] ?? '',
+        $e['banco_abono'] ?? '',
+        $e['banco_plazo'] ?? '',
+        $e['banco_letra'] ?? '',
+        $e['banco_letra_quincenal'] ?? '',
+        $e['banco_promocion'] ?? '',
+        $e['banco_cuantia'] ?? '',
+        $e['banco_comentarios'] ?? '',
+        $e['banco_fecha_evaluacion'] ?? '',
     ];
 }
 
@@ -280,6 +415,8 @@ function rep_segfin_build_reporte(PDO $pdo, ?array $filtOverride = null): array
     $filas = [];
     $conMotus = 0;
     $sinMotus = 0;
+    $enviadaBanco = 0;
+    $noEnviadaBanco = 0;
     $seenFr = [];
 
     foreach ($raw as $row) {
@@ -299,6 +436,11 @@ function rep_segfin_build_reporte(PDO $pdo, ?array $filtOverride = null): array
         } else {
             $sinMotus++;
         }
+        if (!empty($e['enviada_a_banco'])) {
+            $enviadaBanco++;
+        } else {
+            $noEnviadaBanco++;
+        }
         $filas[] = $e;
     }
 
@@ -309,13 +451,19 @@ function rep_segfin_build_reporte(PDO $pdo, ?array $filtOverride = null): array
             'total' => count($filas),
             'con_motus' => $conMotus,
             'sin_motus' => $sinMotus,
+            'enviada_banco' => $enviadaBanco,
+            'no_enviada_banco' => $noEnviadaBanco,
         ],
         'pie_vinculo' => [
             ['label' => 'Con solicitud Motus', 'total' => $conMotus],
             ['label' => 'Sin solicitud Motus', 'total' => $sinMotus],
         ],
+        'pie_enviada_banco' => [
+            ['label' => 'Enviadas a banco', 'total' => $enviadaBanco],
+            ['label' => 'No enviadas a banco', 'total' => $noEnviadaBanco],
+        ],
         'filas' => $filas,
-        'nota' => 'Incluye todos los envíos del formulario público (enlace). La solicitud Motus se detecta por financiamiento_registro_id o solicitud_credito_id.',
+        'nota' => 'Incluye todos los envíos del formulario público (enlace). La solicitud Motus se detecta por financiamiento_registro_id o solicitud_credito_id. Datos de banco = respuesta seleccionada.',
     ];
 }
 
