@@ -442,9 +442,9 @@ function cargarSolicitudes() {
                                         </button>
                                     </div>
                                     ` : ''}
-                                    ${(window.userRoles && window.userRoles.isAdmin) ? `
+                                    ${(window.userRoles && (window.userRoles.isAdmin || window.userRoles.isGestor)) ? `
                                     <div class="btn-group btn-group-sm mb-1" role="group">
-                                        <button class="btn btn-warning btn-action" onclick="abrirModalCambioEstado(${solicitud.id})" title="Cambiar Estado (Solo Admin)">
+                                        <button class="btn btn-warning btn-action" onclick="abrirModalCambioEstado(${solicitud.id})" title="Cambiar Estado">
                                             <i class="fas fa-cogs"></i>
                                         </button>
                                     </div>

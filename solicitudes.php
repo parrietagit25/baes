@@ -547,9 +547,9 @@ if ($isBanco && !$isAdmin) {
                                                           </button>
                                                       </div>
                                                       <?php endif; ?>
-                                                    <?php if (in_array('ROLE_ADMIN', $userRoles)): ?>
+                                                    <?php if (in_array('ROLE_ADMIN', $userRoles) || in_array('ROLE_GESTOR', $userRoles)): ?>
                                                     <div class="btn-group btn-group-sm mb-1" role="group">
-                                                        <button class="btn btn-warning btn-action" onclick="abrirModalCambioEstado(<?php echo $solicitud['id']; ?>)" title="Cambiar Estado (Solo Admin)">
+                                                        <button class="btn btn-warning btn-action" onclick="abrirModalCambioEstado(<?php echo $solicitud['id']; ?>)" title="Cambiar Estado">
                                                             <i class="fas fa-cogs"></i>
                                                         </button>
                                                     </div>
@@ -1980,7 +1980,7 @@ if ($isBanco && !$isAdmin) {
             });
         }
 
-        // Función para abrir modal de cambio de estado (Solo Admin)
+        // Función para abrir modal de cambio de estado (Admin / Gestor)
         function abrirModalCambioEstado(solicitudId) {
             // Limpiar formulario
             $('#cambioEstadoForm')[0].reset();

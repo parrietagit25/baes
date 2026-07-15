@@ -1001,11 +1001,11 @@ function cambiarEstadoSolicitud() {
     global $pdo;
     
     try {
-        // Verificar permisos: Admin puede cambiar cualquier estado, Vendedor solo de solicitudes asignadas
+        // Verificar permisos: Admin/Gestor pueden cambiar estado; Vendedor solo de solicitudes asignadas
         $userRoles = $_SESSION['user_roles'];
         $puedeCambiarEstado = false;
         
-        if (in_array('ROLE_ADMIN', $userRoles)) {
+        if (in_array('ROLE_ADMIN', $userRoles) || in_array('ROLE_GESTOR', $userRoles)) {
             $puedeCambiarEstado = true;
         } elseif (in_array('ROLE_VENDEDOR', $userRoles)) {
             // Verificar que el vendedor tenga la solicitud asignada
@@ -1076,7 +1076,13 @@ function cambiarEstadoSolicitud() {
             $stmt->execute([$nuevo_estado, $solicitud_id]);
             
             // Crear nota en el muro
-            $rol_usuario = in_array('ROLE_ADMIN', $userRoles) ? 'administrador' : 'vendedor';
+            if (in_array('ROLE_ADMIN', $userRoles)) {
+                $rol_usuario = 'administrador';
+            } elseif (in_array('ROLE_GESTOR', $userRoles)) {
+                $rol_usuario = 'gestor';
+            } else {
+                $rol_usuario = 'vendedor';
+            }
             $titulo_nota = "Estado cambiado por {$rol_usuario}";
             $contenido_nota = "Estado cambiado de '{$estado_anterior}' a '{$nuevo_estado}'. Motivo: {$nota}";
             
