@@ -1423,7 +1423,7 @@ if ($isBanco && !$isAdmin) {
                                     <div class="row">
                                         <div class="col-md-4">
                                             <div class="mb-3">
-                                                <label for="valor_financiar" class="form-label">Valor a Financiar</label>
+                                                <label for="valor_financiar" class="form-label">Precio de venta</label>
                                                 <div class="input-group">
                                                     <span class="input-group-text">$</span>
                                                     <input type="number" class="form-control" id="valor_financiar" name="valor_financiar" step="0.01" min="0" disabled>
