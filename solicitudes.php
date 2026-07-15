@@ -1521,7 +1521,7 @@ if ($isBanco && !$isAdmin) {
         </div>
     </div>
 
-    <!-- Modal de Cambio de Estado (Solo Admin) -->
+    <!-- Modal de Cambio de Estado (Admin / Gestor) -->
     <div class="modal fade" id="cambioEstadoModal" tabindex="-1">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
