@@ -1061,6 +1061,9 @@ if ($emailDestinoVendedor !== null || $emailCliente !== null) {
         if ($pdfPath && file_exists($pdfPath)) {
             require_once __DIR__ . '/../includes/EmailService.php';
             $emailService = new EmailService();
+            if ($solicitudId > 0) {
+                $emailService->paraSolicitud($solicitudId);
+            }
             $nombreClienteAsunto = trim((string)$nombre);
             if ($nombreClienteAsunto === '') {
                 $nombreClienteAsunto = 'Cliente sin nombre';
@@ -1116,7 +1119,8 @@ if ($emailDestinoVendedor !== null || $emailCliente !== null) {
                     $attachmentsCliente,
                     [],
                     [],
-                    ''
+                    '',
+                    $solicitudId > 0 ? $solicitudId : null
                 );
                 $emailEnviado = !empty($resultUnico['success']);
             } else {
@@ -1130,7 +1134,8 @@ if ($emailDestinoVendedor !== null || $emailCliente !== null) {
                         $attachmentsVendedor,
                         [],
                         [],
-                        ''
+                        '',
+                        $solicitudId > 0 ? $solicitudId : null
                     );
                     $emailEnviado = !empty($result['success']);
                 }
@@ -1144,7 +1149,8 @@ if ($emailDestinoVendedor !== null || $emailCliente !== null) {
                         $attachmentsCliente,
                         [],
                         [],
-                        ''
+                        '',
+                        $solicitudId > 0 ? $solicitudId : null
                     );
                     if (!empty($resultCliente['success'])) {
                         $emailEnviado = true;

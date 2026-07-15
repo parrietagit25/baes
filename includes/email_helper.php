@@ -1,9 +1,14 @@
 <?php
 /**
  * Funciones helper para facilitar el envío de correos
- * 
+ *
  * Este archivo proporciona funciones de alto nivel para enviar correos
- * en diferentes escenarios del sistema
+ * en diferentes escenarios del sistema.
+ *
+ * Convención Motus: todo correo ligado a una solicitud de crédito debe
+ * asociarse a su ID (EmailService::paraSolicitud($id) o parámetro $solicitudId
+ * de enviarCorreo). Si la solicitud tiene email_pipedrive, se incluye en CC.
+ * Si no tiene, el envío continúa sin esa copia.
  */
 
 require_once __DIR__ . '/EmailService.php';
@@ -250,7 +255,7 @@ function enviarNotificacionVendedor($solicitudId) {
             return ['success' => false, 'message' => 'Vendedor no encontrado o sin email'];
         }
         
-        $emailService = new EmailService();
+        $emailService = (new EmailService())->paraSolicitud((int) $solicitudId);
         $vendedorNombre = trim(($solicitud['vendedor_nombre'] ?? '') . ' ' . ($solicitud['vendedor_apellido'] ?? ''));
 
         return $emailService->notificarVendedorBancoResponde(
@@ -288,7 +293,7 @@ function enviarRecordatorioBanco($solicitudId, $usuarioBancoId) {
             return ['success' => false, 'message' => 'Usuario banco no encontrado o sin email'];
         }
         
-        $emailService = new EmailService();
+        $emailService = (new EmailService())->paraSolicitud((int) $solicitudId);
         $bancoNombre = trim(($solicitud['banco_nombre'] ?? '') . ' ' . ($solicitud['banco_apellido'] ?? ''));
 
         $resultado = $emailService->enviarRecordatorioBanco(
@@ -328,7 +333,7 @@ function notificarBancoNuevaSolicitud($solicitudId, $usuarioBancoId) {
             return ['success' => false, 'message' => 'Usuario banco no encontrado o sin email'];
         }
         
-        $emailService = new EmailService();
+        $emailService = (new EmailService())->paraSolicitud((int) $solicitudId);
         $bancoNombre = trim(($solicitud['banco_nombre'] ?? '') . ' ' . ($solicitud['banco_apellido'] ?? ''));
 
         $resultado = $emailService->notificarBancoNuevaSolicitud(
@@ -368,7 +373,7 @@ function notificarClienteAprobacion($solicitudId) {
             return ['success' => false, 'message' => 'La solicitud no está aprobada'];
         }
         
-        $emailService = new EmailService();
+        $emailService = (new EmailService())->paraSolicitud((int) $solicitudId);
 
         return $emailService->notificarClienteAprobacion(
             $solicitud['email'],
@@ -403,7 +408,7 @@ function notificarGestorCambioEstado($solicitudId, $estadoAnterior, $estadoNuevo
             return ['success' => false, 'message' => 'Gestor no encontrado o sin email'];
         }
         
-        $emailService = new EmailService();
+        $emailService = (new EmailService())->paraSolicitud((int) $solicitudId);
         $gestorNombre = trim(($solicitud['gestor_nombre'] ?? '') . ' ' . ($solicitud['gestor_apellido'] ?? ''));
 
         return $emailService->notificarGestorCambioEstado(
@@ -443,7 +448,7 @@ function notificarReevaluacion($solicitudId, $evaluacionId, $comentario) {
             return ['success' => false, 'message' => 'Usuario banco no encontrado o sin email'];
         }
 
-        $emailService = new EmailService();
+        $emailService = (new EmailService())->paraSolicitud((int) $solicitudId);
         $bancoNombre = trim(($row['banco_nombre'] ?? '') . ' ' . ($row['banco_apellido'] ?? ''));
 
         $resultado = $emailService->notificarReevaluacion(
@@ -597,7 +602,7 @@ function enviarResumenSolicitudBanco($solicitudId, $usuarioBancoId) {
         }
         $archivosAdjuntos = adjuntosArchivosParaCorreoResumen($adjuntos);
 
-        $emailService = new EmailService();
+        $emailService = (new EmailService())->paraSolicitud((int) $solicitudId);
         $resultado = $emailService->enviarCorreo(
             $banco['banco_email'],
             asuntoResumenSolicitudBancoMail($solicitud),
@@ -607,7 +612,8 @@ function enviarResumenSolicitudBanco($solicitudId, $usuarioBancoId) {
             $archivosAdjuntos,
             $ccVisibles,
             [],
-            $replyToGestor
+            $replyToGestor,
+            (int) $solicitudId
         );
         registrarLogResumenBancoEmail(
             $pdo,
@@ -771,7 +777,7 @@ function enviarResumenSolicitudBancoTodosUnCorreo($solicitudId) {
         }
 
         $archivosAdjuntos = adjuntosArchivosParaCorreoResumen($adjuntos);
-        $emailService = new EmailService();
+        $emailService = (new EmailService())->paraSolicitud((int) $solicitudId);
 
         $logsPendientes = [];
         foreach (array_unique($idsUsuariosBanco) as $uid) {
@@ -803,7 +809,8 @@ function enviarResumenSolicitudBancoTodosUnCorreo($solicitudId) {
             $archivosAdjuntos,
             array_values(array_unique($cc)),
             $bcc,
-            $replyToGestor
+            $replyToGestor,
+            (int) $solicitudId
         );
 
         $ok = !empty($resultado['success']);
@@ -900,7 +907,7 @@ function enviarResumenSolicitudPipedriveDirecto($solicitudId) {
         );
 
         $archivosAdjuntos = adjuntosArchivosParaCorreoResumen($adjuntos);
-        $emailService = new EmailService();
+        $emailService = (new EmailService())->paraSolicitud((int) $solicitudId);
         $emailPara = 'fyi@automarketpan.com';
 
         $resultado = $emailService->enviarCorreo(
@@ -911,7 +918,9 @@ function enviarResumenSolicitudPipedriveDirecto($solicitudId) {
             strip_tags(preg_replace('/<br\s*\/?>/i', "\n", $html)),
             $archivosAdjuntos,
             [$emailPipe],
-            []
+            [],
+            '',
+            (int) $solicitudId
         );
 
         if (!empty($resultado['success'])) {

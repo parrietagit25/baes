@@ -16,6 +16,9 @@ class EmailService {
     private $config;
     private const CC_GLOBAL_FIJO = 'fyi@automarketpan.com';
 
+    /** @var int|null ID de solicitudes_credito para CC automático de email_pipedrive */
+    private $solicitudContextoId = null;
+
     public function __construct() {
         $this->config = require __DIR__ . '/../config/email.php';
         $nombreCorrecto = 'AutoMarket Seminuevos';
@@ -39,9 +42,20 @@ class EmailService {
     }
 
     /**
+     * Asocia el envío a una solicitud de crédito: si tiene email_pipedrive, irá en CC.
+     * Usar en envíos futuros: (new EmailService())->paraSolicitud($id)->enviarCorreo(...)
+     */
+    public function paraSolicitud($solicitudId): self {
+        $id = (int) $solicitudId;
+        $this->solicitudContextoId = $id > 0 ? $id : null;
+        return $this;
+    }
+
+    /**
      * @param array $attachments Rutas locales (string) o items ['path' => abs, 'filename' => 'nombre.pdf'] para el nombre en el correo
      * @param array $cc Lista de correos en copia visible (solo dirección, sin nombre)
      * @param array $bcc Lista de correos en copia oculta (no visible para el destinatario principal)
+     * @param int|null $solicitudId Si se indica, se agrega email_pipedrive de esa solicitud al CC (si existe)
      */
     public function enviarCorreo(
         $to,
@@ -52,14 +66,69 @@ class EmailService {
         $attachments = [],
         array $cc = [],
         array $bcc = [],
-        $replyToOverride = ''
+        $replyToOverride = '',
+        $solicitudId = null
     ) {
         try {
+            $sid = null;
+            if ($solicitudId !== null && (int) $solicitudId > 0) {
+                $sid = (int) $solicitudId;
+            } elseif ($this->solicitudContextoId) {
+                $sid = $this->solicitudContextoId;
+            }
+            $cc = $this->mergeCcEmailPipedrive($cc, $sid);
+
             return $this->enviarCorreoResend($to, $toName, $subject, $bodyHTML, $bodyText, $attachments, $cc, $bcc, $replyToOverride);
         } catch (Throwable $e) {
             error_log('Error al enviar correo (Resend): ' . $e->getMessage());
             return ['success' => false, 'message' => 'Error al enviar correo: ' . $e->getMessage()];
         }
+    }
+
+    /**
+     * Agrega email_pipedrive al CC si la solicitud lo tiene. Si no hay correo, no cambia el CC.
+     *
+     * @param array<int, string> $cc
+     * @return array<int, string>
+     */
+    private function mergeCcEmailPipedrive(array $cc, ?int $solicitudId, ?string $emailPipeHint = null): array {
+        $pipe = trim((string) ($emailPipeHint ?? ''));
+        if ($pipe === '' && $solicitudId) {
+            $pipe = (string) ($this->obtenerEmailPipedriveSolicitud($solicitudId) ?? '');
+        }
+        if ($pipe === '' || !filter_var($pipe, FILTER_VALIDATE_EMAIL)) {
+            return $cc;
+        }
+        $cc[] = $pipe;
+        return $cc;
+    }
+
+    private function obtenerEmailPipedriveSolicitud(int $solicitudId): ?string {
+        static $cache = [];
+        if (array_key_exists($solicitudId, $cache)) {
+            return $cache[$solicitudId];
+        }
+        try {
+            if (isset($GLOBALS['pdo']) && $GLOBALS['pdo'] instanceof PDO) {
+                $pdo = $GLOBALS['pdo'];
+            } else {
+                require_once __DIR__ . '/../config/database.php';
+                if (!isset($pdo) || !($pdo instanceof PDO)) {
+                    $cache[$solicitudId] = null;
+                    return null;
+                }
+                $GLOBALS['pdo'] = $pdo;
+            }
+            $st = $pdo->prepare('SELECT email_pipedrive FROM solicitudes_credito WHERE id = ? LIMIT 1');
+            $st->execute([$solicitudId]);
+            $row = $st->fetch(PDO::FETCH_ASSOC);
+            $email = trim((string) ($row['email_pipedrive'] ?? ''));
+            $cache[$solicitudId] = ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL)) ? $email : null;
+        } catch (Throwable $e) {
+            error_log('obtenerEmailPipedriveSolicitud: ' . $e->getMessage());
+            $cache[$solicitudId] = null;
+        }
+        return $cache[$solicitudId];
     }
 
     private function mensajeErrorResend(string $raw): string {
@@ -226,7 +295,25 @@ class EmailService {
         $bodyText = strip_tags($bodyHTML);
         $subject = $data['subject'] ?? 'Notificación de AutoMarket Seminuevos';
 
-        return $this->enviarCorreo($to, $subject, $bodyHTML, $toName, $bodyText, []);
+        $solicitudId = null;
+        if (!empty($data['solicitud']['id'])) {
+            $solicitudId = (int) $data['solicitud']['id'];
+        } elseif (!empty($data['solicitud_id'])) {
+            $solicitudId = (int) $data['solicitud_id'];
+        }
+
+        // Si el array de solicitud ya trae el pipe, evitar una consulta extra.
+        $pipeHint = null;
+        if (!empty($data['solicitud']['email_pipedrive'])) {
+            $pipeHint = trim((string) $data['solicitud']['email_pipedrive']);
+        }
+
+        $cc = [];
+        if ($pipeHint !== null && $pipeHint !== '') {
+            $cc = $this->mergeCcEmailPipedrive($cc, null, $pipeHint);
+        }
+
+        return $this->enviarCorreo($to, $subject, $bodyHTML, $toName, $bodyText, [], $cc, [], '', $solicitudId);
     }
 
     public function notificarVendedorBancoResponde($vendedorEmail, $vendedorNombre, $solicitud) {
