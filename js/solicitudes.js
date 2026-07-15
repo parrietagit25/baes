@@ -1496,8 +1496,7 @@ function generarContenidoTab(solicitudId, tabId, vehiculo, usuariosBanco, isFirs
     
     // Si no hay usuarios banco, mostrar solo comentarios generales
     if (usuariosBanco.length === 0) {
-        contenidoHTML += generarFormularioNota(solicitudId, null, vehiculo ? vehiculo.id : null);
-        contenidoHTML += generarListaNotas(solicitudId, vehiculo ? vehiculo.id : null);
+        contenidoHTML += generarSeccionNotasAcordeon(solicitudId, null, vehiculo ? vehiculo.id : null);
     } else {
         // Generar sub-pestañas para cada usuario banco
         contenidoHTML += `
@@ -1537,8 +1536,7 @@ function generarContenidoTab(solicitudId, tabId, vehiculo, usuariosBanco, isFirs
                         </div>
             `;
             
-            contenidoHTML += generarFormularioNota(solicitudId, usuario.id, vehiculo ? vehiculo.id : null);
-            contenidoHTML += generarListaNotas(solicitudId, vehiculo ? vehiculo.id : null, usuario.id);
+            contenidoHTML += generarSeccionNotasAcordeon(solicitudId, usuario.id, vehiculo ? vehiculo.id : null);
             
             contenidoHTML += `
                     </div>
@@ -1589,14 +1587,39 @@ function cargarNotasPrimerTab() {
     }, 300);
 }
 
-// Función para generar formulario de notas
+// Acordeón colapsado: Agregar Nota (+ abre formulario + notas existentes)
+function generarSeccionNotasAcordeon(solicitudId, usuarioBancoId, vehiculoId) {
+    const uid = `notas_acc_${solicitudId}_${vehiculoId || 'general'}_${usuarioBancoId || 'general'}`;
+    const collapseId = `collapse_${uid}`;
+    return `
+        <div class="card mb-4 accordion-notas-muro">
+            <div class="card-header d-flex justify-content-between align-items-center py-2">
+                <h6 class="mb-0"><i class="fas fa-sticky-note me-2"></i>Agregar Nota</h6>
+                <button type="button"
+                    class="btn btn-sm btn-outline-primary btn-toggle-notas-muro"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#${collapseId}"
+                    aria-expanded="false"
+                    aria-controls="${collapseId}"
+                    title="Abrir / cerrar">
+                    <i class="fas fa-plus icon-toggle-notas"></i>
+                </button>
+            </div>
+            <div id="${collapseId}" class="collapse">
+                <div class="card-body">
+                    ${generarFormularioNota(solicitudId, usuarioBancoId, vehiculoId)}
+                    <hr class="my-3">
+                    <h6 class="mb-3"><i class="fas fa-comments me-2"></i>Notas / contenido</h6>
+                    ${generarListaNotas(solicitudId, vehiculoId, usuarioBancoId)}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Función para generar formulario de notas (contenido interno del acordeón)
 function generarFormularioNota(solicitudId, usuarioBancoId, vehiculoId) {
     return `
-        <div class="card mb-4">
-            <div class="card-header">
-                <h6 class="mb-0"><i class="fas fa-plus-circle me-2"></i>Agregar Nota</h6>
-            </div>
-            <div class="card-body">
                 <form class="formNotaMuro" data-solicitud="${solicitudId}" data-usuario-banco="${usuarioBancoId || ''}" data-vehiculo="${vehiculoId || ''}">
                     <div class="row">
                         <div class="col-md-6">
@@ -1628,8 +1651,6 @@ function generarFormularioNota(solicitudId, usuarioBancoId, vehiculoId) {
                         </button>
                     </div>
                 </form>
-            </div>
-        </div>
     `;
 }
 
@@ -1644,6 +1665,16 @@ function generarListaNotas(solicitudId, vehiculoId, usuarioBancoId) {
         </div>
     `;
 }
+
+// Alternar ícono + / − del acordeón de notas del muro
+$(document).on('show.bs.collapse', '.accordion-notas-muro .collapse', function () {
+    $(this).closest('.accordion-notas-muro').find('.icon-toggle-notas').removeClass('fa-plus').addClass('fa-minus');
+    $(this).closest('.accordion-notas-muro').find('.btn-toggle-notas-muro').attr('aria-expanded', 'true');
+});
+$(document).on('hide.bs.collapse', '.accordion-notas-muro .collapse', function () {
+    $(this).closest('.accordion-notas-muro').find('.icon-toggle-notas').removeClass('fa-minus').addClass('fa-plus');
+    $(this).closest('.accordion-notas-muro').find('.btn-toggle-notas-muro').attr('aria-expanded', 'false');
+});
 
 // Función para cargar información de la solicitud en el muro
 function cargarInfoSolicitud(id) {
