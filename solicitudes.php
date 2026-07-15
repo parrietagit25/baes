@@ -1709,6 +1709,7 @@ if ($isBanco && !$isAdmin) {
                     <div class="col-md-6">
                         <strong>Cliente:</strong> ${aprobacionEsc(solicitud.nombre_cliente || '—')}<br>
                         <strong>Cédula:</strong> ${aprobacionEsc(solicitud.cedula || '—')}<br>
+                        <strong>Teléfono:</strong> ${aprobacionEsc(solicitud.telefono || '—')}<br>
                         <strong>Perfil:</strong> <span class="badge bg-secondary">${aprobacionEsc(perfil)}</span><br>
                         <strong>Gestor:</strong> ${aprobacionEsc((solicitud.gestor_nombre || '') + ' ' + (solicitud.gestor_apellido || '')).trim() || '—'}<br>
                         <strong>Estado:</strong> <span class="badge bg-info">${aprobacionEsc(solicitud.estado || '—')}</span>
