@@ -595,21 +595,25 @@ function solicitarReevaluacion() {
         ");
         $stmt->execute([$comentario, $evaluacionId]);
         
-        // Enviar notificación al banco sobre la reevaluación (solo si email_helper está disponible)
+        // Enviar notificación SOLO al usuario banco de esa evaluación
+        $mensajeEmail = '';
         try {
             require_once '../includes/email_helper.php';
             $resultadoEmail = notificarReevaluacion($solicitudId, $evaluacionId, $comentario);
-            if (!$resultadoEmail['success']) {
-                error_log("No se pudo enviar correo de reevaluación: " . $resultadoEmail['message']);
+            if (!empty($resultadoEmail['success'])) {
+                $mensajeEmail = ' Se notificó por correo al usuario banco.';
+            } else {
+                error_log('No se pudo enviar correo de reevaluación: ' . ($resultadoEmail['message'] ?? ''));
+                $mensajeEmail = ' (No se pudo enviar el correo al banco: ' . ($resultadoEmail['message'] ?? 'error') . ')';
             }
         } catch (Exception $e) {
-            // Si no se puede cargar email_helper (Composer no instalado), continuar sin enviar correo
-            error_log("No se pudo cargar email_helper: " . $e->getMessage());
+            error_log('No se pudo cargar email_helper: ' . $e->getMessage());
+            $mensajeEmail = ' (Correo no enviado: servicio de email no disponible)';
         }
         
         echo json_encode([
             'success' => true,
-            'message' => 'Reevaluación solicitada correctamente'
+            'message' => 'Reevaluación solicitada correctamente.' . $mensajeEmail
         ]);
         
     } catch (PDOException $e) {

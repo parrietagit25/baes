@@ -388,15 +388,25 @@ class EmailService {
         );
     }
 
-    public function notificarReevaluacion($bancoEmail, $bancoNombre, $solicitud, $comentario) {
+    public function notificarReevaluacion($bancoEmail, $bancoNombre, $solicitud, $comentario, $gestorNombre = '', array $evaluacion = []) {
+        $sid = (int) ($solicitud['id'] ?? 0);
+        $cliente = trim((string) ($solicitud['nombre_cliente'] ?? ''));
+        $subject = 'Reevaluación solicitada — Solicitud #' . $sid;
+        if ($cliente !== '') {
+            $subject .= ' — ' . $cliente;
+        }
+        $subject .= ' — MOTUS';
+
         return $this->enviarTemplate(
             $bancoEmail,
             $bancoNombre,
             'notificacion_reevaluacion',
             [
-                'subject' => 'Solicitud de Reevaluación - Solicitud #' . $solicitud['id'],
+                'subject' => $subject,
                 'banco_nombre' => $bancoNombre,
+                'gestor_nombre' => $gestorNombre,
                 'solicitud' => $solicitud,
+                'evaluacion' => $evaluacion,
                 'comentario' => $comentario,
                 'app_url' => $this->config['app_url'],
             ]
