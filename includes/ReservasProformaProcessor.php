@@ -50,8 +50,21 @@ class ReservasProformaProcessor
         if ($v === '') {
             return null;
         }
+        // Serial de Excel (días desde 1899-12-30).
+        if (is_numeric($v)) {
+            $n = (float) $v;
+            if ($n > 20000 && $n < 80000) {
+                $unix = (int) round(($n - 25569) * 86400);
+                if ($unix > 0) {
+                    return gmdate('Y-m-d', $unix);
+                }
+            }
+        }
         if (preg_match('/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/', $v, $m)) {
             return sprintf('%04d-%02d-%02d', (int) $m[3], (int) $m[1], (int) $m[2]);
+        }
+        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})/', $v, $m)) {
+            return sprintf('%04d-%02d-%02d', (int) $m[1], (int) $m[2], (int) $m[3]);
         }
         $ts = strtotime($v);
         return $ts ? date('Y-m-d', $ts) : null;
@@ -122,6 +135,7 @@ class ReservasProformaProcessor
             'almacen', 'concepto', 'comentarios', 'observaciones', 'condicion', 'articulo',
             'tipo_auto', 'cantidad', 'precio_marcado', 'importe', 'impuestos',
             'liberado', 'ctc_completo', 'banco', 'prestamo', 'mov_liberacion', 'saldo',
+            'piso', 'accesorios',
         ];
         foreach ($keys as $k) {
             $v = trim((string) ($f[$k] ?? ''));
@@ -166,6 +180,15 @@ class ReservasProformaProcessor
         if (count($filas) === 0) {
             return ['success' => false, 'message' => 'No se encontraron filas de datos (revise encabezados en fila 1 y datos desde fila 2)'];
         }
+
+        $layoutDetectado = (string) ($filas[0]['_layout'] ?? 'compatible_por_encabezados');
+        $nombresLayout = [
+            'reservas_activas_aj' => 'Reservas Activas (A–AJ)',
+            'new_format_af' => 'New Format (A–AF)',
+            'compatible_por_encabezados' => 'compatible por encabezados',
+            'desconocido' => 'detectado por encabezados',
+        ];
+        $layoutTxt = $nombresLayout[$layoutDetectado] ?? $layoutDetectado;
 
         $upsert = $this->columnaMovIdNormExiste();
         if (!$upsert) {
@@ -308,7 +331,8 @@ class ReservasProformaProcessor
 
             $this->pdo->commit();
             $msg = sprintf(
-                '%d filas en este reporte (%d nuevas, %d actualizadas por Mov ID). Ejecute Procesar para aplicar a solicitudes.',
+                'Layout %s: %d filas en este reporte (%d nuevas, %d actualizadas por Mov ID). Ejecute Procesar para aplicar a solicitudes.',
+                $layoutTxt,
                 $totalReporte,
                 $insertadas,
                 $actualizadas
@@ -320,6 +344,7 @@ class ReservasProformaProcessor
                     'filas_total' => $totalReporte,
                     'filas_insertadas' => $insertadas,
                     'filas_actualizadas' => $actualizadas,
+                    'layout' => $layoutDetectado,
                 ],
             ];
         } catch (PDOException $e) {

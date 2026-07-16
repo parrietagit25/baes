@@ -131,7 +131,7 @@ function badge_estado_linea_php(?string $estado): string
             <div class="container-fluid py-4">
                 <div class="mb-4">
                     <h2 class="mb-1">Subir Reporte de Reservas</h2>
-                    <p class="text-muted mb-0">Excel de reservas (fila 1 encabezados, datos desde fila 2, columnas A–AJ). Coincide solicitudes y aparta vehículos.</p>
+                    <p class="text-muted mb-0">Excel de reservas (fila 1 = encabezados, datos desde fila 2). Acepta el layout Reservas Activas (A–AJ) y el New Format (A–AF); mapea por nombre de columna, no por posición.</p>
                 </div>
                 <div class="alert alert-info py-2 small mb-3">
                     Clave de actualización: <strong>Mov ID</strong> (columna B). Cédula (I), Correo (J), Nombre (H), Marca (Q), Modelo (R), Año (U), Km (V), Total (Z), Abono (AI).
