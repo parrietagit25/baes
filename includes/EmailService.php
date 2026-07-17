@@ -359,12 +359,14 @@ class EmailService {
     }
 
     public function notificarClienteAprobacion($clienteEmail, $clienteNombre, $solicitud) {
+        $esPreaprobada = (($solicitud['evaluacion_decision'] ?? '') === 'preaprobado');
+        $estadoCorreo = $esPreaprobada ? 'Preaprobada' : 'Aprobada';
         return $this->enviarTemplate(
             $clienteEmail,
             $clienteNombre,
             'notificacion_cliente_aprobacion',
             [
-                'subject' => '¡Felicidades! Su solicitud de crédito ha sido aprobada',
+                'subject' => '¡Felicitaciones! Su solicitud ha sido ' . $estadoCorreo,
                 'cliente_nombre' => $clienteNombre,
                 'solicitud' => $solicitud,
                 'app_url' => $this->config['app_url'],

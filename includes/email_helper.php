@@ -353,25 +353,70 @@ function notificarBancoNuevaSolicitud($solicitudId, $usuarioBancoId) {
 }
 
 /**
- * Notifica al cliente cuando su solicitud es aprobada
+ * Notifica al cliente cuando una evaluación bancaria es aprobada o preaprobada.
+ * Usa la evaluación recién registrada para no mezclar condiciones de otros bancos.
  */
-function notificarClienteAprobacion($solicitudId) {
+function notificarClienteAprobacion($solicitudId, $evaluacionId = null) {
     global $pdo;
     
     try {
-        // Obtener información de la solicitud
-        $stmt = $pdo->prepare("SELECT * FROM solicitudes_credito WHERE id = ?");
-        $stmt->execute([$solicitudId]);
-        $solicitud = $stmt->fetch();
+        $sql = "
+            SELECT
+                s.*,
+                e.id AS evaluacion_email_id,
+                e.decision AS evaluacion_decision,
+                e.valor_financiar AS precio_venta_banco,
+                e.abono AS abono_inicial_banco,
+                e.plazo AS plazo_banco,
+                e.letra AS cuota_mensual_banco,
+                e.promocion AS promocion_banco,
+                e.cuantia AS cuantia_banco,
+                v.marca AS vehiculo_marca,
+                v.modelo AS vehiculo_modelo,
+                v.anio AS vehiculo_anio,
+                v.precio AS vehiculo_precio,
+                b.nombre AS banco_nombre,
+                ub.nombre AS banco_usuario_nombre,
+                ub.apellido AS banco_usuario_apellido
+            FROM solicitudes_credito s
+            INNER JOIN evaluaciones_banco e ON e.solicitud_id = s.id
+            INNER JOIN usuarios_banco_solicitudes ubs ON ubs.id = e.usuario_banco_id
+            INNER JOIN usuarios ub ON ub.id = ubs.usuario_banco_id
+            LEFT JOIN bancos b ON b.id = ub.banco_id
+            LEFT JOIN vehiculos_solicitud v ON v.id = e.vehiculo_id
+            WHERE s.id = ?
+              AND e.decision IN ('aprobado', 'preaprobado')
+        ";
+        $params = [(int) $solicitudId];
+        if ($evaluacionId !== null && (int) $evaluacionId > 0) {
+            $sql .= ' AND e.id = ?';
+            $params[] = (int) $evaluacionId;
+        }
+        $sql .= ' ORDER BY e.fecha_evaluacion DESC, e.id DESC LIMIT 1';
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $solicitud = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if (!$solicitud || empty($solicitud['email'])) {
             return ['success' => false, 'message' => 'Cliente no encontrado o sin email'];
         }
         
-        // Solo enviar si está aprobada
-        if ($solicitud['respuesta_banco'] !== 'Aprobado' && $solicitud['respuesta_banco'] !== 'Pre Aprobado') {
+        if (!in_array($solicitud['evaluacion_decision'] ?? '', ['aprobado', 'preaprobado'], true)) {
             return ['success' => false, 'message' => 'La solicitud no está aprobada'];
         }
+
+        $promocion = trim((string) ($solicitud['promocion_banco'] ?? ''));
+        $cuantia = isset($solicitud['cuantia_banco']) && $solicitud['cuantia_banco'] !== ''
+            ? (float) $solicitud['cuantia_banco']
+            : 0.0;
+        $esBonoParaAbono = stripos($promocion, 'cash back') !== false
+            || stripos($promocion, 'abono') !== false;
+        $solicitud['bono_banco_abono'] = ($esBonoParaAbono && $cuantia > 0) ? $cuantia : 0.0;
+        $abonoInicial = isset($solicitud['abono_inicial_banco']) && $solicitud['abono_inicial_banco'] !== ''
+            ? (float) $solicitud['abono_inicial_banco']
+            : 0.0;
+        $solicitud['total_abono_calculo'] = $abonoInicial + (float) $solicitud['bono_banco_abono'];
         
         $emailService = (new EmailService())->paraSolicitud((int) $solicitudId);
 

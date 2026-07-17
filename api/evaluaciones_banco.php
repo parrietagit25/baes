@@ -451,7 +451,7 @@ function guardarEvaluacion() {
                 
                 // Si está aprobada, también notificar al cliente
                 if (in_array($respuestaBancoEnum, ['Aprobado', 'Pre Aprobado'])) {
-                    $resultadoCliente = notificarClienteAprobacion($solicitudId);
+                    $resultadoCliente = notificarClienteAprobacion($solicitudId, $evaluacionId);
                     if (!$resultadoCliente['success']) {
                         error_log("No se pudo enviar correo al cliente: " . $resultadoCliente['message']);
                     }
