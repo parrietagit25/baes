@@ -1432,8 +1432,10 @@ if ($isBanco && !$isAdmin) {
                         </div>
 
                         <div class="mb-4" id="wrap_razon_evaluacion" style="display: none;">
-                            <label for="razon_evaluacion" class="form-label">Razón</label>
-                            <textarea class="form-control" id="razon_evaluacion" name="razon_evaluacion" rows="2" placeholder="Indique la razón de la decisión..." disabled></textarea>
+                            <label for="razon_evaluacion" class="form-label">Razón *</label>
+                            <select class="form-select" id="razon_evaluacion" name="razon_evaluacion" disabled>
+                                <option value="">Seleccione una razón...</option>
+                            </select>
                         </div>
 
                         <div class="mb-4">
@@ -1799,6 +1801,7 @@ if ($isBanco && !$isAdmin) {
             // Limpiar formulario
             $('#aprobacionForm')[0].reset();
             $('#camposDecision').hide();
+            actualizarCampoRazonDecision('');
             $('#aprobacion_solicitud_id').val(solicitudId);
             aprobacionVehiculosCache = [];
             aprobacionSolicitudCache = null;
@@ -1948,13 +1951,55 @@ if ($isBanco && !$isAdmin) {
         };
 
         window.actualizarCampoRazonDecision = function(decision) {
-            var tieneDecision = (decision || '').trim() !== '';
-            if (tieneDecision) {
+            var razonesCondicionales = [
+                'Documentación pendiente o actualización de información',
+                'Validación de ingresos y estabilidad laboral',
+                'Presentar carta laboral actualizada',
+                'Presentar codeudor o fiador',
+                'Corrección de observaciones crediticias',
+                'Aprobación o validación interna requerida',
+                'Se recomienda incrementar abono y/o evaluar un auto de menor precio',
+                'Corregir discrepancias en buró de crédito',
+                'Cumplir antigüedad laboral mínima requerida',
+                'Sujeto a aprobación de comité de crédito'
+            ];
+            var razonesRechazo = [
+                'Capacidad de pago insuficiente',
+                'Endeudamiento elevado',
+                'Historial crediticio desfavorable',
+                'Incumplimiento de políticas de crédito',
+                'Inestabilidad laboral',
+                'Negocio propio sin suficiente trayectoria',
+                'Inconsistencias entre lo declarado y lo evidenciado',
+                'Perfil de riesgo no aceptable',
+                'Empresa no elegible según política de crédito vigente'
+            ];
+
+            var opciones = [];
+            if (decision === 'preaprobado' || decision === 'aprobado_condicional') {
+                opciones = razonesCondicionales;
+            } else if (decision === 'rechazado') {
+                opciones = razonesRechazo;
+            }
+
+            var $select = $('#razon_evaluacion');
+            $select.empty().append($('<option>', {
+                value: '',
+                text: 'Seleccione una razón...'
+            }));
+            opciones.forEach(function(razon) {
+                $select.append($('<option>', {
+                    value: razon,
+                    text: razon
+                }));
+            });
+
+            if (opciones.length > 0) {
                 $('#wrap_razon_evaluacion').show();
-                $('#razon_evaluacion').prop('disabled', false);
+                $select.prop('disabled', false).prop('required', true);
             } else {
                 $('#wrap_razon_evaluacion').hide();
-                $('#razon_evaluacion').prop('disabled', true).val('');
+                $select.prop('disabled', true).prop('required', false).val('');
             }
         };
 

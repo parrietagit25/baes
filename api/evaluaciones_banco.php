@@ -302,8 +302,45 @@ function guardarEvaluacion() {
             $cuantia = null;
         }
 
+        $razonesCondicionales = [
+            'Documentación pendiente o actualización de información',
+            'Validación de ingresos y estabilidad laboral',
+            'Presentar carta laboral actualizada',
+            'Presentar codeudor o fiador',
+            'Corrección de observaciones crediticias',
+            'Aprobación o validación interna requerida',
+            'Se recomienda incrementar abono y/o evaluar un auto de menor precio',
+            'Corregir discrepancias en buró de crédito',
+            'Cumplir antigüedad laboral mínima requerida',
+            'Sujeto a aprobación de comité de crédito',
+        ];
+        $razonesRechazo = [
+            'Capacidad de pago insuficiente',
+            'Endeudamiento elevado',
+            'Historial crediticio desfavorable',
+            'Incumplimiento de políticas de crédito',
+            'Inestabilidad laboral',
+            'Negocio propio sin suficiente trayectoria',
+            'Inconsistencias entre lo declarado y lo evidenciado',
+            'Perfil de riesgo no aceptable',
+            'Empresa no elegible según política de crédito vigente',
+        ];
+
         $razon = trim((string) ($_POST['razon_evaluacion'] ?? ''));
-        if ($razon === '') {
+        $razonesPermitidas = [];
+        if ($decision === 'preaprobado' || $decision === 'aprobado_condicional') {
+            $razonesPermitidas = $razonesCondicionales;
+        } elseif ($decision === 'rechazado') {
+            $razonesPermitidas = $razonesRechazo;
+        }
+
+        if ($razonesPermitidas !== []) {
+            if ($razon === '' || !in_array($razon, $razonesPermitidas, true)) {
+                echo json_encode(['success' => false, 'message' => 'Debe seleccionar una razón válida para la decisión']);
+                return;
+            }
+        } else {
+            // Aprobado no requiere razón.
             $razon = null;
         }
 
