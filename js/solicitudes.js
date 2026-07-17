@@ -411,6 +411,11 @@ function cargarSolicitudes() {
                 response.data.forEach(function(solicitud) {
                     const estadoClass = getEstadoClass(solicitud.estado);
                     const respuestaClass = getRespuestaClass(solicitud.respuesta_banco);
+                    const alertaSinRespuesta2h = solicitud.alerta_sin_respuesta_2h === true
+                        || parseInt(solicitud.alerta_sin_respuesta_2h, 10) === 1;
+                    const filaAlertaAttr = alertaSinRespuesta2h
+                        ? ' class="solicitud-sin-respuesta-2h" title="Enviada a bancos hace más de 2 horas sin ninguna respuesta"'
+                        : '';
                     const vendedorNombre = (solicitud.vendedor_nombre || '').toString().trim() || 'Sin vendedor';
                     const idCelda = (window.userRoles && window.userRoles.isAdmin)
                         ? ('<a href="javascript:void(0);" class="link-cronologia-solicitud text-primary fw-semibold text-decoration-underline" role="button" data-id="' +
@@ -461,7 +466,7 @@ function cargarSolicitudes() {
                     let row;
                     if (isBancoNoAdmin) {
                         row = `
-                        <tr>
+                        <tr${filaAlertaAttr}>
                             <td data-order="${solicitud.id}">${idCelda}</td>
                             <td>${solicitud.nombre_cliente}</td>
                             <td>${solicitud.cedula}</td>
@@ -479,7 +484,7 @@ function cargarSolicitudes() {
                         </tr>`;
                     } else {
                         row = `
-                        <tr>
+                        <tr${filaAlertaAttr}>
                             <td data-order="${solicitud.id}">${idCelda}</td>
                             <td>${solicitud.nombre_cliente}</td>
                             <td>${textoVehiculoLista(solicitud)}</td>

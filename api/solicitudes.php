@@ -200,6 +200,28 @@ function obtenerSolicitudes() {
                    ub.nombre as banco_nombre, ub.apellido as banco_apellido,
                    b.nombre as banco_institucion,
                    COUNT(DISTINCT n.id) as total_notas,
+                   (SELECT MIN(ubs_alerta.fecha_asignacion)
+                    FROM usuarios_banco_solicitudes ubs_alerta
+                    WHERE ubs_alerta.solicitud_id = s.id) as fecha_primer_envio_banco,
+                   (SELECT COUNT(*)
+                    FROM evaluaciones_banco eb_alerta
+                    WHERE eb_alerta.solicitud_id = s.id) as total_respuestas_banco,
+                   CASE
+                       WHEN EXISTS (
+                           SELECT 1 FROM usuarios_banco_solicitudes ubs_alerta
+                           WHERE ubs_alerta.solicitud_id = s.id
+                       )
+                       AND NOT EXISTS (
+                           SELECT 1 FROM evaluaciones_banco eb_alerta
+                           WHERE eb_alerta.solicitud_id = s.id
+                       )
+                       AND (
+                           SELECT MIN(ubs_alerta.fecha_asignacion)
+                           FROM usuarios_banco_solicitudes ubs_alerta
+                           WHERE ubs_alerta.solicitud_id = s.id
+                       ) <= DATE_SUB(NOW(), INTERVAL 2 HOUR)
+                       THEN 1 ELSE 0
+                   END as alerta_sin_respuesta_2h,
                    " . solicitud_sql_campos_vehiculo_reserva() . "
             FROM solicitudes_credito s
             LEFT JOIN usuarios u ON s.gestor_id = u.id
@@ -254,6 +276,7 @@ function obtenerSolicitudes() {
                 $s['año_auto'] = $s['ao_auto'];
             }
             $s['texto_vehiculo'] = solicitud_texto_vehiculo_lista($s);
+            $s['alerta_sin_respuesta_2h'] = !empty($s['alerta_sin_respuesta_2h']);
         }
         unset($s);
         echo json_encode(['success' => true, 'data' => $solicitudes]);

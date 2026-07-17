@@ -196,6 +196,13 @@ if ($isBanco && !$isAdmin) {
         .estado-rechazada { background: linear-gradient(135deg, #e84393 0%, #fd79a8 100%); }
         .estado-completada { background: linear-gradient(135deg, #2d3436 0%, #636e72 100%); }
         .estado-desistimiento { background: linear-gradient(135deg, #636e72 0%, #b2bec3 100%); }
+        /* Enviada a banco hace 2+ horas sin ninguna evaluación registrada. */
+        #solicitudesTable tbody tr.solicitud-sin-respuesta-2h > td {
+            background-color: #f8d7da !important;
+        }
+        #solicitudesTable tbody tr.solicitud-sin-respuesta-2h:hover > td {
+            background-color: #f1bfc4 !important;
+        }
         
         /* Estilos para adjuntos */
         .adjunto-item {
@@ -360,6 +367,28 @@ if ($isBanco && !$isAdmin) {
                                                      u.nombre as gestor_nombre, u.apellido as gestor_apellido,
                                                      ev.nombre as vendedor_nombre,
                                                      (SELECT COUNT(*) FROM usuarios_banco_solicitudes WHERE solicitud_id = s.id AND estado = 'activo') as total_usuarios_banco,
+                                                     (SELECT MIN(ubs_alerta.fecha_asignacion)
+                                                      FROM usuarios_banco_solicitudes ubs_alerta
+                                                      WHERE ubs_alerta.solicitud_id = s.id) as fecha_primer_envio_banco,
+                                                     (SELECT COUNT(*)
+                                                      FROM evaluaciones_banco eb_alerta
+                                                      WHERE eb_alerta.solicitud_id = s.id) as total_respuestas_banco,
+                                                     CASE
+                                                         WHEN EXISTS (
+                                                             SELECT 1 FROM usuarios_banco_solicitudes ubs_alerta
+                                                             WHERE ubs_alerta.solicitud_id = s.id
+                                                         )
+                                                         AND NOT EXISTS (
+                                                             SELECT 1 FROM evaluaciones_banco eb_alerta
+                                                             WHERE eb_alerta.solicitud_id = s.id
+                                                         )
+                                                         AND (
+                                                             SELECT MIN(ubs_alerta.fecha_asignacion)
+                                                             FROM usuarios_banco_solicitudes ubs_alerta
+                                                             WHERE ubs_alerta.solicitud_id = s.id
+                                                         ) <= DATE_SUB(NOW(), INTERVAL 2 HOUR)
+                                                         THEN 1 ELSE 0
+                                                     END as alerta_sin_respuesta_2h,
                                                      s.evaluacion_seleccionada,
                                                      (SELECT ubs.usuario_banco_id FROM evaluaciones_banco e 
                                                       INNER JOIN usuarios_banco_solicitudes ubs ON e.usuario_banco_id = ubs.id 
@@ -425,8 +454,13 @@ if ($isBanco && !$isAdmin) {
                                                 case 'Pre Aprobado': $respuestaClass = 'estado-revision'; break;
                                                 case 'Rechazado': $respuestaClass = 'estado-rechazada'; break;
                                             }
+                                            $alertaSinRespuesta2h = !empty($solicitud['alerta_sin_respuesta_2h']);
+                                            $filaClase = $alertaSinRespuesta2h ? 'solicitud-sin-respuesta-2h' : '';
+                                            $filaTitulo = $alertaSinRespuesta2h
+                                                ? 'Enviada a bancos hace más de 2 horas sin ninguna respuesta'
+                                                : '';
                                         ?>
-                                        <tr>
+                                        <tr class="<?php echo $filaClase; ?>"<?php echo $filaTitulo !== '' ? ' title="' . htmlspecialchars($filaTitulo, ENT_QUOTES, 'UTF-8') . '"' : ''; ?>>
                                             <td data-order="<?php echo (int) $solicitud['id']; ?>">
                                                 <?php if ($isAdmin): ?>
                                                 <a href="javascript:void(0);" class="link-cronologia-solicitud text-primary fw-semibold text-decoration-underline" role="button"
