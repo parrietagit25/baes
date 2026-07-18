@@ -2036,6 +2036,13 @@ if ($isBanco && !$isAdmin) {
             }
         };
 
+        function avisarPropuestaYaSeleccionada(message) {
+            const msg = message || 'Esta solicitud ya tiene una propuesta seleccionada de otra entidad. Su evaluación/decisión no será procesada.';
+            alert(msg);
+            $('#aprobacionModal').modal('hide');
+            location.reload();
+        }
+
         // Función para procesar la aprobación
         function procesarAprobacion() {
             const formData = new FormData($('#aprobacionForm')[0]);
@@ -2051,6 +2058,8 @@ if ($isBanco && !$isAdmin) {
                 alert('Por favor seleccione una decisión');
                 return;
             }
+
+            const solicitudId = $('#aprobacion_solicitud_id').val();
             
             // Confirmar acción
             const mensaje = '¿Está seguro de procesar esta decisión: "' + decision.replace('_', ' ').toUpperCase() + '"?';
@@ -2058,37 +2067,68 @@ if ($isBanco && !$isAdmin) {
             if (!confirm(mensaje)) {
                 return;
             }
-            
-            // Enviar datos a la API de evaluaciones del banco
+
+            const enviarDecision = function() {
+                $.ajax({
+                    url: 'api/evaluaciones_banco.php',
+                    type: 'POST',
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    dataType: 'json',
+                    success: function(response) {
+                        if (response.success) {
+                            alert(response.message);
+                            $('#aprobacionModal').modal('hide');
+                            location.reload();
+                        } else if (response.code === 'PROPUESTA_YA_SELECCIONADA') {
+                            avisarPropuestaYaSeleccionada(response.message);
+                        } else {
+                            alert(response.message || 'No se pudo procesar la decisión');
+                        }
+                    },
+                    error: function(xhr) {
+                        let errorMsg = 'Error al procesar la decisión';
+                        let parsed = null;
+                        if (xhr.responseText) {
+                            try {
+                                parsed = JSON.parse(xhr.responseText);
+                                errorMsg = parsed.message || errorMsg;
+                            } catch (e) {
+                                errorMsg = xhr.responseText;
+                            }
+                        }
+                        if (parsed && parsed.code === 'PROPUESTA_YA_SELECCIONADA') {
+                            avisarPropuestaYaSeleccionada(parsed.message);
+                            return;
+                        }
+                        alert(errorMsg);
+                    }
+                });
+            };
+
+            // Chequeo previo: si el gestor ya eligió otra entidad mientras esta modal estaba abierta
             $.ajax({
                 url: 'api/evaluaciones_banco.php',
-                type: 'POST',
-                data: formData,
-                processData: false,
-                contentType: false,
-                dataType: 'json',
-                success: function(response) {
-                    if (response.success) {
-                        alert(response.message);
-                        $('#aprobacionModal').modal('hide');
-                        // Recargar la tabla
-                        location.reload();
-                    } else {
-                        alert('Error: ' + response.message);
-                    }
-                },
-                error: function(xhr) {
-                    let errorMsg = 'Error al procesar la decisión';
-                    if (xhr.responseText) {
-                        try {
-                            const error = JSON.parse(xhr.responseText);
-                            errorMsg = error.message || errorMsg;
-                        } catch(e) {
-                            errorMsg = xhr.responseText;
-                        }
-                    }
-                    alert(errorMsg);
+                type: 'GET',
+                data: { solicitud_id: solicitudId },
+                dataType: 'json'
+            }).done(function(response) {
+                if (response.success
+                    && response.evaluacion_seleccionada
+                    && response.usuario_banco_id_seleccionado
+                    && String(response.usuario_banco_id_seleccionado) !== String(window.userId || '')
+                ) {
+                    avisarPropuestaYaSeleccionada(
+                        'Esta solicitud ya tiene una propuesta seleccionada de otra entidad bancaria. '
+                        + 'Su evaluación/decisión no será procesada. Actualice la página para ver el estado actual.'
+                    );
+                    return;
                 }
+                enviarDecision();
+            }).fail(function() {
+                // Si falla el chequeo, el POST igual aplica la regla en servidor
+                enviarDecision();
             });
         }
 

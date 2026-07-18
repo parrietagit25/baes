@@ -181,7 +181,11 @@ function obtenerEvaluaciones($solicitudId, $usuarioBancoId = null) {
                      s.nombre_cliente,
                      s.cedula,
                      s.comentario_seleccion_propuesta,
-                     (SELECT eb2.usuario_banco_id FROM evaluaciones_banco eb2 WHERE eb2.id = s.evaluacion_seleccionada) AS usuario_banco_id_seleccionado
+                     (SELECT ubs_sel.usuario_banco_id
+                        FROM evaluaciones_banco eb2
+                        INNER JOIN usuarios_banco_solicitudes ubs_sel ON ubs_sel.id = eb2.usuario_banco_id
+                       WHERE eb2.id = s.evaluacion_seleccionada
+                       LIMIT 1) AS usuario_banco_id_seleccionado
               FROM solicitudes_credito s
               WHERE s.id = ?
           ");
@@ -279,6 +283,39 @@ function guardarEvaluacion() {
         
         if (!$asignacion) {
             echo json_encode(['success' => false, 'message' => 'No está asignado a esta solicitud']);
+            return;
+        }
+
+        // Si el gestor ya seleccionó una propuesta de otra entidad, no procesar esta decisión.
+        $stmt = $pdo->prepare("
+            SELECT s.evaluacion_seleccionada,
+                   ubs.usuario_banco_id AS usuario_seleccionado_id,
+                   TRIM(CONCAT(COALESCE(u.nombre, ''), ' ', COALESCE(u.apellido, ''))) AS agente_seleccionado,
+                   b.nombre AS entidad_seleccionada
+            FROM solicitudes_credito s
+            LEFT JOIN evaluaciones_banco e ON e.id = s.evaluacion_seleccionada
+            LEFT JOIN usuarios_banco_solicitudes ubs ON ubs.id = e.usuario_banco_id
+            LEFT JOIN usuarios u ON u.id = ubs.usuario_banco_id
+            LEFT JOIN bancos b ON b.id = u.banco_id
+            WHERE s.id = ?
+            LIMIT 1
+        ");
+        $stmt->execute([$solicitudId]);
+        $bloqueo = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!empty($bloqueo['evaluacion_seleccionada'])
+            && !empty($bloqueo['usuario_seleccionado_id'])
+            && (int)$bloqueo['usuario_seleccionado_id'] !== (int)$_SESSION['user_id']
+        ) {
+            $entidad = trim((string)($bloqueo['entidad_seleccionada'] ?? ''));
+            $agente = trim((string)($bloqueo['agente_seleccionado'] ?? ''));
+            $detalle = $entidad !== '' ? $entidad : ($agente !== '' ? $agente : 'otra entidad bancaria');
+            echo json_encode([
+                'success' => false,
+                'code' => 'PROPUESTA_YA_SELECCIONADA',
+                'message' => 'Esta solicitud ya tiene una propuesta seleccionada (' . $detalle . '). '
+                    . 'Su evaluación/decisión no será procesada. Actualice la página para ver el estado actual.',
+            ]);
             return;
         }
         
