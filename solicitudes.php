@@ -434,6 +434,7 @@ if ($isBanco && !$isAdmin) {
                                             switch($solicitud['estado']) {
                                                 case 'Nueva': $estadoClass = 'estado-nueva'; break;
                                                 case 'En Revisión Banco':
+                                                case 'Reevaluación por los Bancos':
                                                 case 'Evaluacion':
                                                 case 'Comité':
                                                 case 'Reconsideración':
@@ -572,8 +573,9 @@ if ($isBanco && !$isAdmin) {
                                                       </div>
                                                       <?php 
                                                       // Usuario banco ve el botón de respuesta si la solicitud está asignada a él y está en revisión o aún en Nueva (por si el estado no se actualizó)
-                                                      $puedeResponderBanco = in_array('ROLE_BANCO', $userRoles) && 
-                                                          ($solicitud['estado'] === 'En Revisión Banco' || $solicitud['estado'] === 'Nueva');
+                                                      $estadosRespuestaBanco = ['En Revisión Banco', 'Reevaluación por los Bancos', 'Nueva'];
+                                                      $puedeResponderBanco = in_array('ROLE_BANCO', $userRoles) &&
+                                                          in_array($solicitud['estado'], $estadosRespuestaBanco, true);
                                                       if ($puedeResponderBanco): ?>
                                                       <div class="btn-group btn-group-sm" role="group">
                                                           <button class="btn btn-success btn-action" onclick="abrirModalAprobacion(<?php echo $solicitud['id']; ?>)" title="Aprobar/Rechazar Solicitud">
@@ -1598,6 +1600,7 @@ if ($isBanco && !$isAdmin) {
                             <label for="nuevo_estado" class="form-label">Nuevo Estado *</label>
                             <select class="form-select" id="nuevo_estado" name="nuevo_estado" required>
                                 <option value="">Seleccionar nuevo estado...</option>
+                                <option value="Reevaluación por los Bancos">🔁 Reevaluación por los Bancos</option>
                                 <option value="Evaluacion">Evaluacion</option>
                                 <option value="Comité">Comité</option>
                                 <option value="Reconsideración">Reconsideración</option>
@@ -1608,7 +1611,7 @@ if ($isBanco && !$isAdmin) {
                                 <option value="Completada">🎉 Completada</option>
                                 <option value="Desistimiento">🚫 Desistimiento</option>
                             </select>
-                            <div class="form-text">Seleccione el nuevo estado para esta solicitud</div>
+                            <div class="form-text">«Reevaluación por los Bancos» deja la solicitud activa para evaluación bancaria (mismo efecto que «En Revisión Banco»).</div>
                         </div>
                         
                         <!-- Campo de Nota -->

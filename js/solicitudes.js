@@ -440,7 +440,7 @@ function cargarSolicitudes() {
                                             <i class="fas fa-paperclip"></i>
                                         </button>
                                     </div>
-                                    ${(window.userRoles && window.userRoles.isBanco && solicitud.estado === 'En Revisión Banco') ? `
+                                    ${(window.userRoles && window.userRoles.isBanco && (solicitud.estado === 'En Revisión Banco' || solicitud.estado === 'Reevaluación por los Bancos' || solicitud.estado === 'Nueva')) ? `
                                     <div class="btn-group btn-group-sm mb-1" role="group">
                                         <button class="btn btn-success btn-action" onclick="abrirModalAprobacion(${solicitud.id})" title="Aprobar/Rechazar Solicitud">
                                             <i class="fas fa-gavel"></i>
@@ -547,6 +547,7 @@ function getEstadoClass(estado) {
     const clases = {
         'Nueva': 'estado-nueva',
         'En Revisión Banco': 'estado-revision',
+        'Reevaluación por los Bancos': 'estado-revision',
         'Evaluacion': 'estado-revision',
         'Comité': 'estado-revision',
         'Reconsideración': 'estado-revision',

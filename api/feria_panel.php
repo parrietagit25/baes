@@ -359,6 +359,7 @@ try {
             $stats['con_solicitud']++;
             switch ($estado) {
                 case 'En Revisión Banco':
+                case 'Reevaluación por los Bancos':
                     $stats['en_revision_banco']++;
                     break;
                 case 'Aprobada':

@@ -941,7 +941,8 @@ function aprobarSolicitud() {
         }
         
         // Verificar que la solicitud esté en estado correcto
-        if ($solicitud['estado'] !== 'En Revisión Banco') {
+        $estadosRevision = ['En Revisión Banco', 'Reevaluación por los Bancos'];
+        if (!in_array($solicitud['estado'], $estadosRevision, true)) {
             echo json_encode(['success' => false, 'message' => 'La solicitud no está en estado de revisión']);
             return;
         }
@@ -1068,6 +1069,7 @@ function cambiarEstadoSolicitud() {
             'Reconsideración',
             'Pre Aprobado',
             'Aprobado con Condición',
+            'Reevaluación por los Bancos',
         ];
         if (!in_array($nuevo_estado, $estados_validos)) {
             echo json_encode(['success' => false, 'message' => 'Estado no válido']);
@@ -1097,6 +1099,19 @@ function cambiarEstadoSolicitud() {
                 WHERE id = ?
             ");
             $stmt->execute([$nuevo_estado, $solicitud_id]);
+
+            // Igual que enviar a bancos: liberar propuesta seleccionada para que puedan volver a evaluar
+            if ($nuevo_estado === 'Reevaluación por los Bancos') {
+                $stmt = $pdo->prepare("
+                    UPDATE solicitudes_credito
+                    SET evaluacion_seleccionada = NULL,
+                        fecha_aprobacion_propuesta = NULL,
+                        comentario_seleccion_propuesta = NULL,
+                        evaluacion_en_reevaluacion = NULL
+                    WHERE id = ?
+                ");
+                $stmt->execute([$solicitud_id]);
+            }
             
             // Crear nota en el muro
             if (in_array('ROLE_ADMIN', $userRoles)) {
@@ -1108,6 +1123,9 @@ function cambiarEstadoSolicitud() {
             }
             $titulo_nota = "Estado cambiado por {$rol_usuario}";
             $contenido_nota = "Estado cambiado de '{$estado_anterior}' a '{$nuevo_estado}'. Motivo: {$nota}";
+            if ($nuevo_estado === 'Reevaluación por los Bancos') {
+                $contenido_nota .= ' La solicitud queda nuevamente abierta para evaluación de los bancos asignados.';
+            }
             
             $stmt = $pdo->prepare("
                 INSERT INTO notas_solicitud (solicitud_id, usuario_id, tipo_nota, titulo, contenido)

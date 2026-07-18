@@ -28,6 +28,7 @@ function getEstadoClass(estado) {
     var clases = {
         'Nueva': 'estado-nueva',
         'En Revisión Banco': 'estado-revision',
+        'Reevaluación por los Bancos': 'estado-revision',
         'Aprobada': 'estado-aprobada',
         'Rechazada': 'estado-rechazada',
         'Completada': 'estado-completada',
