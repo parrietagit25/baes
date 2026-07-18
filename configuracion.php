@@ -11,6 +11,7 @@ require_once __DIR__ . '/includes/configuracion_sistema_helper.php';
 
 $chatbotActual = motus_chatbot_habilitado();
 $mantenimientoActual = motus_mantenimiento_activo();
+$puedeExportarBd = ((int)($_SESSION['user_id'] ?? 0) === 1);
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -83,6 +84,22 @@ $mantenimientoActual = motus_mantenimiento_activo();
                         <span class="ms-2 small text-muted" id="msgGuardarChatbot"></span>
                     </div>
                 </div>
+
+                <?php if ($puedeExportarBd): ?>
+                <div class="card mb-4 border-success">
+                    <div class="card-body">
+                        <h5 class="card-title"><i class="fas fa-database me-2 text-success"></i>Exportar base de datos</h5>
+                        <p class="card-text text-muted small">
+                            Descarga un respaldo completo en formato <code>.sql</code> (estructura + datos),
+                            compatible con la exportación de phpMyAdmin. Solo disponible para el administrador principal.
+                        </p>
+                        <a href="api/exportar_base_datos.php" class="btn btn-success" id="btnExportarBd">
+                            <i class="fas fa-download me-1"></i>Exportar .sql
+                        </a>
+                        <span class="ms-2 small text-muted" id="msgExportarBd"></span>
+                    </div>
+                </div>
+                <?php endif; ?>
             </div>
         </div>
     </div>
