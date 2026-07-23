@@ -164,8 +164,12 @@ function guardarUsuario() {
         dataObj.password = password;
     }
 
-    const rolNombre = ($('#rol_id option:selected').data('rol-nombre') || $('#rol_id option:selected').text() || '').toString().trim();
-    if ((rolNombre === 'ROLE_BANCO' || rolNombre === 'ROLE_ADMIN_BANCO') && !dataObj.banco_id) {
+    const rolNombre = (
+        $('#rol_id option:selected').attr('data-rol-nombre') ||
+        $('#rol_id option:selected').text() ||
+        ''
+    ).toString().trim();
+    if ((rolNombre === 'ROLE_BANCO' || rolNombre === 'ROLE_ADMIN_BANCO' || /ROLE_BANCO|ROLE_ADMIN_BANCO/i.test(rolNombre)) && !dataObj.banco_id) {
         mostrarAlerta('Debe seleccionar el banco asignado para este rol', 'danger');
         return;
     }
@@ -417,25 +421,30 @@ function cargarBancos() {
 
 // Función para mostrar/ocultar select de banco
 function toggleBancoSelect() {
-    console.log('=== EJECUTANDO TOGGLE BANCO SELECT ===');
-    
     const bancoSection = $('#bancoSection');
     const $rolOption = $('#rol_id option:selected');
-    const rolNombre = ($rolOption.data('rol-nombre') || $rolOption.text() || '').toString().trim();
-    
-    console.log('Rol seleccionado:', rolNombre);
-    
-    // ROLE_BANCO (analista) y ROLE_ADMIN_BANCO (admin de entidad) requieren banco_id
-    const requiereBanco = rolNombre === 'ROLE_BANCO' || rolNombre === 'ROLE_ADMIN_BANCO';
+    const rolId = String($('#rol_id').val() || '');
+    // Preferir atributo HTML (evita rarezas de jQuery .data con guiones)
+    const rolNombre = (
+        $rolOption.attr('data-rol-nombre') ||
+        $rolOption.data('rolNombre') ||
+        $rolOption.text() ||
+        ''
+    ).toString().trim();
+
+    console.log('=== EJECUTANDO TOGGLE BANCO SELECT ===', { rolId: rolId, rolNombre: rolNombre });
+
+    const requiereBanco =
+        rolNombre === 'ROLE_BANCO' ||
+        rolNombre === 'ROLE_ADMIN_BANCO' ||
+        /ROLE_BANCO|ROLE_ADMIN_BANCO/i.test(rolNombre);
 
     if (requiereBanco) {
         bancoSection.show();
         $('#banco_id').prop('required', true);
         console.log('✅ Mostrando select de banco');
-        
-        // Asegurar que los bancos estén cargados
+
         if ($('#banco_id option').length <= 1) {
-            console.log('Cargando bancos...');
             cargarBancos();
         }
     } else {
