@@ -377,13 +377,17 @@ function notificarClienteAprobacion($solicitudId, $evaluacionId = null) {
                 v.precio AS vehiculo_precio,
                 b.nombre AS banco_nombre,
                 ub.nombre AS banco_usuario_nombre,
-                ub.apellido AS banco_usuario_apellido
+                ub.apellido AS banco_usuario_apellido,
+                ug.email AS gestor_email,
+                uv.email AS vendedor_email
             FROM solicitudes_credito s
             INNER JOIN evaluaciones_banco e ON e.solicitud_id = s.id
             INNER JOIN usuarios_banco_solicitudes ubs ON ubs.id = e.usuario_banco_id
             INNER JOIN usuarios ub ON ub.id = ubs.usuario_banco_id
             LEFT JOIN bancos b ON b.id = ub.banco_id
             LEFT JOIN vehiculos_solicitud v ON v.id = e.vehiculo_id
+            LEFT JOIN usuarios ug ON ug.id = s.gestor_id
+            LEFT JOIN usuarios uv ON uv.id = s.vendedor_id
             WHERE s.id = ?
               AND e.decision IN ('aprobado', 'preaprobado')
         ";
@@ -417,13 +421,25 @@ function notificarClienteAprobacion($solicitudId, $evaluacionId = null) {
             ? (float) $solicitud['abono_inicial_banco']
             : 0.0;
         $solicitud['total_abono_calculo'] = $abonoInicial + (float) $solicitud['bono_banco_abono'];
+
+        // Gestor y vendedor en CC del correo de aprobación al cliente.
+        // fyi@automarketpan.com ya se agrega automáticamente en EmailService.
+        $cc = [];
+        foreach (['gestor_email', 'vendedor_email'] as $campoCc) {
+            $emailCc = trim((string) ($solicitud[$campoCc] ?? ''));
+            if ($emailCc !== '' && filter_var($emailCc, FILTER_VALIDATE_EMAIL)) {
+                $cc[] = $emailCc;
+            }
+        }
+        $cc[] = 'fyi@automarketpan.com';
         
         $emailService = (new EmailService())->paraSolicitud((int) $solicitudId);
 
         return $emailService->notificarClienteAprobacion(
             $solicitud['email'],
             $solicitud['nombre_cliente'],
-            $solicitud
+            $solicitud,
+            $cc
         );
         
     } catch (Exception $e) {

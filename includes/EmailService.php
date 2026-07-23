@@ -309,6 +309,9 @@ class EmailService {
         }
 
         $cc = [];
+        if (!empty($data['cc']) && is_array($data['cc'])) {
+            $cc = $data['cc'];
+        }
         if ($pipeHint !== null && $pipeHint !== '') {
             $cc = $this->mergeCcEmailPipedrive($cc, null, $pipeHint);
         }
@@ -358,7 +361,7 @@ class EmailService {
         );
     }
 
-    public function notificarClienteAprobacion($clienteEmail, $clienteNombre, $solicitud) {
+    public function notificarClienteAprobacion($clienteEmail, $clienteNombre, $solicitud, array $cc = []) {
         $esPreaprobada = (($solicitud['evaluacion_decision'] ?? '') === 'preaprobado');
         $estadoCorreo = $esPreaprobada ? 'Preaprobada' : 'Aprobada';
         return $this->enviarTemplate(
@@ -370,6 +373,7 @@ class EmailService {
                 'cliente_nombre' => $clienteNombre,
                 'solicitud' => $solicitud,
                 'app_url' => $this->config['app_url'],
+                'cc' => $cc,
             ]
         );
     }
