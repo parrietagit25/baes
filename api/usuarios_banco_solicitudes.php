@@ -64,6 +64,7 @@ function obtenerUsuariosAsignados($pdo, $solicitud_id) {
                u.apellido as usuario_apellido, 
                u.email as usuario_email,
                u.telefono as usuario_telefono,
+               u.banco_id as banco_id,
                b.nombre as banco_nombre,
                u_creador.nombre as creado_por_nombre, 
                u_creador.apellido as creado_por_apellido

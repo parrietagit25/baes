@@ -7,9 +7,11 @@ if (!isset($_SESSION['user_id'])) {
 
 // Obtener la página actual para marcar el menú activo
 $current_page = basename($_SERVER['PHP_SELF']);
+require_once __DIR__ . '/banco_scope_helper.php';
 $isAdmin = in_array('ROLE_ADMIN', $_SESSION['user_roles']);
 $isGestor = in_array('ROLE_GESTOR', $_SESSION['user_roles']);
-$isBanco = in_array('ROLE_BANCO', $_SESSION['user_roles']);
+$isBanco = motus_es_vista_banco($_SESSION['user_roles'] ?? []);
+$isAdminBanco = motus_es_admin_banco($_SESSION['user_roles'] ?? []);
 $isVendedor = in_array('ROLE_VENDEDOR', $_SESSION['user_roles']);
 
 $paginasSolicitudesMenu = [
@@ -68,7 +70,7 @@ $reportSubmenu = $enReportes ? ($_GET['submenu'] ?? 'usuarios') : '';
             </a>
             <?php if ($isBanco): ?>
             <a class="nav-link ps-4 py-2 small <?php echo ($current_page === 'mis_propuestas_banco.php') ? 'active' : ''; ?>" href="mis_propuestas_banco.php">
-                <i class="fas fa-hand-holding-usd me-2"></i>Mis propuestas
+                <i class="fas fa-hand-holding-usd me-2"></i><?php echo $isAdminBanco ? 'Propuestas del banco' : 'Mis propuestas'; ?>
             </a>
             <?php endif; ?>
             <?php if ($isAdmin || $isGestor): ?>

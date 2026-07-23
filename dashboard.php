@@ -9,11 +9,13 @@ if (!isset($_SESSION['user_id'])) {
 
 require_once 'config/database.php';
 require_once 'includes/validar_acceso.php';
+require_once 'includes/banco_scope_helper.php';
 
 // Verificar roles del usuario
 $userRoles = $_SESSION['user_roles'] ?? [];
 $isAdmin = in_array('ROLE_ADMIN', $userRoles);
-$isBanco = in_array('ROLE_BANCO', $userRoles);
+$isBanco = motus_es_vista_banco($userRoles);
+$isAdminBanco = motus_es_admin_banco($userRoles);
 $isGestor = in_array('ROLE_GESTOR', $userRoles);
 $isVendedor = in_array('ROLE_VENDEDOR', $userRoles);
 $usuarioId = (int) $_SESSION['user_id'];
@@ -32,7 +34,31 @@ if ($isAdmin) {
     $dashboardFiltroSqlAliasS = ' AND s.gestor_id = ? ';
     $dashboardFiltroParams[] = $usuarioId;
     $dashboardAlcanceEtiqueta = 'Vista personal: solo solicitudes donde usted es el gestor asignado.';
-} elseif ($isBanco) {
+} elseif ($isAdminBanco) {
+    $bancoIdDash = motus_obtener_banco_id_usuario($pdo, $usuarioId);
+    if ($bancoIdDash) {
+        $dashboardFiltroSqlTabla = " AND EXISTS (
+            SELECT 1 FROM usuarios_banco_solicitudes ubs
+            INNER JOIN usuarios u_banco ON u_banco.id = ubs.usuario_banco_id
+            WHERE ubs.solicitud_id = solicitudes_credito.id
+            AND ubs.estado = 'activo'
+            AND u_banco.banco_id = ?
+        ) ";
+        $dashboardFiltroSqlAliasS = " AND EXISTS (
+            SELECT 1 FROM usuarios_banco_solicitudes ubs
+            INNER JOIN usuarios u_banco ON u_banco.id = ubs.usuario_banco_id
+            WHERE ubs.solicitud_id = s.id
+            AND ubs.estado = 'activo'
+            AND u_banco.banco_id = ?
+        ) ";
+        $dashboardFiltroParams[] = $bancoIdDash;
+        $dashboardAlcanceEtiqueta = 'Vista de entidad: solicitudes asignadas a usuarios de su banco.';
+    } else {
+        $dashboardFiltroSqlTabla = ' AND 1=0 ';
+        $dashboardFiltroSqlAliasS = ' AND 1=0 ';
+        $dashboardAlcanceEtiqueta = 'Sin entidad bancaria asignada: no hay solicitudes visibles.';
+    }
+} elseif (motus_es_analista_banco($userRoles)) {
     $dashboardFiltroSqlTabla = " AND EXISTS (
         SELECT 1 FROM usuarios_banco_solicitudes ubs
         WHERE ubs.solicitud_id = solicitudes_credito.id

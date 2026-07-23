@@ -19,11 +19,14 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
+require_once __DIR__ . '/banco_scope_helper.php';
+
 // Obtener roles del usuario
 $userRoles = $_SESSION['user_roles'] ?? [];
 $isAdmin = in_array('ROLE_ADMIN', $userRoles);
 $isGestor = in_array('ROLE_GESTOR', $userRoles);
-$isBanco = in_array('ROLE_BANCO', $userRoles);
+$isBanco = motus_es_vista_banco($userRoles);
+$isAdminBanco = motus_es_admin_banco($userRoles);
 $isVendedor = in_array('ROLE_VENDEDOR', $userRoles);
 
 // Obtener la página actual
@@ -51,6 +54,7 @@ if ($isAdmin) {
 } elseif ($isGestor) {
     $accesoPermitido = verificarAcceso($current_page, $userRoles, $paginasGestor);
 } elseif ($isBanco) {
+    // ROLE_BANCO y ROLE_ADMIN_BANCO: mismas páginas de banco
     $accesoPermitido = verificarAcceso($current_page, $userRoles, $paginasBanco);
 } elseif ($isVendedor) {
     $accesoPermitido = verificarAcceso($current_page, $userRoles, $paginasVendedor);

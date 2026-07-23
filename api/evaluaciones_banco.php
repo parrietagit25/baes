@@ -15,6 +15,7 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 require_once '../config/database.php';
+require_once '../includes/banco_scope_helper.php';
 
 function evaluaciones_tiene_letra_quincenal(PDO $pdo): bool
 {
@@ -118,12 +119,14 @@ switch ($method) {
 }
 
 /**
- * Lista todas las evaluaciones (propuestas) emitidas por el usuario banco logueado, en todas las solicitudes.
+ * Lista evaluaciones (propuestas) del usuario banco logueado,
+ * o de toda la entidad si es ROLE_ADMIN_BANCO.
  */
 function listarMisPropuestasBanco(): void {
     global $pdo;
 
-    if (!isset($_SESSION['user_roles']) || !in_array('ROLE_BANCO', $_SESSION['user_roles'], true)) {
+    $roles = $_SESSION['user_roles'] ?? [];
+    if (!motus_es_vista_banco($roles)) {
         http_response_code(403);
         echo json_encode(['success' => false, 'message' => 'Solo usuarios banco pueden ver esta lista']);
         return;
@@ -132,27 +135,60 @@ function listarMisPropuestasBanco(): void {
     $uid = (int) $_SESSION['user_id'];
 
     try {
-        $sql = "
-            SELECT
-                e.*,
-                s.id AS solicitud_id,
-                s.nombre_cliente,
-                s.cedula,
-                s.estado AS solicitud_estado,
-                s.evaluacion_seleccionada,
-                (s.evaluacion_seleccionada = e.id) AS es_propuesta_seleccionada,
-                v.marca AS vehiculo_marca,
-                v.modelo AS vehiculo_modelo,
-                v.anio AS vehiculo_anio
-            FROM evaluaciones_banco e
-            INNER JOIN usuarios_banco_solicitudes ubs ON e.usuario_banco_id = ubs.id
-            INNER JOIN solicitudes_credito s ON e.solicitud_id = s.id
-            LEFT JOIN vehiculos_solicitud v ON e.vehiculo_id = v.id
-            WHERE ubs.usuario_banco_id = ?
-            ORDER BY e.fecha_evaluacion DESC
-        ";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([$uid]);
+        if (motus_es_admin_banco($roles)) {
+            $bancoId = motus_obtener_banco_id_usuario($pdo, $uid);
+            if (!$bancoId) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Admin banco sin entidad bancaria asignada']);
+                return;
+            }
+            $sql = "
+                SELECT
+                    e.*,
+                    s.id AS solicitud_id,
+                    s.nombre_cliente,
+                    s.cedula,
+                    s.estado AS solicitud_estado,
+                    s.evaluacion_seleccionada,
+                    (s.evaluacion_seleccionada = e.id) AS es_propuesta_seleccionada,
+                    v.marca AS vehiculo_marca,
+                    v.modelo AS vehiculo_modelo,
+                    v.anio AS vehiculo_anio,
+                    u.nombre AS analista_nombre,
+                    u.apellido AS analista_apellido
+                FROM evaluaciones_banco e
+                INNER JOIN usuarios_banco_solicitudes ubs ON e.usuario_banco_id = ubs.id
+                INNER JOIN usuarios u ON u.id = ubs.usuario_banco_id
+                INNER JOIN solicitudes_credito s ON e.solicitud_id = s.id
+                LEFT JOIN vehiculos_solicitud v ON e.vehiculo_id = v.id
+                WHERE u.banco_id = ?
+                ORDER BY e.fecha_evaluacion DESC
+            ";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([$bancoId]);
+        } else {
+            $sql = "
+                SELECT
+                    e.*,
+                    s.id AS solicitud_id,
+                    s.nombre_cliente,
+                    s.cedula,
+                    s.estado AS solicitud_estado,
+                    s.evaluacion_seleccionada,
+                    (s.evaluacion_seleccionada = e.id) AS es_propuesta_seleccionada,
+                    v.marca AS vehiculo_marca,
+                    v.modelo AS vehiculo_modelo,
+                    v.anio AS vehiculo_anio
+                FROM evaluaciones_banco e
+                INNER JOIN usuarios_banco_solicitudes ubs ON e.usuario_banco_id = ubs.id
+                INNER JOIN solicitudes_credito s ON e.solicitud_id = s.id
+                LEFT JOIN vehiculos_solicitud v ON e.vehiculo_id = v.id
+                WHERE ubs.usuario_banco_id = ?
+                ORDER BY e.fecha_evaluacion DESC
+            ";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([$uid]);
+        }
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         foreach ($rows as &$r) {

@@ -440,7 +440,7 @@ function cargarSolicitudes() {
                                             <i class="fas fa-paperclip"></i>
                                         </button>
                                     </div>
-                                    ${(window.userRoles && window.userRoles.isBanco && (solicitud.estado === 'En Revisión Banco' || solicitud.estado === 'Reevaluación por los Bancos' || solicitud.estado === 'Nueva')) ? `
+                                    ${(window.userRoles && window.userRoles.isBancoAnalista && (solicitud.estado === 'En Revisión Banco' || solicitud.estado === 'Reevaluación por los Bancos' || solicitud.estado === 'Nueva')) ? `
                                     <div class="btn-group btn-group-sm mb-1" role="group">
                                         <button class="btn btn-success btn-action" onclick="abrirModalAprobacion(${solicitud.id})" title="Aprobar/Rechazar Solicitud">
                                             <i class="fas fa-gavel"></i>
@@ -1407,14 +1407,19 @@ function cargarMuroCompleto(solicitudId) {
                   success: function(responseUsuarios) {
                       let usuariosBanco = responseUsuarios.success ? responseUsuarios.data : [];
                       
-                      // Si el usuario es tipo banco (y no es admin ni gestor), filtrar solo su propia pestaña
+                      // Analista banco: solo su pestaña. Admin banco: usuarios de su entidad.
                       if (window.userRoles && window.userRoles.isBanco && 
                           !window.userRoles.isAdmin && !window.userRoles.isGestor && 
                           window.userId) {
-                          usuariosBanco = usuariosBanco.filter(function(usuario) {
-                              // Comparar el usuario_banco_id con el userId del usuario logueado
-                              return usuario.usuario_banco_id == window.userId;
-                          });
+                          if (window.userRoles.isAdminBanco && window.userBancoId) {
+                              usuariosBanco = usuariosBanco.filter(function(usuario) {
+                                  return String(usuario.banco_id) === String(window.userBancoId);
+                              });
+                          } else if (!window.userRoles.isAdminBanco) {
+                              usuariosBanco = usuariosBanco.filter(function(usuario) {
+                                  return usuario.usuario_banco_id == window.userId;
+                              });
+                          }
                       }
                       
                       // Generar estructura de pestañas

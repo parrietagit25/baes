@@ -8,19 +8,21 @@ if (!isset($_SESSION['user_id'])) {
 
 require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/includes/validar_acceso.php';
+require_once __DIR__ . '/includes/banco_scope_helper.php';
 
 $userRoles = $_SESSION['user_roles'] ?? [];
-if (!in_array('ROLE_BANCO', $userRoles, true)) {
+if (!motus_es_vista_banco($userRoles)) {
     header('Location: dashboard.php');
     exit();
 }
+$esAdminBancoPagina = motus_es_admin_banco($userRoles);
 ?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mis propuestas - MOTUS</title>
+    <title><?php echo $esAdminBancoPagina ? 'Propuestas del banco' : 'Mis propuestas'; ?> - MOTUS</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css" rel="stylesheet">
@@ -40,8 +42,10 @@ if (!in_array('ROLE_BANCO', $userRoles, true)) {
         <div class="col-md-9 col-lg-10 main-content">
             <div class="container-fluid py-4">
                 <div class="page-header">
-                    <h2 class="mb-1"><i class="fas fa-file-contract me-2"></i>Mis propuestas</h2>
-                    <p class="mb-0 opacity-90">Todas las evaluaciones que has registrado como usuario banco, en cualquier solicitud asignada.</p>
+                    <h2 class="mb-1"><i class="fas fa-file-contract me-2"></i><?php echo $esAdminBancoPagina ? 'Propuestas del banco' : 'Mis propuestas'; ?></h2>
+                    <p class="mb-0 opacity-90"><?php echo $esAdminBancoPagina
+                        ? 'Evaluaciones registradas por los usuarios banco de su entidad, en cualquier solicitud asignada.'
+                        : 'Todas las evaluaciones que has registrado como usuario banco, en cualquier solicitud asignada.'; ?></p>
                 </div>
                 <div class="card shadow-sm">
                     <div class="card-body">
@@ -53,6 +57,7 @@ if (!in_array('ROLE_BANCO', $userRoles, true)) {
                                         <th>Solicitud</th>
                                         <th>Cliente</th>
                                         <th>Cédula</th>
+                                        <?php if ($esAdminBancoPagina): ?><th>Analista</th><?php endif; ?>
                                         <th>Estado</th>
                                         <th>Vehículo</th>
                                         <th>Decisión</th>
@@ -84,6 +89,7 @@ if (!in_array('ROLE_BANCO', $userRoles, true)) {
 <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
 <script>
 (function () {
+    var esAdminBanco = <?php echo $esAdminBancoPagina ? 'true' : 'false'; ?>;
     function esc(s) {
         if (s == null) return '';
         return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -103,16 +109,11 @@ if (!in_array('ROLE_BANCO', $userRoles, true)) {
         dataType: 'json'
     }).done(function (res) {
         if (!res.success) {
-            $('#tablaMisPropuestas tbody').html('<tr><td colspan="15" class="text-danger">' + esc(res.message || 'Error') + '</td></tr>');
+            $('#tablaMisPropuestas tbody').html('<tr><td colspan="18" class="text-danger">' + esc(res.message || 'Error') + '</td></tr>');
             return;
         }
         const rows = res.data || [];
-        $('#tablaMisPropuestas').DataTable({
-            data: rows,
-            order: [[0, 'desc']],
-            pageLength: 25,
-            language: { url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json' },
-            columns: [
+        var cols = [
                 {
                     data: 'fecha_evaluacion',
                     render: function (d) {
@@ -126,7 +127,18 @@ if (!in_array('ROLE_BANCO', $userRoles, true)) {
                     }
                 },
                 { data: 'nombre_cliente', defaultContent: '-', render: function (d) { return esc(d || '-'); } },
-                { data: 'cedula', defaultContent: '-', render: function (d) { return esc(d || '-'); } },
+                { data: 'cedula', defaultContent: '-', render: function (d) { return esc(d || '-'); } }
+        ];
+        if (esAdminBanco) {
+            cols.push({
+                data: null,
+                render: function (data, type, row) {
+                    var n = [row.analista_nombre, row.analista_apellido].filter(Boolean).join(' ').trim();
+                    return esc(n || '-');
+                }
+            });
+        }
+        cols = cols.concat([
                 { data: 'solicitud_estado', defaultContent: '-', render: function (d) { return esc(d || '-'); } },
                 {
                     data: null,
@@ -169,10 +181,16 @@ if (!in_array('ROLE_BANCO', $userRoles, true)) {
                         return '<a class="btn btn-sm btn-outline-primary" href="solicitudes.php?abrir_solicitud=' + sid + '" title="Abrir solicitud"><i class="fas fa-external-link-alt"></i></a>';
                     }
                 }
-            ]
+        ]);
+        $('#tablaMisPropuestas').DataTable({
+            data: rows,
+            order: [[0, 'desc']],
+            pageLength: 25,
+            language: { url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json' },
+            columns: cols
         });
     }).fail(function () {
-        $('#tablaMisPropuestas tbody').html('<tr><td colspan="15" class="text-danger">Error de conexión</td></tr>');
+        $('#tablaMisPropuestas tbody').html('<tr><td colspan="18" class="text-danger">Error de conexión</td></tr>');
     });
 })();
 </script>

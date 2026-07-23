@@ -9,6 +9,7 @@ if (!isset($_SESSION['user_id'])) {
 require_once 'config/database.php';
 require_once 'includes/validar_acceso.php';
 require_once 'includes/solicitud_vehiculo_helper.php';
+require_once 'includes/banco_scope_helper.php';
 
 // Vista histórica: Completada, Rechazada, Desistimiento
 $esHistorico = defined('MOTUS_VISTA_HISTORICO') && MOTUS_VISTA_HISTORICO;
@@ -18,8 +19,11 @@ $estadosHistoricoSql = "'Completada', 'Rechazada', 'Desistimiento'";
 $userRoles = $_SESSION['user_roles'] ?? [];
 $isAdmin = in_array('ROLE_ADMIN', $userRoles);
 $isGestor = in_array('ROLE_GESTOR', $userRoles);
-$isBanco = in_array('ROLE_BANCO', $userRoles);
+$isAdminBanco = motus_es_admin_banco($userRoles);
+$isBancoAnalista = motus_es_analista_banco($userRoles);
+$isBanco = motus_es_vista_banco($userRoles);
 $esUsuarioBancoLista = $isBanco && !$isAdmin; // Vista lista tipo banco (sin columna «todos los bancos» de admin)
+$bancoIdSesion = motus_obtener_banco_id_usuario($pdo);
 
 // Ejecutivos de ventas para el select (Datos Generales)
 $ejecutivosVentas = [];
@@ -40,15 +44,30 @@ $filtroEstadoLista = $esHistorico
     ? "estado IN ($estadosHistoricoSql)"
     : "estado NOT IN ($estadosHistoricoSql)";
 
-// Obtener estadísticas (filtrar por usuario banco si aplica)
+// Obtener estadísticas (filtrar por usuario banco / admin banco si aplica)
 if ($isBanco && !$isAdmin) {
-    // Usuario banco solo ve sus solicitudes asignadas
-    $filtroBanco = "AND EXISTS (
-        SELECT 1 FROM usuarios_banco_solicitudes ubs 
-        WHERE ubs.solicitud_id = solicitudes_credito.id 
-        AND ubs.usuario_banco_id = " . $_SESSION['user_id'] . "
-        AND ubs.estado = 'activo'
-    )";
+    if ($isAdminBanco) {
+        $bancoIdFiltro = (int) ($bancoIdSesion ?? 0);
+        if ($bancoIdFiltro > 0) {
+            $filtroBanco = "AND EXISTS (
+                SELECT 1 FROM usuarios_banco_solicitudes ubs
+                INNER JOIN usuarios u_banco ON u_banco.id = ubs.usuario_banco_id
+                WHERE ubs.solicitud_id = solicitudes_credito.id
+                AND ubs.estado = 'activo'
+                AND u_banco.banco_id = {$bancoIdFiltro}
+            )";
+        } else {
+            $filtroBanco = "AND 1=0";
+        }
+    } else {
+        // Analista banco solo ve sus solicitudes asignadas
+        $filtroBanco = "AND EXISTS (
+            SELECT 1 FROM usuarios_banco_solicitudes ubs 
+            WHERE ubs.solicitud_id = solicitudes_credito.id 
+            AND ubs.usuario_banco_id = " . (int) $_SESSION['user_id'] . "
+            AND ubs.estado = 'activo'
+        )";
+    }
     
     $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE $filtroEstadoLista $filtroBanco");
     $totalSolicitudes = $stmt->fetch()['total'];
@@ -401,7 +420,20 @@ if ($isBanco && !$isAdmin) {
                                         
                                           // Aplicar filtro según el rol del usuario
                                           $whereParts = [];
-                                          if (in_array('ROLE_BANCO', $userRoles) && !in_array('ROLE_ADMIN', $userRoles)) {
+                                          if ($isAdminBanco && !$isAdmin) {
+                                              $bancoIdFiltroLista = (int) ($bancoIdSesion ?? 0);
+                                              if ($bancoIdFiltroLista > 0) {
+                                                  $whereParts[] = "EXISTS (
+                                                      SELECT 1 FROM usuarios_banco_solicitudes ubs
+                                                      INNER JOIN usuarios u_banco ON u_banco.id = ubs.usuario_banco_id
+                                                      WHERE ubs.solicitud_id = s.id
+                                                      AND ubs.estado = 'activo'
+                                                      AND u_banco.banco_id = {$bancoIdFiltroLista}
+                                                  )";
+                                              } else {
+                                                  $whereParts[] = "1=0";
+                                              }
+                                          } elseif ($isBancoAnalista && !$isAdmin) {
                                               // Usuario banco solo ve sus solicitudes asignadas
                                               $whereParts[] = "EXISTS (
                                                   SELECT 1 FROM usuarios_banco_solicitudes ubs 
@@ -528,9 +560,10 @@ if ($isBanco && !$isAdmin) {
                                               <td><?php echo date('d/m/Y H:i', strtotime($solicitud['fecha_creacion'])); ?></td>
                                               <td>
                                                   <?php
-                                                  // Para usuarios banco: verificar si hay una evaluación seleccionada y si el usuario actual es el dueño
+                                                  // Analista banco: si hay propuesta seleccionada de otro, ocultar acciones.
+                                                  // Admin banco (solo vista) siempre puede abrir detalles.
                                                   $mostrarBotonesAcciones = true;
-                                                  if ($isBanco && !$isAdmin) {
+                                                  if ($isBancoAnalista && !$isAdmin) {
                                                       $evaluacionSeleccionada = $solicitud['evaluacion_seleccionada'] ?? null;
                                                       if ($evaluacionSeleccionada) {
                                                           // Obtener el usuario_banco_id del usuario actual para esta solicitud
@@ -1715,10 +1748,13 @@ if ($isBanco && !$isAdmin) {
           window.userRoles = {
               isAdmin: <?php echo $isAdmin ? 'true' : 'false'; ?>,
               isGestor: <?php echo $isGestor ? 'true' : 'false'; ?>,
-              isBanco: <?php echo $isBanco ? 'true' : 'false'; ?>
+              isBanco: <?php echo $isBanco ? 'true' : 'false'; ?>,
+              isAdminBanco: <?php echo $isAdminBanco ? 'true' : 'false'; ?>,
+              isBancoAnalista: <?php echo $isBancoAnalista ? 'true' : 'false'; ?>
           };
           // Pasar ID del usuario a JavaScript
-          window.userId = <?php echo $_SESSION['user_id']; ?>;
+          window.userId = <?php echo (int) $_SESSION['user_id']; ?>;
+          window.userBancoId = <?php echo $bancoIdSesion ? (int) $bancoIdSesion : 'null'; ?>;
 
         // Cache vehículos del modal de decisión (usuario banco)
         var aprobacionVehiculosCache = [];

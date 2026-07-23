@@ -17,6 +17,7 @@ if (!isset($_SESSION['user_id'])) {
 require_once '../config/database.php';
 require_once '../includes/historial_helper.php';
 require_once '../includes/solicitud_vehiculo_helper.php';
+require_once '../includes/banco_scope_helper.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 
@@ -240,6 +241,21 @@ function obtenerSolicitudes() {
         if (in_array('ROLE_GESTOR', $userRoles)) {
             $whereClause = " WHERE s.gestor_id = ?";
             $params[] = $usuarioId;
+        } elseif (motus_es_admin_banco($userRoles)) {
+            $bancoId = motus_obtener_banco_id_usuario($pdo, (int) $usuarioId);
+            if (!$bancoId) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Admin banco sin entidad bancaria asignada']);
+                return;
+            }
+            $whereClause = " WHERE EXISTS (
+                SELECT 1 FROM usuarios_banco_solicitudes ubs_adm
+                INNER JOIN usuarios u_adm ON u_adm.id = ubs_adm.usuario_banco_id
+                WHERE ubs_adm.solicitud_id = s.id
+                  AND ubs_adm.estado = 'activo'
+                  AND u_adm.banco_id = ?
+            )";
+            $params[] = $bancoId;
         } elseif (in_array('ROLE_BANCO', $userRoles)) {
             // Usuarios banco solo ven solicitudes asignadas a ellos
             $whereClause = " WHERE ubs.usuario_banco_id = ?";
@@ -561,7 +577,7 @@ function actualizarSolicitud() {
             $puedeEditar = true;
         } elseif (in_array('ROLE_GESTOR', $userRoles) && $solicitud['gestor_id'] == $_SESSION['user_id']) {
             $puedeEditar = true;
-        } elseif (in_array('ROLE_BANCO', $userRoles)) {
+        } elseif (motus_es_vista_banco($userRoles) && motus_solicitud_en_alcance_banco($pdo, (int) $solicitud['id'], $userRoles)) {
             $puedeEditar = true;
         } elseif (in_array('ROLE_VENDEDOR', $userRoles) && $solicitud['vendedor_id'] == $_SESSION['user_id']) {
             $puedeEditar = true;

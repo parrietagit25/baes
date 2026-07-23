@@ -10,6 +10,7 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../includes/banco_scope_helper.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 
@@ -67,7 +68,7 @@ function obtenerNotasSolicitud($solicitudId, $vehiculoId = null, $usuarioBancoId
             $tieneAcceso = true;
         } elseif (in_array('ROLE_GESTOR', $userRoles) && $solicitud['gestor_id'] == $_SESSION['user_id']) {
             $tieneAcceso = true;
-        } elseif (in_array('ROLE_BANCO', $userRoles)) {
+        } elseif (motus_es_vista_banco($userRoles) && motus_solicitud_en_alcance_banco($pdo, (int) $solicitudId, $userRoles)) {
             $tieneAcceso = true;
         }
         
@@ -131,8 +132,10 @@ function obtenerTodasLasNotas() {
         if (in_array('ROLE_GESTOR', $userRoles)) {
             $whereClause = " WHERE s.gestor_id = ?";
             $params[] = $_SESSION['user_id'];
-        } elseif (in_array('ROLE_BANCO', $userRoles)) {
-            $whereClause = " WHERE s.respuesta_banco IN ('Pendiente', 'Pre Aprobado')";
+        } elseif (motus_es_vista_banco($userRoles)) {
+            [$filtroBanco, $paramsBanco] = motus_sql_filtro_alcance_banco($pdo, $userRoles, 's.id');
+            $whereClause = ' WHERE 1=1' . $filtroBanco;
+            $params = array_merge($params, $paramsBanco);
         } elseif (in_array('ROLE_ADMIN', $userRoles)) {
             // Los administradores ven todas las notas
         } else {
@@ -190,7 +193,7 @@ function crearNota() {
             $tieneAcceso = true;
         } elseif (in_array('ROLE_GESTOR', $userRoles) && $solicitud['gestor_id'] == $_SESSION['user_id']) {
             $tieneAcceso = true;
-        } elseif (in_array('ROLE_BANCO', $userRoles)) {
+        } elseif (motus_es_vista_banco($userRoles) && motus_solicitud_en_alcance_banco($pdo, (int) $solicitudId, $userRoles)) {
             $tieneAcceso = true;
         } elseif (in_array('ROLE_VENDEDOR', $userRoles) && $solicitud['vendedor_id'] == $_SESSION['user_id']) {
             $tieneAcceso = true;

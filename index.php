@@ -23,13 +23,14 @@ if ($_POST) {
     } else {
         $email = $_POST['email'];
         $password = $_POST['password'];
-        $stmt = $pdo->prepare("SELECT id, nombre, apellido, email, password, activo FROM usuarios WHERE email = ?");
+        $stmt = $pdo->prepare("SELECT id, nombre, apellido, email, password, activo, banco_id FROM usuarios WHERE email = ?");
         $stmt->execute([$email]);
         $user = $stmt->fetch();
         if ($user && password_verify($password, $user['password']) && $user['activo'] == 1) {
         $_SESSION['user_id'] = $user['id'];
         $_SESSION['user_name'] = $user['nombre'] . ' ' . $user['apellido'];
         $_SESSION['user_email'] = $user['email'];
+        $_SESSION['banco_id'] = !empty($user['banco_id']) ? (int) $user['banco_id'] : null;
         
         // Obtener roles del usuario
         $stmt = $pdo->prepare("SELECT r.nombre FROM roles r 
