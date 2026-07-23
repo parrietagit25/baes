@@ -1,5 +1,8 @@
 <?php
 // Configuración de la base de datos
+// Zona horaria operativa Motus (Panamá, sin DST).
+date_default_timezone_set('America/Panama');
+
 // En producción (Digital Ocean, etc.) defina APP_DEBUG en el entorno o póngalo aquí a true para ver errores SQL en la respuesta.
 if (!defined('APP_DEBUG')) {
     define('APP_DEBUG', getenv('APP_DEBUG') === '1' || getenv('APP_DEBUG') === 'true');
@@ -34,6 +37,8 @@ $options = [
 
 try {
     $pdo = new PDO($dsn, $username, $password, $options);
+    // Alinear NOW()/CURRENT_TIMESTAMP de la sesión MySQL con Panamá (UTC-5).
+    $pdo->exec("SET time_zone = '-05:00'");
 } catch (PDOException $e) {
     throw new PDOException($e->getMessage(), (int)$e->getCode());
 }

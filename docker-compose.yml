@@ -9,12 +9,15 @@ services:
       MYSQL_DATABASE: ${MYSQL_DATABASE}
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      TZ: America/Panama
     volumes:
       - motus_db_data:/var/lib/mysql
       - ./database:/docker-entrypoint-initdb.d
     networks:
       - motus_network
-    command: --default-authentication-plugin=mysql_native_password
+    command:
+      - --default-authentication-plugin=mysql_native_password
+      - --default-time-zone=-05:00
 
   # Servicio de PHPMyAdmin
   # No se usa phpmyadmin en este proyecto
@@ -37,6 +40,7 @@ services:
     networks:
       - motus_network
     environment:
+      - TZ=America/Panama
       - DB_HOST=motus_db
       - DB_PORT=3306
       - DB_NAME=${MYSQL_DATABASE}
