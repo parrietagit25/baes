@@ -163,6 +163,12 @@ function guardarUsuario() {
     if (password) {
         dataObj.password = password;
     }
+
+    const rolNombre = ($('#rol_id option:selected').data('rol-nombre') || $('#rol_id option:selected').text() || '').toString().trim();
+    if ((rolNombre === 'ROLE_BANCO' || rolNombre === 'ROLE_ADMIN_BANCO') && !dataObj.banco_id) {
+        mostrarAlerta('Debe seleccionar el banco asignado para este rol', 'danger');
+        return;
+    }
     
     console.log('Datos a enviar:', dataObj);
     
@@ -414,12 +420,15 @@ function toggleBancoSelect() {
     console.log('=== EJECUTANDO TOGGLE BANCO SELECT ===');
     
     const bancoSection = $('#bancoSection');
-    const rolId = $('#rol_id').val();
+    const $rolOption = $('#rol_id option:selected');
+    const rolNombre = ($rolOption.data('rol-nombre') || $rolOption.text() || '').toString().trim();
     
-    console.log('Rol seleccionado:', rolId);
+    console.log('Rol seleccionado:', rolNombre);
     
-    // Verificar si es ROLE_BANCO (ID 8)
-    if (rolId == '8') {
+    // ROLE_BANCO (analista) y ROLE_ADMIN_BANCO (admin de entidad) requieren banco_id
+    const requiereBanco = rolNombre === 'ROLE_BANCO' || rolNombre === 'ROLE_ADMIN_BANCO';
+
+    if (requiereBanco) {
         bancoSection.show();
         $('#banco_id').prop('required', true);
         console.log('✅ Mostrando select de banco');

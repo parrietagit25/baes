@@ -301,19 +301,19 @@ $roles = $stmt->fetchAll();
                             <select class="form-select" id="rol_id" name="rol_id" required>
                                 <option value="">Seleccionar rol...</option>
                                 <?php foreach ($roles as $rol): ?>
-                                <option value="<?php echo $rol['id']; ?>"><?php echo htmlspecialchars($rol['nombre']); ?></option>
+                                <option value="<?php echo $rol['id']; ?>" data-rol-nombre="<?php echo htmlspecialchars($rol['nombre']); ?>"><?php echo htmlspecialchars($rol['nombre']); ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
 
-                        <!-- Select de Banco (solo para usuarios tipo banco) -->
+                        <!-- Select de Banco (ROLE_BANCO y ROLE_ADMIN_BANCO) -->
                         <div class="mb-3" id="bancoSection" style="display: none;">
-                            <label for="banco_id" class="form-label">Banco Asignado</label>
+                            <label for="banco_id" class="form-label">Banco Asignado *</label>
                             <select class="form-select" id="banco_id" name="banco_id">
                                 <option value="">Seleccionar banco...</option>
                                 <!-- Se llenará via JavaScript -->
                             </select>
-                            <div class="form-text">Solo aplica para usuarios con rol de banco</div>
+                            <div class="form-text">Obligatorio para ROLE_BANCO y ROLE_ADMIN_BANCO (define la entidad del usuario)</div>
                         </div>
                     </div>
                     <div class="modal-footer">

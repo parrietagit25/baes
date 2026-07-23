@@ -11,6 +11,28 @@ if (!isset($_SESSION['user_id']) || !in_array('ROLE_ADMIN', $_SESSION['user_role
 
 require_once '../config/database.php';
 
+/**
+ * ROLE_BANCO y ROLE_ADMIN_BANCO requieren usuarios.banco_id.
+ */
+function usuariosValidarBancoRequerido(PDO $pdo, $rolId, $bancoId): bool {
+    $rolId = (int) $rolId;
+    if ($rolId <= 0) {
+        return true;
+    }
+    try {
+        $stmt = $pdo->prepare('SELECT nombre FROM roles WHERE id = ? LIMIT 1');
+        $stmt->execute([$rolId]);
+        $nombre = (string) ($stmt->fetchColumn() ?: '');
+        if ($nombre !== 'ROLE_BANCO' && $nombre !== 'ROLE_ADMIN_BANCO') {
+            return true;
+        }
+        return $bancoId !== null && $bancoId !== '' && (int) $bancoId > 0;
+    } catch (Throwable $e) {
+        error_log('usuariosValidarBancoRequerido: ' . $e->getMessage());
+        return false;
+    }
+}
+
 $method = $_SERVER['REQUEST_METHOD'];
 
 switch ($method) {
@@ -135,6 +157,11 @@ function crearUsuario() {
                 return;
             }
         }
+
+        if (!usuariosValidarBancoRequerido($pdo, $_POST['rol_id'] ?? null, $_POST['banco_id'] ?? null)) {
+            echo json_encode(['success' => false, 'message' => 'Debe seleccionar el banco asignado para ROLE_BANCO o ROLE_ADMIN_BANCO']);
+            return;
+        }
         
         // Validar email único
         $stmt = $pdo->prepare("SELECT COUNT(*) FROM usuarios WHERE email = ?");
@@ -206,6 +233,17 @@ function actualizarUsuario() {
         
         if (empty($_PUT['id'])) {
             echo json_encode(['success' => false, 'message' => 'ID de usuario requerido']);
+            return;
+        }
+
+        $rolIdValidar = $_PUT['rol_id'] ?? null;
+        if ($rolIdValidar === null || $rolIdValidar === '') {
+            $stmtRolActual = $pdo->prepare("SELECT rol_id FROM usuario_roles WHERE usuario_id = ? LIMIT 1");
+            $stmtRolActual->execute([$_PUT['id']]);
+            $rolIdValidar = $stmtRolActual->fetchColumn() ?: null;
+        }
+        if (!usuariosValidarBancoRequerido($pdo, $rolIdValidar, $_PUT['banco_id'] ?? null)) {
+            echo json_encode(['success' => false, 'message' => 'Debe seleccionar el banco asignado para ROLE_BANCO o ROLE_ADMIN_BANCO']);
             return;
         }
         
