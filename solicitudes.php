@@ -1694,8 +1694,11 @@ if ($isBanco && !$isAdmin) {
                                         </div>
                                     </div>
                                     <div class="mb-3">
-                                        <label for="comentarios_evaluacion" class="form-label">Comentarios</label>
+                                        <label for="comentarios_evaluacion" class="form-label">
+                                            Comentarios <span id="comentarios_obligatorio_mark" class="text-danger d-none">*</span>
+                                        </label>
                                         <textarea class="form-control" id="comentarios_evaluacion" name="comentarios_evaluacion" rows="3" placeholder="Comentarios adicionales..." disabled></textarea>
+                                        <div class="form-text d-none" id="comentarios_rechazo_hint">En un rechazo el comentario es obligatorio.</div>
                                     </div>
                                 </div>
                             </div>
@@ -2184,6 +2187,9 @@ if ($isBanco && !$isAdmin) {
             if (decision === 'rechazado') {
                 $('#comentarios_evaluacion').prop('disabled', false);
                 $('#comentarios_evaluacion').prop('required', true);
+                $('#comentarios_obligatorio_mark').removeClass('d-none');
+                $('#comentarios_rechazo_hint').removeClass('d-none');
+                $('#comentarios_evaluacion').attr('placeholder', 'Explique el rechazo (obligatorio)...');
                 $('#letra_evaluacion').val('');
                 $('#letra_quincenal_evaluacion').val('');
                 $('#promocion_evaluacion').val('');
@@ -2193,9 +2199,14 @@ if ($isBanco && !$isAdmin) {
                     $(campo).prop('disabled', false).prop('readonly', false);
                 });
                 $('#comentarios_evaluacion').prop('required', false);
+                $('#comentarios_obligatorio_mark').addClass('d-none');
+                $('#comentarios_rechazo_hint').addClass('d-none');
+                $('#comentarios_evaluacion').attr('placeholder', 'Comentarios adicionales...');
                 actualizarCampoCuantiaPromocion();
             } else {
                 $('#camposDecision').hide();
+                $('#comentarios_obligatorio_mark').addClass('d-none');
+                $('#comentarios_rechazo_hint').addClass('d-none');
                 actualizarCampoCuantiaPromocion();
             }
         };
@@ -2221,6 +2232,15 @@ if ($isBanco && !$isAdmin) {
             if (!decision) {
                 alert('Por favor seleccione una decisión');
                 return;
+            }
+
+            if (decision === 'rechazado') {
+                const comentarios = ($('#comentarios_evaluacion').val() || '').trim();
+                if (!comentarios) {
+                    alert('En un rechazo el comentario es obligatorio');
+                    $('#comentarios_evaluacion').focus();
+                    return;
+                }
             }
 
             const solicitudId = $('#aprobacion_solicitud_id').val();

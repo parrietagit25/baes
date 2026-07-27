@@ -417,6 +417,12 @@ function guardarEvaluacion() {
             $razon = null;
         }
 
+        $comentariosEval = trim((string) ($_POST['comentarios_evaluacion'] ?? ''));
+        if ($decision === 'rechazado' && $comentariosEval === '') {
+            echo json_encode(['success' => false, 'message' => 'En un rechazo el comentario es obligatorio']);
+            return;
+        }
+
         $hasLetraQ = evaluaciones_tiene_letra_quincenal($pdo);
         $hasCuantia = evaluaciones_tiene_cuantia($pdo);
         $hasRazon = evaluaciones_tiene_razon($pdo);
@@ -460,7 +466,7 @@ function guardarEvaluacion() {
         $cols[] = 'tasa_bancaria';
         $vals[] = $tasaBancaria;
         $cols[] = 'comentarios';
-        $vals[] = $_POST['comentarios_evaluacion'] ?? null;
+        $vals[] = $comentariosEval !== '' ? $comentariosEval : null;
 
         $placeholders = implode(', ', array_fill(0, count($cols), '?'));
         $stmt = $pdo->prepare(
@@ -506,24 +512,25 @@ function guardarEvaluacion() {
             $_POST['plazo_evaluacion'] ?? null,
             $_POST['abono_evaluacion'] ?? null,
             $promocion,
-            $_POST['comentarios_evaluacion'] ?? null,
+            $comentariosEval !== '' ? $comentariosEval : null,
             $_SESSION['user_id'],
             $solicitudId
         ]);
         
-        // Enviar notificación al vendedor si el banco respondió (solo si email_helper está disponible)
+        // Notificaciones por correo:
+        // - Cualquier decisión: vendedor (CC F&I + Pipe vía EmailService). Nunca al banco que respondió.
+        // - Solo aprobado/preaprobado: también al cliente.
+        // - Rechazo: NO se notifica al cliente ni al banco que rechazó.
         try {
             require_once '../includes/email_helper.php';
             
-            if (in_array($respuestaBancoEnum, ['Aprobado', 'Pre Aprobado', 'Rechazado', 'Aprobado Condicional'])) {
+            if (in_array($respuestaBancoEnum, ['Aprobado', 'Pre Aprobado', 'Rechazado', 'Aprobado Condicional'], true)) {
                 $resultadoEmail = enviarNotificacionVendedor($solicitudId);
-                // Log del resultado (no fallar si el correo no se envía)
                 if (!$resultadoEmail['success']) {
                     error_log("No se pudo enviar correo al vendedor: " . $resultadoEmail['message']);
                 }
                 
-                // Si está aprobada, también notificar al cliente
-                if (in_array($respuestaBancoEnum, ['Aprobado', 'Pre Aprobado'])) {
+                if (in_array($respuestaBancoEnum, ['Aprobado', 'Pre Aprobado'], true)) {
                     $resultadoCliente = notificarClienteAprobacion($solicitudId, $evaluacionId);
                     if (!$resultadoCliente['success']) {
                         error_log("No se pudo enviar correo al cliente: " . $resultadoCliente['message']);
