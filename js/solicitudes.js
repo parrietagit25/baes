@@ -478,7 +478,6 @@ function cargarSolicitudes() {
                             <td>${textoVehiculoLista(solicitud)}</td>
                             <td>${solicitud.gestor_nombre} ${solicitud.gestor_apellido}</td>
                             <td>${vendedorNombre}</td>
-                            <td><span class="badge badge-estado ${estadoClass}">${solicitud.estado}</span></td>
                             <td>${formatearFecha(solicitud.fecha_creacion)}</td>
                             <td>${accionesComunes}</td>
                         </tr>`;
