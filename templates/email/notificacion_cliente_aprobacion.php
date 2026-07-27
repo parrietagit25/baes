@@ -18,14 +18,22 @@ if ($bancoNombre === '') {
     $bancoNombre = 'Banco';
 }
 
-$vehiculo = trim(implode(' – ', array_filter([
-    trim((string) ($solicitud['vehiculo_marca'] ?? $solicitud['marca_auto'] ?? '')),
-    trim((string) ($solicitud['vehiculo_modelo'] ?? $solicitud['modelo_auto'] ?? '')),
-    trim((string) ($solicitud['vehiculo_anio'] ?? $solicitud['ao_auto'] ?? '')),
-])));
-if ($vehiculo === '') {
-    $vehiculo = '—';
+$modelo = trim((string) ($solicitud['vehiculo_modelo'] ?? $solicitud['modelo_auto'] ?? ''));
+$marca = trim((string) ($solicitud['vehiculo_marca'] ?? $solicitud['marca_auto'] ?? ''));
+$anio = trim((string) ($solicitud['vehiculo_anio'] ?? $solicitud['ao_auto'] ?? ''));
+if ($modelo === '' && $marca !== '') {
+    $modelo = $marca;
+} elseif ($modelo !== '' && $marca !== '' && stripos($modelo, $marca) === false) {
+    $modelo = $marca . ' ' . $modelo;
 }
+$vehiculoParts = [];
+if ($modelo !== '') {
+    $vehiculoParts[] = 'Modelo ' . $modelo;
+}
+if ($anio !== '') {
+    $vehiculoParts[] = 'Año ' . $anio;
+}
+$vehiculo = $vehiculoParts !== [] ? implode(', ', $vehiculoParts) : '—';
 
 $precioVenta = $solicitud['precio_venta_banco']
     ?? $solicitud['vehiculo_precio']
@@ -34,9 +42,18 @@ $precioVenta = $solicitud['precio_venta_banco']
 $abonoInicial = $solicitud['abono_inicial_banco'] ?? null;
 $bonoBanco = (float) ($solicitud['bono_banco_abono'] ?? 0);
 $totalAbono = $solicitud['total_abono_calculo'] ?? $abonoInicial;
+$mostrarCashBackAbono = !empty($solicitud['mostrar_cashback_abono']) && $bonoBanco > 0;
 $plazo = $solicitud['plazo_banco'] ?? null;
 $cuotaMensual = $solicitud['cuota_mensual_banco'] ?? null;
 $promocion = $solicitud['promocion_banco'] ?? null;
+
+$abonoHtml = '<p><strong>Abono inicial:</strong> ' . $h($money($abonoInicial)) . '</p>';
+if ($mostrarCashBackAbono) {
+    $abonoHtml = '<p><strong>Abono inicial:</strong> ' . $h($money($abonoInicial))
+        . ' + <strong>Cash Back para abono:</strong> ' . $h($money($bonoBanco))
+        . ' = <strong>Total de abono contemplado para el cálculo de la letra:</strong> '
+        . $h($money($totalAbono)) . '</p>';
+}
 
 $content = '
     <h2>¡Felicitaciones! ¡Su solicitud ha sido ' . $h($estadoTitulo) . '!</h2>
@@ -47,12 +64,9 @@ $content = '
 
     <h3>Detalles de su aprobación</h3>
     <div class="info-box">
-        <p><strong>Vehículo (Marca – Modelo – Año):</strong> ' . $h($vehiculo) . '</p>
+        <p><strong>Vehículo:</strong> ' . $h($vehiculo) . '</p>
         <p><strong>Precio del auto:</strong> ' . $h($money($precioVenta)) . '</p>
-        <p><strong>Abono inicial:</strong> ' . $h($money($abonoInicial))
-            . ' + <strong>Bono Banco:</strong> ' . $h($money($bonoBanco))
-            . ' = <strong>Total de abono contemplado para el cálculo de la letra:</strong> '
-            . $h($money($totalAbono)) . '</p>
+        ' . $abonoHtml . '
         <p><strong>Plazo:</strong> '
             . ($plazo !== null && $plazo !== '' ? $h($plazo) . ' meses' : '—') . '</p>
         <p><strong>Cuota mensual:</strong> ' . $h($money($cuotaMensual)) . '</p>
@@ -79,8 +93,11 @@ $content = '
     <p><strong>¡Gracias por elegirnos y felicitaciones por este gran paso!</strong></p>
 
     <p>Saludos cordiales,<br>Equipo AutoMarket Seminuevos</p>
+
+    <p style="margin-top:24px;padding:12px 14px;background:#fff3cd;border:1px solid #ffecb5;border-radius:6px;color:#664d03;font-weight:700;text-align:center;">
+        No responder a este correo.
+    </p>
 ';
 
 include __DIR__ . '/base.php';
 ?>
-

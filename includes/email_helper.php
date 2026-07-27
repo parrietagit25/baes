@@ -414,9 +414,10 @@ function notificarClienteAprobacion($solicitudId, $evaluacionId = null) {
         $cuantia = isset($solicitud['cuantia_banco']) && $solicitud['cuantia_banco'] !== ''
             ? (float) $solicitud['cuantia_banco']
             : 0.0;
-        $esBonoParaAbono = stripos($promocion, 'cash back') !== false
-            || stripos($promocion, 'abono') !== false;
-        $solicitud['bono_banco_abono'] = ($esBonoParaAbono && $cuantia > 0) ? $cuantia : 0.0;
+        // Solo "Cash Back para abono" muestra monto de cuantía en el correo al cliente.
+        $esCashBackAbono = strcasecmp($promocion, 'Cash Back para abono') === 0;
+        $solicitud['mostrar_cashback_abono'] = $esCashBackAbono && $cuantia > 0;
+        $solicitud['bono_banco_abono'] = !empty($solicitud['mostrar_cashback_abono']) ? $cuantia : 0.0;
         $abonoInicial = isset($solicitud['abono_inicial_banco']) && $solicitud['abono_inicial_banco'] !== ''
             ? (float) $solicitud['abono_inicial_banco']
             : 0.0;
