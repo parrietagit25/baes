@@ -30,6 +30,8 @@ if (!isset($_SESSION['user_id'])) {
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../includes/historial_helper.php';
 require_once __DIR__ . '/../includes/OcrHelper.php';
+require_once __DIR__ . '/../includes/banco_scope_helper.php';
+require_once __DIR__ . '/../includes/email_helper.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 
@@ -265,6 +267,7 @@ function subirAdjunto() {
         $archivosSubidos = 0;
         $archivosFallidos = 0;
         $errores = [];
+        $nombresSubidosOk = [];
         
         // Detectar si es un array de archivos o un solo archivo
         $esArray = is_array($archivos['name']);
@@ -396,6 +399,7 @@ function subirAdjunto() {
                 registrarHistorialSolicitud($pdo, $solicitudId, $_SESSION['user_id'], 'documento_agregado', $descHistorial, null, null);
                 
                 $archivosSubidos++;
+                $nombresSubidosOk[] = $nombreOriginal;
             } else {
                 $errores[] = $nombreOriginal . ': Error al guardar el archivo';
                 $archivosFallidos++;
@@ -404,6 +408,19 @@ function subirAdjunto() {
         
         // Preparar respuesta
         if ($archivosSubidos > 0) {
+            // Si sube un usuario banco → notificar gestor (CC F&I + Pipe)
+            $userRoles = $_SESSION['user_roles'] ?? [];
+            if (!is_array($userRoles)) {
+                $userRoles = [];
+            }
+            if (motus_es_vista_banco($userRoles) && !empty($nombresSubidosOk)) {
+                try {
+                    enviarNotificacionAdjuntoBanco((int) $solicitudId, $nombresSubidosOk, (string) $descripcion);
+                } catch (Throwable $e) {
+                    error_log('adjunto banco mail: ' . $e->getMessage());
+                }
+            }
+
             $mensaje = $archivosSubidos . ' archivo(s) subido(s) correctamente';
             if ($archivosFallidos > 0) {
                 $mensaje .= '. ' . $archivosFallidos . ' archivo(s) fallaron';

@@ -657,6 +657,123 @@ function asuntoComentarioMuroMail(array $solicitud): string {
 }
 
 /**
+ * Asunto: adjunto subido por banco.
+ */
+function asuntoAdjuntoBancoMail(array $solicitud): string {
+    $id = (int) ($solicitud['id'] ?? 0);
+    $nombre = nombreClienteParaAsuntoMail($solicitud);
+    if ($nombre !== '') {
+        return 'Adjunto del banco en Solicitud #' . $id . ' — ' . $nombre . ' — MOTUS';
+    }
+    return 'Adjunto del banco en Solicitud #' . $id . ' — MOTUS';
+}
+
+/**
+ * Notifica al gestor (CC F&I + Pipe) cuando un usuario banco sube adjunto(s).
+ *
+ * @param array<int, string> $nombresArchivos
+ */
+function enviarNotificacionAdjuntoBanco(int $solicitudId, array $nombresArchivos, string $descripcion = ''): array {
+    global $pdo;
+
+    try {
+        $nombresArchivos = array_values(array_filter(array_map(static function ($n) {
+            return trim((string) $n);
+        }, $nombresArchivos)));
+        if ($solicitudId <= 0 || empty($nombresArchivos)) {
+            return ['success' => false, 'message' => 'Datos insuficientes'];
+        }
+
+        $stmt = $pdo->prepare("
+            SELECT s.*,
+                   ug.email AS gestor_email,
+                   ug.nombre AS gestor_nombre,
+                   ug.apellido AS gestor_apellido
+            FROM solicitudes_credito s
+            LEFT JOIN usuarios ug ON s.gestor_id = ug.id
+            WHERE s.id = ?
+            LIMIT 1
+        ");
+        $stmt->execute([$solicitudId]);
+        $solicitud = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$solicitud) {
+            return ['success' => false, 'message' => 'Solicitud no encontrada'];
+        }
+
+        $to = trim((string) ($solicitud['gestor_email'] ?? ''));
+        $toName = trim(($solicitud['gestor_nombre'] ?? '') . ' ' . ($solicitud['gestor_apellido'] ?? ''));
+        if ($to === '' || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
+            return ['success' => false, 'message' => 'Gestor sin email válido'];
+        }
+
+        $autorId = (int) ($_SESSION['user_id'] ?? 0);
+        $autorNombre = trim((string) ($_SESSION['user_name'] ?? ''));
+        if ($autorNombre === '' && $autorId > 0) {
+            $stA = $pdo->prepare('SELECT nombre, apellido FROM usuarios WHERE id = ? LIMIT 1');
+            $stA->execute([$autorId]);
+            $rowA = $stA->fetch(PDO::FETCH_ASSOC) ?: [];
+            $autorNombre = trim(($rowA['nombre'] ?? '') . ' ' . ($rowA['apellido'] ?? ''));
+        }
+        if ($autorNombre === '') {
+            $autorNombre = 'Usuario banco';
+        }
+
+        $listaArchivos = '';
+        foreach ($nombresArchivos as $nombre) {
+            $listaArchivos .= '<li>' . htmlspecialchars($nombre, ENT_QUOTES, 'UTF-8') . '</li>';
+        }
+
+        $cliente = htmlspecialchars((string) ($solicitud['nombre_cliente'] ?? ''), ENT_QUOTES, 'UTF-8');
+        $autorSafe = htmlspecialchars($autorNombre, ENT_QUOTES, 'UTF-8');
+        $descSafe = trim($descripcion) !== ''
+            ? '<p><strong>Descripción:</strong> ' . htmlspecialchars(trim($descripcion), ENT_QUOTES, 'UTF-8') . '</p>'
+            : '';
+
+        $html = '
+        <div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.5;">
+            <p>El <strong>banco</strong> subió adjunto(s) a una solicitud en MOTUS.</p>
+            <p>
+                <strong>Solicitud:</strong> #' . (int) $solicitudId . '<br>
+                <strong>Cliente:</strong> ' . $cliente . '<br>
+                <strong>Subido por:</strong> ' . $autorSafe . '
+            </p>
+            ' . $descSafe . '
+            <p><strong>Archivo(s):</strong></p>
+            <ul>' . $listaArchivos . '</ul>
+            <p style="color:#666;font-size:12px;">Revise la solicitud en MOTUS para ver o descargar los documentos.</p>
+        </div>';
+
+        $replyTo = '';
+        if ($autorId > 0) {
+            $stR = $pdo->prepare('SELECT email FROM usuarios WHERE id = ? LIMIT 1');
+            $stR->execute([$autorId]);
+            $replyCand = trim((string) ($stR->fetchColumn() ?: ''));
+            if ($replyCand !== '' && filter_var($replyCand, FILTER_VALIDATE_EMAIL)) {
+                $replyTo = $replyCand;
+            }
+        }
+
+        // Destinatario: gestor. CC F&I + Pipedrive vía EmailService.
+        $emailService = (new EmailService())->paraSolicitud($solicitudId);
+        return $emailService->enviarCorreo(
+            $to,
+            asuntoAdjuntoBancoMail($solicitud),
+            $html,
+            $toName !== '' ? $toName : 'Gestor',
+            strip_tags(str_replace(['<br>', '<br/>', '<br />'], "\n", $html)),
+            [],
+            [],
+            [],
+            $replyTo,
+            $solicitudId
+        );
+    } catch (Throwable $e) {
+        error_log('enviarNotificacionAdjuntoBanco: ' . $e->getMessage());
+        return ['success' => false, 'message' => 'Error al enviar correo de adjunto'];
+    }
+}
+
+/**
  * Notifica por correo un comentario del muro.
  * - Banco → gestor (CC: F&I + Pipedrive vía EmailService)
  * - Gestor/Admin → usuario banco de la pestaña (CC: F&I + Pipedrive)
