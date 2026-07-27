@@ -273,9 +273,9 @@ window.cargarEnviosCorredor = function(solicitudId) {
     }
     $box.html('<div class="text-center text-muted"><i class="fas fa-spinner fa-spin me-2"></i>Cargando historial...</div>');
     $.ajax({
-        url: (window.location.origin || '') + '/api/enviar_resumen_corredor.php',
+        url: (window.location.origin || '') + '/api/adjuntos.php',
         type: 'GET',
-        data: { solicitud_id: solicitudId },
+        data: { action: 'corredor_listar', solicitud_id: solicitudId },
         dataType: 'json',
         success: function(response) {
             if (!response.success) {
@@ -301,7 +301,7 @@ window.cargarEnviosCorredor = function(solicitudId) {
                     + '<td>' + escHtmlCorredor(r.nombre_original) + '</td>'
                     + '<td>' + escHtmlCorredor(r.comentario_interno || '—') + '</td>'
                     + '<td>' + badge + '</td>'
-                    + '<td><a class="btn btn-sm btn-outline-primary" href="api/enviar_resumen_corredor.php?id=' + encodeURIComponent(r.id) + '&action=descargar" title="Descargar"><i class="fas fa-download"></i></a></td>'
+                    + '<td><a class="btn btn-sm btn-outline-primary" href="api/adjuntos.php?id=' + encodeURIComponent(r.id) + '&action=corredor_descargar" title="Descargar"><i class="fas fa-download"></i></a></td>'
                     + '</tr>';
             });
             html += '</tbody></table></div>';
@@ -345,6 +345,7 @@ window.enviarResumenCorredor = function() {
     }
 
     const fd = new FormData();
+    fd.append('action', 'corredor_enviar');
     fd.append('solicitud_id', solicitudId);
     fd.append('email_corredor', email);
     fd.append('comentario_interno', $('#corredor_comentario_interno').val() || '');
@@ -356,7 +357,7 @@ window.enviarResumenCorredor = function() {
     $btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Enviando...');
 
     $.ajax({
-        url: (window.location.origin || '') + '/api/enviar_resumen_corredor.php',
+        url: (window.location.origin || '') + '/api/adjuntos.php',
         type: 'POST',
         data: fd,
         processData: false,

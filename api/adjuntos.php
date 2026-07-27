@@ -6,7 +6,10 @@
 session_start();
 
 // Para descarga de archivo no enviar JSON ni otra salida antes de los headers del archivo
-$esDescarga = ($_SERVER['REQUEST_METHOD'] ?? '') === 'GET' && isset($_GET['id']) && isset($_GET['action']) && $_GET['action'] === 'descargar';
+$actionGet = $_GET['action'] ?? '';
+$esDescarga = ($_SERVER['REQUEST_METHOD'] ?? '') === 'GET'
+    && isset($_GET['id'])
+    && in_array($actionGet, ['descargar', 'corredor_descargar'], true);
 if ($esDescarga) {
     ob_start();
 } else {
@@ -32,10 +35,23 @@ $method = $_SERVER['REQUEST_METHOD'];
 
 switch ($method) {
     case 'GET':
+        // Corredor: listar / descargar (mismo endpoint que adjuntos para evitar bloqueo WAF)
+        if ($actionGet === 'corredor_listar' && isset($_GET['solicitud_id'])) {
+            require_once __DIR__ . '/../includes/corredor_api.php';
+            asegurarTablaCorredorEnvios($pdo);
+            listarEnviosCorredor($pdo, (int) $_GET['solicitud_id']);
+            break;
+        }
+        if ($actionGet === 'corredor_descargar' && isset($_GET['id'])) {
+            require_once __DIR__ . '/../includes/corredor_api.php';
+            asegurarTablaCorredorEnvios($pdo);
+            descargarEnvioCorredor($pdo, (int) $_GET['id']);
+            break;
+        }
         if (isset($_GET['solicitud_id'])) {
             obtenerAdjuntos($_GET['solicitud_id']);
         } elseif (isset($_GET['id'])) {
-            if (isset($_GET['action']) && $_GET['action'] === 'descargar') {
+            if ($actionGet === 'descargar') {
                 descargarAdjunto($_GET['id']);
             } else {
                 obtenerAdjunto($_GET['id']);
@@ -46,6 +62,20 @@ switch ($method) {
         break;
         
     case 'POST':
+        // Corredor: envío con Resend (multipart por adjuntos.php — Cloudflare bloquea el endpoint dedicado)
+        if (($_POST['action'] ?? '') === 'corredor_enviar') {
+            require_once __DIR__ . '/../includes/email_helper.php';
+            require_once __DIR__ . '/../includes/corredor_api.php';
+            asegurarTablaCorredorEnvios($pdo);
+            try {
+                enviarResumenCorredorApi($pdo);
+            } catch (Throwable $e) {
+                error_log('corredor_enviar: ' . $e->getMessage());
+                http_response_code(500);
+                echo json_encode(['success' => false, 'message' => 'Error interno al procesar Corredor']);
+            }
+            break;
+        }
         subirAdjunto();
         break;
         
