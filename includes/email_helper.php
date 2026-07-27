@@ -604,6 +604,123 @@ function notificarReevaluacion($solicitudId, $evaluacionId, $comentario) {
 }
 
 /**
+ * Notifica al usuario banco dueño de la evaluación cuando gestor/admin selecciona su propuesta.
+ * Para: usuario banco. CC: F&I + Pipedrive (EmailService).
+ */
+function notificarPropuestaSeleccionada($solicitudId, $evaluacionId, $comentario) {
+    global $pdo;
+
+    try {
+        $stmt = $pdo->prepare("
+            SELECT
+                s.id AS solicitud_id,
+                s.nombre_cliente,
+                s.cedula,
+                s.telefono,
+                s.email,
+                s.perfil_financiero,
+                s.estado AS solicitud_estado,
+                s.email_pipedrive,
+                e.id AS evaluacion_id,
+                e.decision,
+                e.razon,
+                e.tasa_bancaria,
+                e.valor_financiar,
+                e.abono,
+                e.plazo,
+                e.letra,
+                e.letra_quincenal,
+                e.promocion,
+                e.cuantia,
+                e.comentarios AS comentarios_decision,
+                e.fecha_evaluacion,
+                e.usuario_banco_id AS asignacion_ubs_id,
+                u.email AS banco_email,
+                u.nombre AS banco_nombre,
+                u.apellido AS banco_apellido,
+                ug.nombre AS gestor_asig_nombre,
+                ug.apellido AS gestor_asig_apellido,
+                v.marca AS vehiculo_marca,
+                v.modelo AS vehiculo_modelo,
+                v.anio AS vehiculo_anio,
+                v.unidad AS vehiculo_unidad
+            FROM evaluaciones_banco e
+            INNER JOIN solicitudes_credito s ON e.solicitud_id = s.id
+            INNER JOIN usuarios_banco_solicitudes ubs ON e.usuario_banco_id = ubs.id
+            INNER JOIN usuarios u ON ubs.usuario_banco_id = u.id
+            LEFT JOIN usuarios ug ON s.gestor_id = ug.id
+            LEFT JOIN vehiculos_solicitud v ON e.vehiculo_id = v.id
+            WHERE e.id = ? AND s.id = ?
+            LIMIT 1
+        ");
+        $stmt->execute([(int) $evaluacionId, (int) $solicitudId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$row || empty($row['banco_email'])) {
+            return ['success' => false, 'message' => 'Usuario banco no encontrado o sin email'];
+        }
+
+        $gestorNombre = trim((string) ($_SESSION['user_name'] ?? ''));
+        if ($gestorNombre === '') {
+            $gestorNombre = trim(($row['gestor_asig_nombre'] ?? '') . ' ' . ($row['gestor_asig_apellido'] ?? ''));
+        }
+        if ($gestorNombre === '') {
+            $gestorNombre = 'Gestor';
+        }
+
+        $solicitud = [
+            'id' => (int) $row['solicitud_id'],
+            'nombre_cliente' => $row['nombre_cliente'] ?? '',
+            'cedula' => $row['cedula'] ?? '',
+            'telefono' => $row['telefono'] ?? '',
+            'email' => $row['email'] ?? '',
+            'perfil_financiero' => $row['perfil_financiero'] ?? '',
+            'estado' => $row['solicitud_estado'] ?? '',
+            'email_pipedrive' => $row['email_pipedrive'] ?? null,
+        ];
+
+        $evaluacion = [
+            'id' => (int) $row['evaluacion_id'],
+            'decision' => $row['decision'] ?? '',
+            'razon' => $row['razon'] ?? '',
+            'tasa_bancaria' => $row['tasa_bancaria'] ?? null,
+            'valor_financiar' => $row['valor_financiar'] ?? null,
+            'abono' => $row['abono'] ?? null,
+            'plazo' => $row['plazo'] ?? null,
+            'letra' => $row['letra'] ?? null,
+            'letra_quincenal' => $row['letra_quincenal'] ?? null,
+            'promocion' => $row['promocion'] ?? '',
+            'cuantia' => $row['cuantia'] ?? null,
+            'comentarios' => $row['comentarios_decision'] ?? '',
+            'fecha_evaluacion' => $row['fecha_evaluacion'] ?? null,
+            'vehiculo_marca' => $row['vehiculo_marca'] ?? '',
+            'vehiculo_modelo' => $row['vehiculo_modelo'] ?? '',
+            'vehiculo_anio' => $row['vehiculo_anio'] ?? '',
+            'vehiculo_unidad' => $row['vehiculo_unidad'] ?? '',
+        ];
+
+        $emailService = (new EmailService())->paraSolicitud((int) $solicitudId);
+        $bancoNombre = trim(($row['banco_nombre'] ?? '') . ' ' . ($row['banco_apellido'] ?? ''));
+
+        $resultado = $emailService->notificarPropuestaSeleccionada(
+            $row['banco_email'],
+            $bancoNombre ?: 'Usuario Banco',
+            $solicitud,
+            $comentario,
+            $gestorNombre,
+            $evaluacion
+        );
+        if (!empty($resultado['success']) && !empty($row['asignacion_ubs_id'])) {
+            incrementarCorreosEnviadosPorAsignacion($pdo, (int) $row['asignacion_ubs_id']);
+        }
+        return $resultado;
+    } catch (Exception $e) {
+        error_log('Error al notificar propuesta seleccionada: ' . $e->getMessage());
+        return ['success' => false, 'message' => 'Error al enviar correo'];
+    }
+}
+
+/**
  * Nombre de cliente limpio para asuntos de correo.
  */
 function nombreClienteParaAsuntoMail(array $solicitud, int $max = 80): string {

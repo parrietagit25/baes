@@ -587,10 +587,26 @@ function seleccionarPropuesta() {
               WHERE id = ?
           ");
           $stmt->execute([$evaluacionId, $comentario, $solicitudId]);
+
+        // Notificar al usuario banco dueño de la propuesta (CC: F&I + Pipe)
+        $mensajeEmail = '';
+        try {
+            require_once __DIR__ . '/../includes/email_helper.php';
+            $resultadoEmail = notificarPropuestaSeleccionada((int) $solicitudId, (int) $evaluacionId, (string) $comentario);
+            if (!empty($resultadoEmail['success'])) {
+                $mensajeEmail = ' Se notificó por correo al usuario banco.';
+            } else {
+                error_log('No se pudo enviar correo de propuesta seleccionada: ' . ($resultadoEmail['message'] ?? ''));
+                $mensajeEmail = ' (No se pudo enviar el correo al banco: ' . ($resultadoEmail['message'] ?? 'error') . ')';
+            }
+        } catch (Throwable $e) {
+            error_log('No se pudo cargar email_helper (propuesta seleccionada): ' . $e->getMessage());
+            $mensajeEmail = ' (Correo no enviado: servicio de email no disponible)';
+        }
         
         echo json_encode([
             'success' => true,
-            'message' => 'Propuesta seleccionada correctamente. Los demás bancos ya no podrán interactuar con esta solicitud.'
+            'message' => 'Propuesta seleccionada correctamente. Los demás bancos ya no podrán interactuar con esta solicitud.' . $mensajeEmail
         ]);
         
     } catch (PDOException $e) {

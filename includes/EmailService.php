@@ -418,4 +418,29 @@ class EmailService {
             ]
         );
     }
+
+    public function notificarPropuestaSeleccionada($bancoEmail, $bancoNombre, $solicitud, $comentario, $gestorNombre = '', array $evaluacion = []) {
+        $sid = (int) ($solicitud['id'] ?? 0);
+        $cliente = trim((string) ($solicitud['nombre_cliente'] ?? ''));
+        $subject = 'Propuesta seleccionada — Solicitud #' . $sid;
+        if ($cliente !== '') {
+            $subject .= ' — ' . $cliente;
+        }
+        $subject .= ' — MOTUS';
+
+        return $this->enviarTemplate(
+            $bancoEmail,
+            $bancoNombre,
+            'notificacion_propuesta_seleccionada',
+            [
+                'subject' => $subject,
+                'banco_nombre' => $bancoNombre,
+                'gestor_nombre' => $gestorNombre,
+                'solicitud' => $solicitud,
+                'evaluacion' => $evaluacion,
+                'comentario' => $comentario,
+                'app_url' => $this->config['app_url'],
+            ]
+        );
+    }
 }
