@@ -273,7 +273,7 @@ window.cargarEnviosCorredor = function(solicitudId) {
     }
     $box.html('<div class="text-center text-muted"><i class="fas fa-spinner fa-spin me-2"></i>Cargando historial...</div>');
     $.ajax({
-        url: 'api/enviar_resumen_corredor.php',
+        url: (window.location.origin || '') + '/api/enviar_resumen_corredor.php',
         type: 'GET',
         data: { solicitud_id: solicitudId },
         dataType: 'json',
@@ -307,8 +307,16 @@ window.cargarEnviosCorredor = function(solicitudId) {
             html += '</tbody></table></div>';
             $box.html(html);
         },
-        error: function() {
-            $box.html('<div class="text-danger">Error de conexión al cargar historial</div>');
+        error: function(xhr) {
+            let msg = 'Error de conexión al cargar historial';
+            try {
+                const j = JSON.parse(xhr.responseText || '{}');
+                if (j.message) msg = j.message;
+            } catch (e) {}
+            if (xhr && xhr.status) {
+                msg += ' (HTTP ' + xhr.status + ')';
+            }
+            $box.html('<div class="text-danger">' + escHtmlCorredor(msg) + '</div>');
         }
     });
 };
@@ -348,7 +356,7 @@ window.enviarResumenCorredor = function() {
     $btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Enviando...');
 
     $.ajax({
-        url: 'api/enviar_resumen_corredor.php',
+        url: (window.location.origin || '') + '/api/enviar_resumen_corredor.php',
         type: 'POST',
         data: fd,
         processData: false,
@@ -370,6 +378,9 @@ window.enviarResumenCorredor = function() {
                 const j = JSON.parse(xhr.responseText || '{}');
                 if (j.message) msg = j.message;
             } catch (e) {}
+            if (xhr && xhr.status) {
+                msg += ' (HTTP ' + xhr.status + ')';
+            }
             mostrarAlerta(msg, 'danger');
         },
         complete: function() {

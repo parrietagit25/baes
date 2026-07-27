@@ -850,7 +850,7 @@ function prefillFormularioDesdeFinanciamiento(d) {
 }
 
 // Función para abrir modal de adjuntos
-function abrirModalAdjuntos() {
+window.abrirModalAdjuntos = function abrirModalAdjuntos() {
     const solicitudId = $('#solicitud_id').val();
     
     if (!solicitudId) {
@@ -873,10 +873,10 @@ function abrirModalAdjuntos() {
     
     // Mostrar modal
     $('#adjuntosModal').modal('show');
-}
+};
 
 // Función para abrir modal de adjuntos desde la tabla
-function abrirModalAdjuntosDesdeTabla(solicitudId) {
+window.abrirModalAdjuntosDesdeTabla = function abrirModalAdjuntosDesdeTabla(solicitudId) {
     // Configurar el ID de solicitud para adjuntos
     $('#adjunto_solicitud_id').val(solicitudId);
     $('#corredor_solicitud_id').val(solicitudId);
@@ -892,7 +892,7 @@ function abrirModalAdjuntosDesdeTabla(solicitudId) {
     
     // Mostrar modal
     $('#adjuntosModal').modal('show');
-}
+};
 
 // Función para cargar información de la solicitud en el modal de adjuntos
 function cargarInfoSolicitudAdjuntos(solicitudId) {

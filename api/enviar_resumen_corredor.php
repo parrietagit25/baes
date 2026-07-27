@@ -30,12 +30,11 @@ require_once __DIR__ . '/../includes/email_helper.php';
 require_once __DIR__ . '/../includes/historial_helper.php';
 
 $userRoles = $_SESSION['user_roles'] ?? [];
-$puedeCorredor = in_array('ROLE_ADMIN', $userRoles, true) || in_array('ROLE_GESTOR', $userRoles, true);
-if (!$puedeCorredor) {
-    http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Solo admin o gestor pueden usar Corredor']);
-    exit;
+if (!is_array($userRoles)) {
+    $userRoles = [];
 }
+// Misma política que envío de resumen a banco: usuario autenticado con acceso a Motus.
+// La pestaña Corredor se oculta en UI para roles solo-banco.
 
 asegurarTablaCorredorEnvios($pdo);
 

@@ -1373,11 +1373,13 @@ if ($isBanco && !$isAdmin) {
                                 <i class="fas fa-upload me-2"></i>Subir Adjunto
                             </button>
                         </li>
+                        <?php if ($isAdmin || $isGestor): ?>
                         <li class="nav-item" role="presentation">
                             <button class="nav-link" id="tab-corredor" data-bs-toggle="tab" data-bs-target="#pane-corredor" type="button" role="tab">
                                 <i class="fas fa-user-tie me-2"></i>Corredor
                             </button>
                         </li>
+                        <?php endif; ?>
                     </ul>
 
                     <div class="tab-content" id="adjuntosTabsContent">
@@ -1441,6 +1443,7 @@ if ($isBanco && !$isAdmin) {
                             </div>
                         </div>
 
+                        <?php if ($isAdmin || $isGestor): ?>
                         <div class="tab-pane fade" id="pane-corredor" role="tabpanel">
                             <div class="card mb-4">
                                 <div class="card-header bg-warning-subtle">
@@ -1490,6 +1493,7 @@ if ($isBanco && !$isAdmin) {
                                 </div>
                             </div>
                         </div>
+                        <?php endif; ?>
                     </div>
                 </div>
                 <div class="modal-footer">
