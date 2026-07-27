@@ -11,6 +11,7 @@ if (!isset($_SESSION['user_id'])) {
 
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../includes/banco_scope_helper.php';
+require_once __DIR__ . '/../includes/email_helper.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 
@@ -205,29 +206,48 @@ function crearNota() {
             return;
         }
         
-        // Crear nota
+        // Crear comentario (tipo fijo; sin título)
         $stmt = $pdo->prepare("
             INSERT INTO notas_solicitud (solicitud_id, vehiculo_id, usuario_id, usuario_banco_id, tipo_nota, titulo, contenido)
             VALUES (?, ?, ?, ?, ?, ?, ?)
         ");
-        
+
+        $ubsId = isset($_POST['usuario_banco_id']) && $_POST['usuario_banco_id'] !== ''
+            ? (int) $_POST['usuario_banco_id']
+            : null;
+        $contenido = trim((string) $_POST['contenido']);
+
         $stmt->execute([
             $solicitudId,
             $_POST['vehiculo_id'] ?? null,
             $_SESSION['user_id'],
-            $_POST['usuario_banco_id'] ?? null,
-            $_POST['tipo_nota'] ?? 'Comentario',
-            $_POST['titulo'] ?? '',
-            $_POST['contenido']
+            $ubsId,
+            'Comentario',
+            '',
+            $contenido
         ]);
-        
+
         $notaId = $pdo->lastInsertId();
-        
-        echo json_encode(['success' => true, 'message' => 'Nota creada correctamente', 'id' => $notaId]);
+
+        // Notificar por correo (banco→gestor; gestor/admin→banco). F&I + Pipe en CC vía EmailService.
+        $mailResult = null;
+        try {
+            $mailResult = enviarNotificacionComentarioMuro((int) $solicitudId, $contenido, $ubsId);
+        } catch (Throwable $e) {
+            error_log('notas crearNota mail: ' . $e->getMessage());
+        }
+
+        echo json_encode([
+            'success' => true,
+            'message' => 'Comentario creado correctamente',
+            'id' => $notaId,
+            'email_enviado' => !empty($mailResult['success']),
+            'email_message' => $mailResult['message'] ?? null,
+        ]);
         
     } catch (PDOException $e) {
         http_response_code(500);
-        echo json_encode(['success' => false, 'message' => 'Error al crear nota: ' . $e->getMessage()]);
+        echo json_encode(['success' => false, 'message' => 'Error al crear comentario: ' . $e->getMessage()]);
     }
 }
 

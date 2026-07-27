@@ -1611,14 +1611,14 @@ function cargarNotasPrimerTab() {
     }, 300);
 }
 
-// Acordeón colapsado: Agregar Nota (+ abre formulario + notas existentes)
+// Acordeón colapsado: Agregar Comentario (+ abre formulario + comentarios existentes)
 function generarSeccionNotasAcordeon(solicitudId, usuarioBancoId, vehiculoId) {
     const uid = `notas_acc_${solicitudId}_${vehiculoId || 'general'}_${usuarioBancoId || 'general'}`;
     const collapseId = `collapse_${uid}`;
     return `
         <div class="card mb-4 accordion-notas-muro">
             <div class="card-header d-flex justify-content-between align-items-center py-2">
-                <h6 class="mb-0"><i class="fas fa-sticky-note me-2"></i>Agregar Nota</h6>
+                <h6 class="mb-0"><i class="fas fa-comment me-2"></i>Agregar Comentario</h6>
                 <button type="button"
                     class="btn btn-sm btn-outline-primary btn-toggle-notas-muro"
                     data-bs-toggle="collapse"
@@ -1633,7 +1633,7 @@ function generarSeccionNotasAcordeon(solicitudId, usuarioBancoId, vehiculoId) {
                 <div class="card-body">
                     ${generarFormularioNota(solicitudId, usuarioBancoId, vehiculoId)}
                     <hr class="my-3">
-                    <h6 class="mb-3"><i class="fas fa-comments me-2"></i>Notas / contenido</h6>
+                    <h6 class="mb-3"><i class="fas fa-comments me-2"></i>Comentarios</h6>
                     ${generarListaNotas(solicitudId, vehiculoId, usuarioBancoId)}
                 </div>
             </div>
@@ -1641,37 +1641,18 @@ function generarSeccionNotasAcordeon(solicitudId, usuarioBancoId, vehiculoId) {
     `;
 }
 
-// Función para generar formulario de notas (contenido interno del acordeón)
+// Función para generar formulario de comentarios (contenido interno del acordeón)
 function generarFormularioNota(solicitudId, usuarioBancoId, vehiculoId) {
     return `
                 <form class="formNotaMuro" data-solicitud="${solicitudId}" data-usuario-banco="${usuarioBancoId || ''}" data-vehiculo="${vehiculoId || ''}">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label">Tipo de Nota</label>
-                                <select class="form-select" name="tipo_nota" required>
-                                    <option value="Comentario">Comentario</option>
-                                    <option value="Actualización">Actualización</option>
-                                    <option value="Documento">Documento</option>
-                                    <option value="Respuesta Banco">Respuesta Banco</option>
-                                    <option value="Respuesta Cliente">Respuesta Cliente</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label">Título</label>
-                                <input type="text" class="form-control" name="titulo" placeholder="Título de la nota">
-                            </div>
-                        </div>
-                    </div>
+                    <input type="hidden" name="tipo_nota" value="Comentario">
                     <div class="mb-3">
-                        <label class="form-label">Contenido *</label>
-                        <textarea class="form-control" name="contenido" rows="3" required placeholder="Escriba su nota aquí..."></textarea>
+                        <label class="form-label">Comentario *</label>
+                        <textarea class="form-control" name="contenido" rows="3" required placeholder="Escriba su comentario aquí..."></textarea>
                     </div>
                     <div class="d-flex justify-content-end">
                         <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-paper-plane me-2"></i>Enviar Nota
+                            <i class="fas fa-paper-plane me-2"></i>Enviar Comentario
                         </button>
                     </div>
                 </form>
@@ -1684,7 +1665,7 @@ function generarListaNotas(solicitudId, vehiculoId, usuarioBancoId) {
     return `
         <div id="${containerId}" class="notas-container">
             <div class="text-center">
-                <i class="fas fa-spinner fa-spin me-2"></i>Cargando notas...
+                <i class="fas fa-spinner fa-spin me-2"></i>Cargando comentarios...
             </div>
         </div>
     `;
@@ -1788,52 +1769,39 @@ function cargarNotasMuro(solicitudId, vehiculoId, usuarioBancoId, containerId) {
     });
 }
 
-// Función para mostrar notas en el muro
+// Función para mostrar comentarios en el muro
 function mostrarNotasMuro(notas, container) {
     if (!container) {
         container = $('#muroNotasContainer');
     }
     
     if (notas.length === 0) {
-        container.html('<div class="alert alert-info text-center">No hay notas para esta sección</div>');
+        container.html('<div class="alert alert-info text-center">No hay comentarios para esta sección</div>');
         return;
     }
     
     let html = '';
     notas.forEach(function(nota) {
-        const tipoClass = getTipoNotaClass(nota.tipo_nota);
-        const fecha = new Date(nota.fecha_creacion).toLocaleString('es-ES');
+        const fecha = new Date(nota.fecha_creacion).toLocaleString('es-PA');
+        const contenidoHtml = muroEsc(nota.contenido || '').replace(/\n/g, '<br>');
         
         html += `
             <div class="card mb-3">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <div>
-                        <strong>${nota.nombre} ${nota.apellido}</strong>
-                        <span class="badge ${tipoClass} ms-2">${nota.tipo_nota}</span>
+                        <strong>${muroEsc(nota.nombre || '')} ${muroEsc(nota.apellido || '')}</strong>
+                        <span class="badge bg-primary ms-2">Comentario</span>
                     </div>
-                    <small class="text-muted">${fecha}</small>
+                    <small class="text-muted">${muroEsc(fecha)}</small>
                 </div>
                 <div class="card-body">
-                    ${nota.titulo ? `<h6 class="card-title">${nota.titulo}</h6>` : ''}
-                    <p class="card-text">${nota.contenido}</p>
+                    <p class="card-text mb-0">${contenidoHtml}</p>
                 </div>
             </div>
         `;
     });
     
     container.html(html);
-}
-
-// Función para obtener clase CSS del tipo de nota
-function getTipoNotaClass(tipo) {
-    const clases = {
-        'Comentario': 'bg-primary',
-        'Actualización': 'bg-info',
-        'Documento': 'bg-success',
-        'Respuesta Banco': 'bg-warning',
-        'Respuesta Cliente': 'bg-danger'
-    };
-    return clases[tipo] || 'bg-secondary';
 }
 
 // Función para enviar nota desde formulario dinámico del muro
@@ -1863,7 +1831,7 @@ function enviarNotaMuro($form) {
         dataType: 'json',
         success: function(response) {
             if (response.success) {
-                mostrarAlerta('Nota enviada correctamente', 'success');
+                mostrarAlerta('Comentario enviado correctamente', 'success');
                 $form[0].reset();
                 
                 // Recargar notas del contenedor correspondiente
@@ -1876,11 +1844,11 @@ function enviarNotaMuro($form) {
                     cargarNotasMuro(solId, vehId, usrBancoId, containerId);
                 }
             } else {
-                mostrarAlerta('Error al enviar nota: ' + response.message, 'danger');
+                mostrarAlerta('Error al enviar comentario: ' + response.message, 'danger');
             }
         },
         error: function() {
-            mostrarAlerta('Error de conexión al enviar nota', 'danger');
+            mostrarAlerta('Error de conexión al enviar comentario', 'danger');
         }
     });
 }
