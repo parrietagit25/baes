@@ -371,7 +371,9 @@ if ($isBanco && !$isAdmin) {
                                             <th>Respuestas del Banco</th>
                                             <?php endif; ?>
                                             <?php endif; ?>
+                                            <?php if (!$esUsuarioBancoLista): ?>
                                             <th>Estado</th>
+                                            <?php endif; ?>
                                             <!-- <th>Respuesta Banco</th> -->
                                             <th>Fecha</th>
                                             <th>Acciones</th>
@@ -556,7 +558,9 @@ if ($isBanco && !$isAdmin) {
                                                 </button>
                                             </td>
                                             <?php endif; ?>
+                                              <?php if (!$esUsuarioBancoLista): ?>
                                               <td><span class="badge badge-estado <?php echo $estadoClass; ?>"><?php echo htmlspecialchars($solicitud['estado'] ?? 'N/A'); ?></span></td>
+                                              <?php endif; ?>
                                               <td><?php echo date('d/m/Y H:i', strtotime($solicitud['fecha_creacion'])); ?></td>
                                               <td>
                                                   <?php
