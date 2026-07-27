@@ -472,6 +472,11 @@ if ($isBanco && !$isAdmin) {
                                                 case 'Evaluacion':
                                                 case 'Comité':
                                                 case 'Reconsideración':
+                                                case 'Pend. Firma':
+                                                case 'Pend. Poliza':
+                                                case 'Pend. Abono':
+                                                case 'Pend. Abono y poliza':
+                                                case 'Pend. CPP':
                                                     $estadoClass = 'estado-revision'; break;
                                                 case 'Pre Aprobado':
                                                 case 'Aprobado con Condición':
@@ -1647,12 +1652,17 @@ if ($isBanco && !$isAdmin) {
                                 <option value="Reconsideración">Reconsideración</option>
                                 <option value="Pre Aprobado">Pre Aprobado</option>
                                 <option value="Aprobado con Condición">Aprobado con Condición</option>
+                                <option value="Pend. Firma">Pend. Firma</option>
+                                <option value="Pend. Poliza">Pend. Poliza</option>
+                                <option value="Pend. Abono">Pend. Abono</option>
+                                <option value="Pend. Abono y poliza">Pend. Abono y poliza</option>
+                                <option value="Pend. CPP">Pend. CPP</option>
                                 <option value="Aprobada">✅ Aprobada</option>
                                 <option value="Rechazada">❌ Rechazada</option>
                                 <option value="Completada">🎉 Completada</option>
                                 <option value="Desistimiento">🚫 Desistimiento</option>
                             </select>
-                            <div class="form-text">«Reevaluación por los Bancos» deja la solicitud activa para evaluación bancaria (mismo efecto que «En Revisión Banco»).</div>
+                            <div class="form-text">Los estados «Pend.» solo marcan seguimiento operativo; no alteran evaluaciones ni el flujo bancario.</div>
                         </div>
                         
                         <!-- Campo de Nota -->

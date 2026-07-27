@@ -1102,6 +1102,11 @@ function cambiarEstadoSolicitud() {
             'Pre Aprobado',
             'Aprobado con Condición',
             'Reevaluación por los Bancos',
+            'Pend. Firma',
+            'Pend. Poliza',
+            'Pend. Abono',
+            'Pend. Abono y poliza',
+            'Pend. CPP',
         ];
         if (!in_array($nuevo_estado, $estados_validos)) {
             echo json_encode(['success' => false, 'message' => 'Estado no válido']);
