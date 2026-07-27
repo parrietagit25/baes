@@ -222,6 +222,63 @@ if ($isBanco && !$isAdmin) {
         #solicitudesTable tbody tr.solicitud-sin-respuesta-2h:hover > td {
             background-color: #f1bfc4 !important;
         }
+
+        /* Respuestas de los Bancos: tabla legible con scroll horizontal */
+        .modal-respuestas-bancos .modal-dialog {
+            max-width: min(98vw, 1900px);
+            width: 98vw;
+            margin: 0.75rem auto;
+        }
+        .modal-respuestas-bancos .modal-body {
+            overflow-x: auto;
+        }
+        .respuestas-banco-wrap {
+            width: 100%;
+            overflow-x: auto;
+        }
+        table.table-respuestas-banco {
+            width: max-content !important;
+            min-width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+        table.table-respuestas-banco thead th {
+            white-space: nowrap;
+            vertical-align: middle !important;
+            padding: 0.75rem 1rem !important;
+            font-size: 0.82rem;
+            font-weight: 600;
+            background: #f1f3f5;
+            border-bottom: 2px solid #dee2e6;
+        }
+        table.table-respuestas-banco tbody td {
+            white-space: nowrap;
+            vertical-align: middle !important;
+            padding: 0.75rem 1rem !important;
+            font-size: 0.875rem;
+            line-height: 1.4;
+            border-color: #e9ecef;
+        }
+        table.table-respuestas-banco td.celda-comentario,
+        table.table-respuestas-banco th.celda-comentario {
+            white-space: normal;
+            min-width: 260px;
+            max-width: 340px;
+        }
+        table.table-respuestas-banco .celda-comentario-inner {
+            white-space: pre-wrap;
+            word-break: break-word;
+            line-height: 1.4;
+            max-height: none;
+            overflow: visible;
+        }
+        table.table-respuestas-banco .celda-resp-val {
+            display: inline-block;
+            line-height: 1.4;
+        }
+        table.table-respuestas-banco .btn-group-vertical .btn {
+            white-space: nowrap;
+        }
         
         /* Estilos para adjuntos */
         .adjunto-item {
@@ -2696,17 +2753,24 @@ if ($isBanco && !$isAdmin) {
                 lengthMenu: [[10, 25, 50, -1], [10, 25, 50, 'Todos']],
                 order: [[0, 'desc']],
                 scrollX: true,
-                autoWidth: false,
+                autoWidth: true,
+                deferRender: true,
                 columnDefs: [
                     { orderable: false, targets: -1 }
                 ]
             });
+            // Recalcular anchos tras render (evita celdas apiñadas)
+            setTimeout(function() {
+                if ($.fn.DataTable.isDataTable(selector)) {
+                    $(selector).DataTable().columns.adjust();
+                }
+            }, 50);
         }
 
         function ajustarDataTableEnModal(modalSelector, tableSelector) {
             $(modalSelector).one('shown.bs.modal', function() {
                 if ($.fn.DataTable && $.fn.DataTable.isDataTable(tableSelector)) {
-                    $(tableSelector).DataTable().columns.adjust();
+                    $(tableSelector).DataTable().columns.adjust().draw(false);
                 }
             });
         }
@@ -2723,10 +2787,20 @@ if ($isBanco && !$isAdmin) {
             partes.push('<strong>Solicitud:</strong> #' + sid);
             return '<div class="alert alert-light border mb-3"><i class="fas fa-user me-2 text-primary"></i>' + partes.join(' &nbsp;&middot;&nbsp; ') + '</div>';
         }
+
+        function celdaRespSimple(texto) {
+            var t = (texto == null || texto === '') ? '-' : String(texto);
+            return '<span class="celda-resp-val">' + escapeHtmlText(t) + '</span>';
+        }
+
         function celdaComentarioGestor(texto) {
             var t = escapeHtmlText(texto || '');
             if (!t) return '<span class="text-muted">—</span>';
-            return '<div class="small text-break" style="max-width:260px;max-height:120px;overflow:auto;white-space:pre-wrap;">' + t + '</div>';
+            return '<div class="celda-comentario-inner">' + t + '</div>';
+        }
+
+        function tdComentario(htmlInner) {
+            return '<td class="celda-comentario">' + htmlInner + '</td>';
         }
 
         function abrirCronologiaSolicitud(solicitudId, nombreCliente) {
@@ -2817,28 +2891,29 @@ if ($isBanco && !$isAdmin) {
                     var comentarioSeleccionGlobal = response.comentario_seleccion_propuesta || '';
                     destruirDataTableRespuestas('#tablaRespuestasBanco');
                     if (response.data.length > 0) {
-                        let html = '<div class="table-responsive"><table id="tablaRespuestasBanco" class="table table-striped table-hover w-100">';
-                        html += '<thead><tr><th>Fecha</th><th>Vehículo</th><th>Decisión</th><th>Razón</th><th>Tasa %</th><th>Valor a Financiar</th><th>Abono</th><th>Plazo</th><th>Letra mensual</th><th>Letra quincenal</th><th>Promoción</th><th>Cuantía</th><th>Comentarios</th><th>Comentario al seleccionar</th><th>Motivo reevaluación</th><th>Selección</th></tr></thead>';
-                        html += '<tbody>';
+                        let html = '<div class="respuestas-banco-wrap"><table id="tablaRespuestasBanco" class="table table-striped table-hover table-bordered table-respuestas-banco">';
+                        html += '<thead><tr>';
+                        html += '<th>Fecha</th><th>Vehículo</th><th>Decisión</th><th class="celda-comentario">Razón</th><th>Tasa %</th><th>Valor a Financiar</th><th>Abono</th><th>Plazo</th><th>Letra mensual</th><th>Letra quincenal</th><th>Promoción</th><th>Cuantía</th><th class="celda-comentario">Comentarios</th><th class="celda-comentario">Comentario al seleccionar</th><th class="celda-comentario">Motivo reevaluación</th><th>Selección</th>';
+                        html += '</tr></thead><tbody>';
                         
                         response.data.forEach(function(evaluacion) {
                             html += '<tr>';
-                            html += '<td data-order="' + escapeHtmlText(evaluacion.fecha_evaluacion || '') + '">' + new Date(evaluacion.fecha_evaluacion).toLocaleString('es-PA') + '</td>';
-                            html += '<td>' + (evaluacion.vehiculo_marca ? `${evaluacion.vehiculo_marca} ${evaluacion.vehiculo_modelo || ''}`.trim() : '-') + '</td>';
-                            html += '<td><span class="badge badge-estado estado-revision">' + evaluacion.decision.toUpperCase().replace('_', ' ') + '</span></td>';
-                            html += '<td>' + celdaComentarioGestor(evaluacion.razon) + '</td>';
-                            html += '<td>' + (evaluacion.tasa_bancaria != null && evaluacion.tasa_bancaria !== '' ? parseFloat(evaluacion.tasa_bancaria).toLocaleString('es-PA', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%' : '-') + '</td>';
-                            html += '<td>' + (evaluacion.valor_financiar ? '$' + parseFloat(evaluacion.valor_financiar).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
-                            html += '<td>' + (evaluacion.abono ? '$' + parseFloat(evaluacion.abono).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
-                            html += '<td>' + (evaluacion.plazo ? evaluacion.plazo + ' meses' : '-') + '</td>';
-                            html += '<td>' + (evaluacion.letra ? '$' + parseFloat(evaluacion.letra).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
-                            html += '<td>' + (evaluacion.letra_quincenal ? '$' + parseFloat(evaluacion.letra_quincenal).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
-                            html += '<td>' + (evaluacion.promocion || '-') + '</td>';
-                            html += '<td>' + (evaluacion.cuantia != null && evaluacion.cuantia !== '' ? '$' + parseFloat(evaluacion.cuantia).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
-                            html += '<td>' + (evaluacion.comentarios || '-') + '</td>';
+                            html += '<td data-order="' + escapeHtmlText(evaluacion.fecha_evaluacion || '') + '">' + celdaRespSimple(new Date(evaluacion.fecha_evaluacion).toLocaleString('es-PA')) + '</td>';
+                            html += '<td>' + celdaRespSimple(evaluacion.vehiculo_marca ? (evaluacion.vehiculo_marca + ' ' + (evaluacion.vehiculo_modelo || '')).trim() : '-') + '</td>';
+                            html += '<td><span class="badge badge-estado estado-revision">' + escapeHtmlText((evaluacion.decision || '').toUpperCase().replace('_', ' ')) + '</span></td>';
+                            html += tdComentario(celdaComentarioGestor(evaluacion.razon));
+                            html += '<td>' + celdaRespSimple(evaluacion.tasa_bancaria != null && evaluacion.tasa_bancaria !== '' ? parseFloat(evaluacion.tasa_bancaria).toLocaleString('es-PA', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%' : '-') + '</td>';
+                            html += '<td>' + celdaRespSimple(evaluacion.valor_financiar ? '$' + parseFloat(evaluacion.valor_financiar).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
+                            html += '<td>' + celdaRespSimple(evaluacion.abono ? '$' + parseFloat(evaluacion.abono).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
+                            html += '<td>' + celdaRespSimple(evaluacion.plazo ? evaluacion.plazo + ' meses' : '-') + '</td>';
+                            html += '<td>' + celdaRespSimple(evaluacion.letra ? '$' + parseFloat(evaluacion.letra).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
+                            html += '<td>' + celdaRespSimple(evaluacion.letra_quincenal ? '$' + parseFloat(evaluacion.letra_quincenal).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
+                            html += '<td>' + celdaRespSimple(evaluacion.promocion || '-') + '</td>';
+                            html += '<td>' + celdaRespSimple(evaluacion.cuantia != null && evaluacion.cuantia !== '' ? '$' + parseFloat(evaluacion.cuantia).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
+                            html += tdComentario(celdaComentarioGestor(evaluacion.comentarios));
                             var textoSeleccionFila = (evaluacionSeleccionada && String(evaluacion.id) === String(evaluacionSeleccionada)) ? comentarioSeleccionGlobal : '';
-                            html += '<td>' + celdaComentarioGestor(textoSeleccionFila) + '</td>';
-                            html += '<td>' + celdaComentarioGestor(evaluacion.comentario_reevaluacion_solicitada) + '</td>';
+                            html += tdComentario(celdaComentarioGestor(textoSeleccionFila));
+                            html += tdComentario(celdaComentarioGestor(evaluacion.comentario_reevaluacion_solicitada));
                             html += '<td>';
                             if (evaluacionSeleccionada && String(evaluacion.id) === String(evaluacionSeleccionada)) {
                                 html += '<span class="badge bg-success"><i class="fas fa-check-circle me-1"></i>Propuesta seleccionada</span>';
@@ -2906,35 +2981,35 @@ if ($isBanco && !$isAdmin) {
                               html += '<i class="fas fa-unlock me-1"></i>Activar Nuevamente</button></div>';
                           }
 
-                          html += '<div class="table-responsive"><table id="tablaRespuestasBancoAdmin" class="table table-striped table-hover w-100">';
-                          html += '<thead><tr><th>Fecha</th><th>Banco</th><th>Vehículo</th><th>Decisión</th><th>Razón</th><th>Tasa %</th><th>Valor a Financiar</th><th>Abono</th><th>Plazo</th><th>Letra mensual</th><th>Letra quincenal</th><th>Promoción</th><th>Cuantía</th><th>Comentarios</th><th>Comentario al seleccionar</th><th>Motivo reevaluación</th>';
+                          html += '<div class="respuestas-banco-wrap"><table id="tablaRespuestasBancoAdmin" class="table table-striped table-hover table-bordered table-respuestas-banco">';
+                          html += '<thead><tr>';
+                          html += '<th>Fecha</th><th>Banco</th><th>Vehículo</th><th>Decisión</th><th class="celda-comentario">Razón</th><th>Tasa %</th><th>Valor a Financiar</th><th>Abono</th><th>Plazo</th><th>Letra mensual</th><th>Letra quincenal</th><th>Promoción</th><th>Cuantía</th><th class="celda-comentario">Comentarios</th><th class="celda-comentario">Comentario al seleccionar</th><th class="celda-comentario">Motivo reevaluación</th>';
                           if (mostrarAcciones) {
                               html += '<th>Acciones</th>';
                           } else {
                               html += '<th>Selección</th>';
                           }
-                          html += '</tr></thead>';
-                          html += '<tbody>';
+                          html += '</tr></thead><tbody>';
                           
                           response.data.forEach(function(evaluacion) {
                               html += '<tr>';
-                              html += '<td data-order="' + escapeHtmlText(evaluacion.fecha_evaluacion || '') + '">' + new Date(evaluacion.fecha_evaluacion).toLocaleString('es-PA') + '</td>';
-                              html += '<td>' + (evaluacion.nombre ? `${evaluacion.nombre} ${evaluacion.apellido || ''}`.trim() : '-') + '</td>';
-                              html += '<td>' + (evaluacion.vehiculo_marca ? `${evaluacion.vehiculo_marca} ${evaluacion.vehiculo_modelo || ''}`.trim() : '-') + '</td>';
-                              html += '<td><span class="badge badge-estado estado-revision">' + evaluacion.decision.toUpperCase().replace('_', ' ') + '</span></td>';
-                              html += '<td>' + celdaComentarioGestor(evaluacion.razon) + '</td>';
-                              html += '<td>' + (evaluacion.tasa_bancaria != null && evaluacion.tasa_bancaria !== '' ? parseFloat(evaluacion.tasa_bancaria).toLocaleString('es-PA', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%' : '-') + '</td>';
-                              html += '<td>' + (evaluacion.valor_financiar ? '$' + parseFloat(evaluacion.valor_financiar).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
-                              html += '<td>' + (evaluacion.abono ? '$' + parseFloat(evaluacion.abono).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
-                              html += '<td>' + (evaluacion.plazo ? evaluacion.plazo + ' meses' : '-') + '</td>';
-                              html += '<td>' + (evaluacion.letra ? '$' + parseFloat(evaluacion.letra).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
-                              html += '<td>' + (evaluacion.letra_quincenal ? '$' + parseFloat(evaluacion.letra_quincenal).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
-                              html += '<td>' + (evaluacion.promocion || '-') + '</td>';
-                              html += '<td>' + (evaluacion.cuantia != null && evaluacion.cuantia !== '' ? '$' + parseFloat(evaluacion.cuantia).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
-                              html += '<td>' + (evaluacion.comentarios || '-') + '</td>';
+                              html += '<td data-order="' + escapeHtmlText(evaluacion.fecha_evaluacion || '') + '">' + celdaRespSimple(new Date(evaluacion.fecha_evaluacion).toLocaleString('es-PA')) + '</td>';
+                              html += '<td>' + celdaRespSimple(evaluacion.nombre ? (evaluacion.nombre + ' ' + (evaluacion.apellido || '')).trim() : '-') + '</td>';
+                              html += '<td>' + celdaRespSimple(evaluacion.vehiculo_marca ? (evaluacion.vehiculo_marca + ' ' + (evaluacion.vehiculo_modelo || '')).trim() : '-') + '</td>';
+                              html += '<td><span class="badge badge-estado estado-revision">' + escapeHtmlText((evaluacion.decision || '').toUpperCase().replace('_', ' ')) + '</span></td>';
+                              html += tdComentario(celdaComentarioGestor(evaluacion.razon));
+                              html += '<td>' + celdaRespSimple(evaluacion.tasa_bancaria != null && evaluacion.tasa_bancaria !== '' ? parseFloat(evaluacion.tasa_bancaria).toLocaleString('es-PA', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%' : '-') + '</td>';
+                              html += '<td>' + celdaRespSimple(evaluacion.valor_financiar ? '$' + parseFloat(evaluacion.valor_financiar).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
+                              html += '<td>' + celdaRespSimple(evaluacion.abono ? '$' + parseFloat(evaluacion.abono).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
+                              html += '<td>' + celdaRespSimple(evaluacion.plazo ? evaluacion.plazo + ' meses' : '-') + '</td>';
+                              html += '<td>' + celdaRespSimple(evaluacion.letra ? '$' + parseFloat(evaluacion.letra).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
+                              html += '<td>' + celdaRespSimple(evaluacion.letra_quincenal ? '$' + parseFloat(evaluacion.letra_quincenal).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
+                              html += '<td>' + celdaRespSimple(evaluacion.promocion || '-') + '</td>';
+                              html += '<td>' + celdaRespSimple(evaluacion.cuantia != null && evaluacion.cuantia !== '' ? '$' + parseFloat(evaluacion.cuantia).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
+                              html += tdComentario(celdaComentarioGestor(evaluacion.comentarios));
                               var textoSel = (evaluacionSeleccionada && String(evaluacion.id) === String(evaluacionSeleccionada)) ? comentarioSeleccionGlobal : '';
-                              html += '<td>' + celdaComentarioGestor(textoSel) + '</td>';
-                              html += '<td>' + celdaComentarioGestor(evaluacion.comentario_reevaluacion_solicitada) + '</td>';
+                              html += tdComentario(celdaComentarioGestor(textoSel));
+                              html += tdComentario(celdaComentarioGestor(evaluacion.comentario_reevaluacion_solicitada));
                               if (mostrarAcciones) {
                                   html += '<td><div class="btn-group-vertical btn-group-sm">';
                                   html += '<button class="btn btn-success btn-sm mb-1" onclick="seleccionarPropuesta(' + evaluacion.id + ', ' + solicitudId + ', \'' + evaluacion.usuario_banco_id + '\')" title="Seleccionar Propuesta"><i class="fas fa-check me-1"></i>Seleccionar</button>';
@@ -3109,8 +3184,8 @@ if ($isBanco && !$isAdmin) {
     </div>
 
     <!-- Modal para ver mis respuestas (usuario banco) — mismo criterio visual que admin/gestor -->
-    <div class="modal fade" id="modalRespuestasBanco" tabindex="-1">
-        <div class="modal-dialog modal-xl">
+    <div class="modal fade modal-respuestas-bancos" id="modalRespuestasBanco" tabindex="-1">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header bg-primary text-white">
                     <h5 class="modal-title">
@@ -3135,8 +3210,8 @@ if ($isBanco && !$isAdmin) {
     </div>
 
     <!-- Modal para ver Respuestas del Banco (Admin/Gestor) -->
-    <div class="modal fade" id="modalRespuestasBancoAdmin" tabindex="-1">
-        <div class="modal-dialog modal-xl">
+    <div class="modal fade modal-respuestas-bancos" id="modalRespuestasBancoAdmin" tabindex="-1">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header bg-primary text-white">
                     <h5 class="modal-title">
