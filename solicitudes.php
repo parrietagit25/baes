@@ -223,18 +223,28 @@ if ($isBanco && !$isAdmin) {
             background-color: #f1bfc4 !important;
         }
 
-        /* Respuestas de los Bancos: tabla legible con scroll horizontal */
+        /* Respuestas de los Bancos: tabla legible con scroll horizontal (solo DataTables) */
         .modal-respuestas-bancos .modal-dialog {
             max-width: min(98vw, 1900px);
             width: 98vw;
             margin: 0.75rem auto;
         }
         .modal-respuestas-bancos .modal-body {
-            overflow-x: auto;
+            overflow-x: hidden;
         }
         .respuestas-banco-wrap {
             width: 100%;
+            overflow-x: hidden;
+        }
+        /* Evitar barra extra del wrapper de DataTables + contenedor externo */
+        .modal-respuestas-bancos .dataTables_wrapper {
+            overflow-x: hidden;
+        }
+        .modal-respuestas-bancos .dataTables_scroll {
             overflow-x: auto;
+        }
+        .modal-respuestas-bancos .dataTables_scrollBody {
+            overflow-x: auto !important;
         }
         table.table-respuestas-banco {
             width: max-content !important;
