@@ -251,5 +251,136 @@ window.eliminarAdjunto = function(id) {
 // Función para configurar adjuntos cuando se abre el modal de edición
 window.configurarAdjuntos = function(solicitudId) {
     $('#adjunto_solicitud_id').val(solicitudId);
+    $('#corredor_solicitud_id').val(solicitudId);
     cargarAdjuntos(solicitudId);
+    if (typeof cargarEnviosCorredor === 'function') {
+        cargarEnviosCorredor(solicitudId);
+    }
 };
+
+function escHtmlCorredor(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+window.cargarEnviosCorredor = function(solicitudId) {
+    const $box = $('#corredorEnviosContainer');
+    if (!$box.length || !solicitudId) {
+        return;
+    }
+    $box.html('<div class="text-center text-muted"><i class="fas fa-spinner fa-spin me-2"></i>Cargando historial...</div>');
+    $.ajax({
+        url: 'api/enviar_resumen_corredor.php',
+        type: 'GET',
+        data: { solicitud_id: solicitudId },
+        dataType: 'json',
+        success: function(response) {
+            if (!response.success) {
+                $box.html('<div class="text-danger">' + escHtmlCorredor(response.message || 'Error') + '</div>');
+                return;
+            }
+            const rows = response.data || [];
+            if (!rows.length) {
+                $box.html('<div class="text-muted">No hay envíos anteriores a corredor para esta solicitud.</div>');
+                return;
+            }
+            let html = '<div class="table-responsive"><table class="table table-sm table-hover align-middle mb-0"><thead><tr>'
+                + '<th>Fecha</th><th>Email</th><th>Archivo</th><th>Interno</th><th>Estado</th><th></th>'
+                + '</tr></thead><tbody>';
+            rows.forEach(function(r) {
+                const fecha = r.fecha_envio ? new Date(r.fecha_envio).toLocaleString('es-PA') : '-';
+                const badge = r.estado === 'enviado'
+                    ? '<span class="badge bg-success">Enviado</span>'
+                    : '<span class="badge bg-danger">Fallido</span>';
+                html += '<tr>'
+                    + '<td>' + escHtmlCorredor(fecha) + '</td>'
+                    + '<td>' + escHtmlCorredor(r.email_corredor) + '</td>'
+                    + '<td>' + escHtmlCorredor(r.nombre_original) + '</td>'
+                    + '<td>' + escHtmlCorredor(r.comentario_interno || '—') + '</td>'
+                    + '<td>' + badge + '</td>'
+                    + '<td><a class="btn btn-sm btn-outline-primary" href="api/enviar_resumen_corredor.php?id=' + encodeURIComponent(r.id) + '&action=descargar" title="Descargar"><i class="fas fa-download"></i></a></td>'
+                    + '</tr>';
+            });
+            html += '</tbody></table></div>';
+            $box.html(html);
+        },
+        error: function() {
+            $box.html('<div class="text-danger">Error de conexión al cargar historial</div>');
+        }
+    });
+};
+
+window.enviarResumenCorredor = function() {
+    const solicitudId = $('#corredor_solicitud_id').val() || $('#adjunto_solicitud_id').val();
+    const email = ($('#corredor_email').val() || '').trim();
+    const archivoInput = document.getElementById('corredor_archivo');
+    const archivo = archivoInput && archivoInput.files ? archivoInput.files[0] : null;
+
+    if (!solicitudId) {
+        mostrarAlerta('No hay solicitud seleccionada', 'warning');
+        return;
+    }
+    if (!archivo) {
+        mostrarAlerta('Debe seleccionar un adjunto', 'warning');
+        return;
+    }
+    if (archivo.size > 10 * 1024 * 1024) {
+        mostrarAlerta('El archivo supera 10MB', 'warning');
+        return;
+    }
+    if (!email) {
+        mostrarAlerta('Email del corredor es obligatorio', 'warning');
+        return;
+    }
+
+    const fd = new FormData();
+    fd.append('solicitud_id', solicitudId);
+    fd.append('email_corredor', email);
+    fd.append('comentario_interno', $('#corredor_comentario_interno').val() || '');
+    fd.append('comentario_correo', $('#corredor_comentario_correo').val() || '');
+    fd.append('archivo', archivo);
+
+    const $btn = $('#btnEnviarCorredor');
+    const original = $btn.html();
+    $btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Enviando...');
+
+    $.ajax({
+        url: 'api/enviar_resumen_corredor.php',
+        type: 'POST',
+        data: fd,
+        processData: false,
+        contentType: false,
+        dataType: 'json',
+        success: function(response) {
+            if (response.success) {
+                mostrarAlerta(response.message || 'Enviado correctamente', 'success');
+                $('#corredorForm')[0].reset();
+                $('#corredor_solicitud_id').val(solicitudId);
+                cargarEnviosCorredor(solicitudId);
+            } else {
+                mostrarAlerta(response.message || 'No se pudo enviar', 'danger');
+            }
+        },
+        error: function(xhr) {
+            let msg = 'Error de conexión al enviar al corredor';
+            try {
+                const j = JSON.parse(xhr.responseText || '{}');
+                if (j.message) msg = j.message;
+            } catch (e) {}
+            mostrarAlerta(msg, 'danger');
+        },
+        complete: function() {
+            $btn.prop('disabled', false).html(original);
+        }
+    });
+};
+
+$(document).on('shown.bs.tab', '#tab-corredor', function() {
+    const sid = $('#corredor_solicitud_id').val() || $('#adjunto_solicitud_id').val();
+    if (sid) {
+        cargarEnviosCorredor(sid);
+    }
+});

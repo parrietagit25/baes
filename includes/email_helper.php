@@ -1069,7 +1069,7 @@ function enviarResumenSolicitudPipedriveDirecto($solicitudId) {
     }
 }
 
-function construirResumenSolicitudHtml($solicitud, $vehiculos, $evaluaciones, $adjuntos, $bancoNombre, $app_url, $mostrarEnlaceMotus = false) {
+function construirResumenSolicitudHtml($solicitud, $vehiculos, $evaluaciones, $adjuntos, $bancoNombre, $app_url, $mostrarEnlaceMotus = false, $comentarioCorreo = '') {
     $h = function($s) { return htmlspecialchars($s ?? '', ENT_QUOTES, 'UTF-8'); };
     $n = function($v, $dec = 0) { return $v !== null && $v !== '' ? number_format((float)$v, $dec, ',', '.') : 'N/A'; };
     $formatSinRedondear = function($v) {
@@ -1141,6 +1141,13 @@ function construirResumenSolicitudHtml($solicitud, $vehiculos, $evaluaciones, $a
     $html = '<h2>Resumen de Solicitud de Crédito #' . (int)$solicitud['id'] . '</h2>';
     $html .= '<p>Estimado/a <strong>' . $h($bancoNombre) . '</strong>,</p>';
     $html .= '<p>Se adjunta un resumen de la solicitud para su revisión.</p>';
+
+    $comentarioCorreo = trim((string) $comentarioCorreo);
+    if ($comentarioCorreo !== '') {
+        $html .= '<h3>Comentario</h3><div class="info-box" style="background:#fff8e6;border-left:4px solid #f0ad4e;padding:12px;margin:10px 0;">';
+        $html .= '<p style="margin:0;white-space:pre-wrap;">' . nl2br($h($comentarioCorreo)) . '</p>';
+        $html .= '</div>';
+    }
 
     $html .= '<h3>Datos generales</h3><div class="info-box" style="background:#f8f9fa;border-left:4px solid #0d6efd;padding:12px;margin:10px 0;">';
     $appendCampoSiTieneValor($html, 'Tipo de persona', $solicitud['tipo_persona'] ?? null);

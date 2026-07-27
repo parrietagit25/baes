@@ -860,12 +860,16 @@ function abrirModalAdjuntos() {
     
     // Configurar el ID de solicitud para adjuntos
     $('#adjunto_solicitud_id').val(solicitudId);
+    $('#corredor_solicitud_id').val(solicitudId);
     
     // Cargar información de la solicitud
     cargarInfoSolicitudAdjuntos(solicitudId);
     
     // Cargar adjuntos existentes
     cargarAdjuntos(solicitudId);
+    if (typeof cargarEnviosCorredor === 'function') {
+        cargarEnviosCorredor(solicitudId);
+    }
     
     // Mostrar modal
     $('#adjuntosModal').modal('show');
@@ -875,12 +879,16 @@ function abrirModalAdjuntos() {
 function abrirModalAdjuntosDesdeTabla(solicitudId) {
     // Configurar el ID de solicitud para adjuntos
     $('#adjunto_solicitud_id').val(solicitudId);
+    $('#corredor_solicitud_id').val(solicitudId);
     
     // Cargar información de la solicitud
     cargarInfoSolicitudAdjuntos(solicitudId);
     
     // Cargar adjuntos existentes
     cargarAdjuntos(solicitudId);
+    if (typeof cargarEnviosCorredor === 'function') {
+        cargarEnviosCorredor(solicitudId);
+    }
     
     // Mostrar modal
     $('#adjuntosModal').modal('show');

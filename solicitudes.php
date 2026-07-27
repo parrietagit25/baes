@@ -1366,59 +1366,127 @@ if ($isBanco && !$isAdmin) {
                         <!-- Se carga via JavaScript -->
                     </div>
                     
-                    <!-- Formulario para subir adjuntos -->
-                    <div class="card mb-4">
-                        <div class="card-header">
-                            <h6 class="mb-0">
+                    <!-- Tabs: Subir Adjunto | Corredor -->
+                    <ul class="nav nav-tabs mb-3" id="adjuntosTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="tab-subir-adjunto" data-bs-toggle="tab" data-bs-target="#pane-subir-adjunto" type="button" role="tab">
                                 <i class="fas fa-upload me-2"></i>Subir Adjunto
-                            </h6>
-                        </div>
-                        <div class="card-body">
-                            <form id="adjuntoForm" enctype="multipart/form-data" onsubmit="return false;">
-                                <input type="hidden" id="adjunto_solicitud_id" name="solicitud_id">
-                                
-                                <div class="row">
-                                    <div class="col-md-12">
-                                        <div class="mb-3">
-                                            <label for="archivo_adjunto" class="form-label">Seleccionar Archivos *</label>
-                                            <input type="file" class="form-control" id="archivo_adjunto" name="archivo[]" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.txt" required>
-                                            <div class="form-text">
-                                                Tipos permitidos: PDF, DOC, DOCX, XLS, XLSX, JPG, PNG, GIF, TXT (Máximo 10MB por archivo)
-                                                <br><strong>Puedes seleccionar múltiples archivos a la vez</strong>
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="tab-corredor" data-bs-toggle="tab" data-bs-target="#pane-corredor" type="button" role="tab">
+                                <i class="fas fa-user-tie me-2"></i>Corredor
+                            </button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content" id="adjuntosTabsContent">
+                        <div class="tab-pane fade show active" id="pane-subir-adjunto" role="tabpanel">
+                            <!-- Formulario para subir adjuntos -->
+                            <div class="card mb-4">
+                                <div class="card-header">
+                                    <h6 class="mb-0">
+                                        <i class="fas fa-upload me-2"></i>Subir Adjunto
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <form id="adjuntoForm" enctype="multipart/form-data" onsubmit="return false;">
+                                        <input type="hidden" id="adjunto_solicitud_id" name="solicitud_id">
+                                        
+                                        <div class="row">
+                                            <div class="col-md-12">
+                                                <div class="mb-3">
+                                                    <label for="archivo_adjunto" class="form-label">Seleccionar Archivos *</label>
+                                                    <input type="file" class="form-control" id="archivo_adjunto" name="archivo[]" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.txt" required>
+                                                    <div class="form-text">
+                                                        Tipos permitidos: PDF, DOC, DOCX, XLS, XLSX, JPG, PNG, GIF, TXT (Máximo 10MB por archivo)
+                                                        <br><strong>Puedes seleccionar múltiples archivos a la vez</strong>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
+                                        
+                                        <div class="row">
+                                            <div class="col-md-12">
+                                                <div class="mb-3">
+                                                    <label for="descripcion_adjunto" class="form-label">Descripción (aplicará a todos los archivos)</label>
+                                                    <input type="text" class="form-control" id="descripcion_adjunto" name="descripcion" placeholder="Breve descripción de los archivos">
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="d-flex justify-content-end">
+                                            <button type="button" class="btn btn-primary" onclick="subirAdjunto()">
+                                                <i class="fas fa-upload me-2"></i>Subir Archivos
+                                            </button>
+                                        </div>
+                                    </form>
                                 </div>
-                                
-                                <div class="row">
-                                    <div class="col-md-12">
-                                        <div class="mb-3">
-                                            <label for="descripcion_adjunto" class="form-label">Descripción (aplicará a todos los archivos)</label>
-                                            <input type="text" class="form-control" id="descripcion_adjunto" name="descripcion" placeholder="Breve descripción de los archivos">
+                            </div>
+                            
+                            <!-- Lista de adjuntos -->
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0">
+                                        <i class="fas fa-paperclip me-2"></i>Archivos Adjuntos
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <div id="adjuntosContainer">
+                                        <div class="text-center text-muted">
+                                            <i class="fas fa-spinner fa-spin me-2"></i>Cargando adjuntos...
                                         </div>
                                     </div>
                                 </div>
-                                
-                                <div class="d-flex justify-content-end">
-                                    <button type="button" class="btn btn-primary" onclick="subirAdjunto()">
-                                        <i class="fas fa-upload me-2"></i>Subir Archivos
-                                    </button>
+                            </div>
+                        </div>
+
+                        <div class="tab-pane fade" id="pane-corredor" role="tabpanel">
+                            <div class="card mb-4">
+                                <div class="card-header bg-warning-subtle">
+                                    <h6 class="mb-0">
+                                        <i class="fas fa-envelope me-2"></i>Enviar resumen al Corredor
+                                    </h6>
                                 </div>
-                            </form>
-                        </div>
-                    </div>
-                    
-                    <!-- Lista de adjuntos -->
-                    <div class="card">
-                        <div class="card-header">
-                            <h6 class="mb-0">
-                                <i class="fas fa-paperclip me-2"></i>Archivos Adjuntos
-                            </h6>
-                        </div>
-                        <div class="card-body">
-                            <div id="adjuntosContainer">
-                                <div class="text-center text-muted">
-                                    <i class="fas fa-spinner fa-spin me-2"></i>Cargando adjuntos...
+                                <div class="card-body">
+                                    <p class="text-muted small">Envía el resumen de la solicitud (igual que a bancos) <strong>sin</strong> los adjuntos de la solicitud. Solo se adjunta el archivo de este formulario.</p>
+                                    <form id="corredorForm" enctype="multipart/form-data" onsubmit="return false;">
+                                        <input type="hidden" id="corredor_solicitud_id" name="solicitud_id">
+                                        <div class="mb-3">
+                                            <label for="corredor_archivo" class="form-label">Adjunto *</label>
+                                            <input type="file" class="form-control" id="corredor_archivo" name="archivo" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.txt" required>
+                                            <div class="form-text">Obligatorio. Máximo 10MB.</div>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="corredor_comentario_interno" class="form-label">Comentario / Descripción (Interno)</label>
+                                            <textarea class="form-control" id="corredor_comentario_interno" name="comentario_interno" rows="2" placeholder="Solo para registro interno en Motus"></textarea>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="corredor_comentario_correo" class="form-label">Comentario / Descripción (Correo)</label>
+                                            <textarea class="form-control" id="corredor_comentario_correo" name="comentario_correo" rows="2" placeholder="Si lo deja vacío, no se incluye comentario en el correo"></textarea>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="corredor_email" class="form-label">Email del corredor *</label>
+                                            <input type="email" class="form-control" id="corredor_email" name="email_corredor" required placeholder="correo@ejemplo.com">
+                                        </div>
+                                        <div class="d-flex justify-content-end">
+                                            <button type="button" class="btn btn-warning" id="btnEnviarCorredor" onclick="enviarResumenCorredor()">
+                                                <i class="fas fa-paper-plane me-2"></i>Enviar al corredor
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0">
+                                        <i class="fas fa-history me-2"></i>Archivos enviados anteriormente
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <div id="corredorEnviosContainer">
+                                        <div class="text-muted small">Abra esta pestaña para ver el historial.</div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
