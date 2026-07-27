@@ -389,6 +389,11 @@ function crearSolicitud() {
             'precio_especial', 'abono_porcentaje', 'abono_monto', 'comentarios_gestor'
         ];
 
+        $tieneScoreApc = solicitudesTieneColumna('score_apc');
+        if ($tieneScoreApc) {
+            $columnas[] = 'score_apc';
+        }
+
         // Función helper para convertir campos numéricos vacíos a null o 0
         $convertirNumero = function($valor, $default = null) {
             if ($valor === '' || $valor === null) {
@@ -457,6 +462,10 @@ function crearSolicitud() {
             $abonoMonto,
             $_POST['comentarios_gestor'] ?? null
         ];
+
+        if ($tieneScoreApc) {
+            $valoresInsert[] = $vacíoANull($_POST['score_apc'] ?? null);
+        }
 
         if ($tieneFinanciamientoRegistroId) {
             array_splice($columnas, 3, 0, ['financiamiento_registro_id']);
@@ -617,6 +626,10 @@ function actualizarSolicitud() {
             'comentarios_fi', 'comentarios_ejecutivo_banco', 'estado'
         ];
 
+        if (solicitudesTieneColumna('score_apc')) {
+            $camposPermitidos[] = 'score_apc';
+        }
+
         if (solicitudesTieneColumna('financiamiento_registro_id')) {
             array_splice($camposPermitidos, 3, 0, ['financiamiento_registro_id']);
         }
@@ -628,6 +641,9 @@ function actualizarSolicitud() {
         }
         // Columnas DECIMAL/DATE: vacío -> NULL (MySQL no acepta '' en estos tipos)
         $camposDecimalOFecha = ['ingreso', 'precio_especial', 'abono_porcentaje', 'abono_monto', 'abono_banco', 'estabilidad_laboral', 'fecha_constitucion'];
+        if (solicitudesTieneColumna('score_apc')) {
+            $camposDecimalOFecha[] = 'score_apc';
+        }
         
         // Valores permitidos para genero (enum en BD)
         $generoPermitidos = ['Masculino', 'Femenino', 'Otro'];

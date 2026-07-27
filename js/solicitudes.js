@@ -1199,7 +1199,8 @@ function llenarFormularioEdicion(solicitud) {
     $('#abono_porcentaje').val(solicitud.abono_porcentaje);
     $('#abono_monto').val(solicitud.abono_monto);
     
-    // Comentarios
+    // Comentarios / Análisis
+    $('#score_apc').val(solicitud.score_apc != null && solicitud.score_apc !== '' ? solicitud.score_apc : '');
     $('#comentarios_gestor').val(solicitud.comentarios_gestor);
     $('#contador_comentarios').text(1000 - (solicitud.comentarios_gestor || '').length);
     

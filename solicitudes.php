@@ -944,6 +944,10 @@ if ($isBanco && !$isAdmin) {
                             <div class="tab-pane fade" id="analisis" role="tabpanel">
                                 <div class="mt-3">
                                     <div class="mb-3">
+                                        <label for="score_apc" class="form-label">Score APC</label>
+                                        <input type="number" class="form-control" id="score_apc" name="score_apc" step="0.01" min="0" placeholder="Ej. 750">
+                                    </div>
+                                    <div class="mb-3">
                                         <label for="comentarios_gestor" class="form-label">Comentarios del Gestor</label>
                                         <textarea class="form-control" id="comentarios_gestor" name="comentarios_gestor" rows="4" maxlength="1000" placeholder="Escriba un breve análisis del perfil del cliente (máximo 1000 caracteres)"></textarea>
                                         <div class="form-text">Caracteres restantes: <span id="contador_comentarios">1000</span></div>

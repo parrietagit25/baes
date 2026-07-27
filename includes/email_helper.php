@@ -1172,7 +1172,11 @@ function construirResumenSolicitudHtml($solicitud, $vehiculos, $evaluaciones, $a
     $html .= '</div>';
 
     $comentariosGestor = trim((string)($solicitud['comentarios_gestor'] ?? ''));
+    $scoreApc = trim((string)($solicitud['score_apc'] ?? ''));
     $html .= '<h3>Análisis del gestor</h3><div class="info-box" style="background:#f8f9fa;border-left:4px solid #6f42c1;padding:12px;margin:10px 0;">';
+    if ($scoreApc !== '') {
+        $html .= '<p style="margin:0 0 8px 0;"><strong>Score APC:</strong> ' . $h($scoreApc) . '</p>';
+    }
     if ($comentariosGestor !== '') {
         $html .= '<p style="margin:0;white-space:pre-wrap;">' . nl2br($h($comentariosGestor)) . '</p>';
     } else {
