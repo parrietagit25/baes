@@ -195,7 +195,7 @@ function enviarResumenCorredorApi(PDO $pdo): void {
     $emailService = (new EmailService())->paraSolicitud($solicitudId);
     $resultado = $emailService->enviarCorreo(
         $emailCorredor,
-        asuntoResumenSolicitudBancoMail($solicitud),
+        asuntoResumenSolicitudCorredorMail($solicitud),
         $html,
         'Corredor',
         strip_tags(preg_replace('/<br\s*\/?>/i', "\n", $html)),

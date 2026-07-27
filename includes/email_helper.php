@@ -604,24 +604,44 @@ function notificarReevaluacion($solicitudId, $evaluacionId, $comentario) {
 }
 
 /**
- * Asunto del correo de resumen al usuario banco (incluye nombre del cliente si existe).
+ * Nombre de cliente limpio para asuntos de correo.
  */
-function asuntoResumenSolicitudBancoMail(array $solicitud): string {
-    $id = (int) ($solicitud['id'] ?? 0);
+function nombreClienteParaAsuntoMail(array $solicitud, int $max = 80): string {
     $nombre = trim((string) ($solicitud['nombre_cliente'] ?? ''));
     $nombre = preg_replace('/[\r\n\x00]+/', ' ', $nombre);
     $nombre = preg_replace('/\s+/u', ' ', $nombre);
     $nombre = trim($nombre);
-    $max = 80;
     if ($nombre !== '' && function_exists('mb_strlen') && mb_strlen($nombre, 'UTF-8') > $max) {
-        $nombre = mb_substr($nombre, 0, $max - 1, 'UTF-8') . '…';
-    } elseif ($nombre !== '' && strlen($nombre) > $max) {
-        $nombre = substr($nombre, 0, $max - 3) . '...';
+        return mb_substr($nombre, 0, $max - 1, 'UTF-8') . '…';
     }
+    if ($nombre !== '' && strlen($nombre) > $max) {
+        return substr($nombre, 0, $max - 3) . '...';
+    }
+    return $nombre;
+}
+
+/**
+ * Asunto del correo de resumen al usuario banco (incluye nombre del cliente si existe).
+ */
+function asuntoResumenSolicitudBancoMail(array $solicitud): string {
+    $id = (int) ($solicitud['id'] ?? 0);
+    $nombre = nombreClienteParaAsuntoMail($solicitud);
     if ($nombre !== '') {
         return 'Resumen Solicitud #' . $id . ' — ' . $nombre . ' — MOTUS';
     }
     return 'Resumen Solicitud #' . $id . ' — MOTUS';
+}
+
+/**
+ * Asunto del correo de proforma al corredor.
+ */
+function asuntoResumenSolicitudCorredorMail(array $solicitud): string {
+    $id = (int) ($solicitud['id'] ?? 0);
+    $nombre = nombreClienteParaAsuntoMail($solicitud);
+    if ($nombre !== '') {
+        return 'Envio de Proforma al corredor - Solicitud #' . $id . ' — ' . $nombre . ' — MOTUS';
+    }
+    return 'Envio de Proforma al corredor - Solicitud #' . $id . ' — MOTUS';
 }
 
 /**
