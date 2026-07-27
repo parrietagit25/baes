@@ -669,6 +669,170 @@ function asuntoAdjuntoBancoMail(array $solicitud): string {
 }
 
 /**
+ * Asunto al reenviar un adjunto de la solicitud a un usuario banco.
+ */
+function asuntoActualizacionAdjuntoBancoMail(array $solicitud): string {
+    $id = (int) ($solicitud['id'] ?? 0);
+    $nombre = nombreClienteParaAsuntoMail($solicitud);
+    if ($nombre !== '') {
+        return 'Actualizaciones de la solicitud #' . $id . ' ' . $nombre;
+    }
+    return 'Actualizaciones de la solicitud #' . $id;
+}
+
+/**
+ * Envía un único adjunto de la solicitud a un usuario banco asignado (activo).
+ * CC: F&I + Pipedrive vía EmailService.
+ *
+ * @param int $usuarioBancoId ID en tabla usuarios (usuario_banco_id de la asignación)
+ */
+function enviarAdjuntoActualizacionBanco(int $solicitudId, int $adjuntoId, int $usuarioBancoId): array {
+    global $pdo;
+
+    try {
+        $roles = $_SESSION['user_roles'] ?? [];
+        if (!is_array($roles)) {
+            $roles = [];
+        }
+        if (!in_array('ROLE_ADMIN', $roles, true) && !in_array('ROLE_GESTOR', $roles, true)) {
+            return ['success' => false, 'message' => 'Solo admin o gestor pueden enviar adjuntos al banco'];
+        }
+
+        if ($solicitudId <= 0 || $adjuntoId <= 0 || $usuarioBancoId <= 0) {
+            return ['success' => false, 'message' => 'Datos incompletos'];
+        }
+
+        $stmt = $pdo->prepare('SELECT * FROM solicitudes_credito WHERE id = ? LIMIT 1');
+        $stmt->execute([$solicitudId]);
+        $solicitud = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$solicitud) {
+            return ['success' => false, 'message' => 'Solicitud no encontrada'];
+        }
+
+        // Debe estar asignado activamente a esta solicitud
+        $stmt = $pdo->prepare("
+            SELECT u.id, u.email, u.nombre, u.apellido, b.nombre AS banco_nombre
+            FROM usuarios_banco_solicitudes ubs
+            INNER JOIN usuarios u ON ubs.usuario_banco_id = u.id
+            LEFT JOIN bancos b ON u.banco_id = b.id
+            WHERE ubs.solicitud_id = ?
+              AND ubs.usuario_banco_id = ?
+              AND ubs.estado = 'activo'
+            LIMIT 1
+        ");
+        $stmt->execute([$solicitudId, $usuarioBancoId]);
+        $banco = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$banco || empty($banco['email']) || !filter_var($banco['email'], FILTER_VALIDATE_EMAIL)) {
+            return ['success' => false, 'message' => 'Usuario banco no asignado o sin email válido'];
+        }
+
+        $stmt = $pdo->prepare("
+            SELECT id, nombre_original, nombre_archivo, ruta_archivo, tipo_archivo, descripcion
+            FROM adjuntos_solicitud
+            WHERE id = ? AND solicitud_id = ?
+            LIMIT 1
+        ");
+        $stmt->execute([$adjuntoId, $solicitudId]);
+        $adjunto = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$adjunto) {
+            return ['success' => false, 'message' => 'Adjunto no encontrado en esta solicitud'];
+        }
+
+        $root = realpath(__DIR__ . '/..') ?: (__DIR__ . '/..');
+        $rel = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, (string) $adjunto['ruta_archivo']);
+        $abs = $root . DIRECTORY_SEPARATOR . $rel;
+        $real = realpath($abs);
+        if ($real === false || !is_file($real) || !is_readable($real)) {
+            return ['success' => false, 'message' => 'Archivo no disponible en disco'];
+        }
+
+        $cliente = htmlspecialchars((string) ($solicitud['nombre_cliente'] ?? ''), ENT_QUOTES, 'UTF-8');
+        $archivoSafe = htmlspecialchars((string) ($adjunto['nombre_original'] ?? 'archivo'), ENT_QUOTES, 'UTF-8');
+        $bancoNombre = trim(($banco['nombre'] ?? '') . ' ' . ($banco['apellido'] ?? ''));
+        $bancoEntidad = trim((string) ($banco['banco_nombre'] ?? ''));
+        $destLabel = htmlspecialchars(
+            $bancoNombre . ($bancoEntidad !== '' ? ' · ' . $bancoEntidad : ''),
+            ENT_QUOTES,
+            'UTF-8'
+        );
+        $desc = trim((string) ($adjunto['descripcion'] ?? ''));
+        $descHtml = $desc !== ''
+            ? '<p><strong>Descripción:</strong> ' . htmlspecialchars($desc, ENT_QUOTES, 'UTF-8') . '</p>'
+            : '';
+
+        $html = '
+        <div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.5;">
+            <p>Se adjunta una actualización de la solicitud en MOTUS.</p>
+            <p>
+                <strong>Solicitud:</strong> #' . (int) $solicitudId . '<br>
+                <strong>Cliente:</strong> ' . $cliente . '<br>
+                <strong>Destinatario:</strong> ' . $destLabel . '<br>
+                <strong>Archivo:</strong> ' . $archivoSafe . '
+            </p>
+            ' . $descHtml . '
+            <p style="color:#666;font-size:12px;">El archivo va adjunto a este correo.</p>
+        </div>';
+
+        $replyToGestor = '';
+        $gestorId = isset($solicitud['gestor_id']) ? (int) $solicitud['gestor_id'] : 0;
+        if ($gestorId > 0) {
+            $stG = $pdo->prepare('SELECT email FROM usuarios WHERE id = ? LIMIT 1');
+            $stG->execute([$gestorId]);
+            $gEmail = trim((string) ($stG->fetchColumn() ?: ''));
+            if ($gEmail !== '' && filter_var($gEmail, FILTER_VALIDATE_EMAIL)) {
+                $replyToGestor = $gEmail;
+            }
+        }
+
+        $emailService = (new EmailService())->paraSolicitud($solicitudId);
+        $resultado = $emailService->enviarCorreo(
+            $banco['email'],
+            asuntoActualizacionAdjuntoBancoMail($solicitud),
+            $html,
+            $bancoNombre !== '' ? $bancoNombre : 'Usuario banco',
+            strip_tags(str_replace(['<br>', '<br/>', '<br />'], "\n", $html)),
+            [['path' => $real, 'filename' => (string) ($adjunto['nombre_original'] ?: basename($real))]],
+            $replyToGestor !== '' ? [$replyToGestor] : [],
+            [],
+            $replyToGestor,
+            $solicitudId
+        );
+
+        if (!empty($resultado['success'])) {
+            try {
+                require_once __DIR__ . '/historial_helper.php';
+                incrementarCorreosEnviadosUsuarioBancoSolicitud($pdo, $solicitudId, $usuarioBancoId);
+            } catch (Throwable $e) {
+                error_log('incrementar correos adjunto banco: ' . $e->getMessage());
+            }
+            try {
+                require_once __DIR__ . '/historial_helper.php';
+                registrarHistorialSolicitud(
+                    $pdo,
+                    $solicitudId,
+                    (int) ($_SESSION['user_id'] ?? 0),
+                    'actualizacion',
+                    'Adjunto enviado por correo a ' . ($banco['email'] ?? '') . ': ' . ($adjunto['nombre_original'] ?? ''),
+                    null,
+                    null
+                );
+            } catch (Throwable $e) {
+                error_log('historial enviar adjunto banco: ' . $e->getMessage());
+            }
+            return ['success' => true, 'message' => 'Adjunto enviado correctamente'];
+        }
+
+        return [
+            'success' => false,
+            'message' => (string) ($resultado['message'] ?? 'No se pudo enviar el correo'),
+        ];
+    } catch (Throwable $e) {
+        error_log('enviarAdjuntoActualizacionBanco: ' . $e->getMessage());
+        return ['success' => false, 'message' => 'Error al enviar adjunto al banco'];
+    }
+}
+
+/**
  * Notifica al gestor (CC F&I + Pipe) cuando un usuario banco sube adjunto(s).
  *
  * @param array<int, string> $nombresArchivos

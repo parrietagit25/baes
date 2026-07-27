@@ -150,12 +150,18 @@ window.mostrarAdjuntos = function(adjuntos) {
         $('#adjuntosContainer').html('<div class="text-center text-muted">No hay archivos adjuntos</div>');
         return;
     }
+
+    const puedeEnviarBanco = !!(window.userRoles && (window.userRoles.isAdmin || window.userRoles.isGestor));
     
     let html = '';
     adjuntos.forEach(function(adjunto) {
         const icono = obtenerIconoArchivo(adjunto.tipo_archivo);
         const tamaño = formatearTamaño(adjunto.tamaño_archivo);
         const fecha = new Date(adjunto.fecha_subida).toLocaleDateString('es-ES');
+        const nombreSafe = String(adjunto.nombre_original || '')
+            .replace(/\\/g, '\\\\')
+            .replace(/'/g, "\\'")
+            .replace(/"/g, '&quot;');
         
         html += `
             <div class="adjunto-item d-flex justify-content-between align-items-center mb-2 p-2 border rounded">
@@ -171,6 +177,10 @@ window.mostrarAdjuntos = function(adjuntos) {
                     <button type="button" class="btn btn-sm btn-outline-primary me-1" onclick="descargarAdjunto(${adjunto.id})" title="Descargar">
                         <i class="fas fa-download"></i>
                     </button>
+                    ${puedeEnviarBanco ? `
+                    <button type="button" class="btn btn-sm btn-outline-success me-1" onclick="abrirModalEnviarAdjuntoBanco(${adjunto.id}, '${nombreSafe}')" title="Enviar por correo al banco">
+                        <i class="fas fa-envelope"></i>
+                    </button>` : ''}
                     <button type="button" class="btn btn-sm btn-outline-danger" onclick="eliminarAdjunto(${adjunto.id})" title="Eliminar">
                         <i class="fas fa-trash"></i>
                     </button>
@@ -180,6 +190,122 @@ window.mostrarAdjuntos = function(adjuntos) {
     });
     
     $('#adjuntosContainer').html(html);
+};
+
+window.abrirModalEnviarAdjuntoBanco = function(adjuntoId, nombreArchivo) {
+    const solicitudId = $('#adjunto_solicitud_id').val();
+    if (!solicitudId) {
+        mostrarAlerta('No hay solicitud seleccionada', 'warning');
+        return;
+    }
+    if (!window.userRoles || !(window.userRoles.isAdmin || window.userRoles.isGestor)) {
+        mostrarAlerta('Solo admin o gestor pueden enviar adjuntos al banco', 'warning');
+        return;
+    }
+
+    $('#enviar_adjunto_id').val(adjuntoId);
+    $('#enviar_adjunto_solicitud_id').val(solicitudId);
+    $('#enviar_adjunto_nombre').text(nombreArchivo || ('Adjunto #' + adjuntoId));
+    $('#enviar_adjunto_usuario_banco').html('<option value="">Cargando...</option>');
+
+    const modalEl = document.getElementById('enviarAdjuntoBancoModal');
+    if (modalEl && window.bootstrap && bootstrap.Modal) {
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    } else {
+        $('#enviarAdjuntoBancoModal').modal('show');
+    }
+
+    $.ajax({
+        url: 'api/usuarios_banco_solicitudes.php',
+        type: 'GET',
+        data: { solicitud_id: solicitudId },
+        dataType: 'json',
+        success: function(response) {
+            const $sel = $('#enviar_adjunto_usuario_banco');
+            $sel.empty();
+            if (!response || !response.success) {
+                $sel.append('<option value="">No se pudieron cargar usuarios</option>');
+                return;
+            }
+            const activos = (response.data || []).filter(function(u) {
+                return String(u.estado || '').toLowerCase() === 'activo';
+            });
+            if (!activos.length) {
+                $sel.append('<option value="">No hay usuarios banco activos en esta solicitud</option>');
+                return;
+            }
+            $sel.append('<option value="">Seleccione un usuario banco...</option>');
+            activos.forEach(function(u) {
+                const nombre = ((u.usuario_nombre || '') + ' ' + (u.usuario_apellido || '')).trim();
+                const banco = u.banco_nombre ? (' · ' + u.banco_nombre) : '';
+                const email = u.usuario_email ? (' <' + u.usuario_email + '>') : '';
+                $sel.append(
+                    $('<option></option>')
+                        .val(u.usuario_banco_id)
+                        .text(nombre + banco + email)
+                );
+            });
+        },
+        error: function() {
+            $('#enviar_adjunto_usuario_banco').html('<option value="">Error al cargar usuarios</option>');
+        }
+    });
+};
+
+window.confirmarEnviarAdjuntoBanco = function() {
+    const adjuntoId = $('#enviar_adjunto_id').val();
+    const solicitudId = $('#enviar_adjunto_solicitud_id').val();
+    const usuarioBancoId = $('#enviar_adjunto_usuario_banco').val();
+
+    if (!adjuntoId || !solicitudId) {
+        mostrarAlerta('Datos incompletos para el envío', 'warning');
+        return;
+    }
+    if (!usuarioBancoId) {
+        mostrarAlerta('Seleccione un usuario banco', 'warning');
+        return;
+    }
+
+    const $btn = $('#btnConfirmarEnviarAdjuntoBanco');
+    const original = $btn.html();
+    $btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Enviando...');
+
+    $.ajax({
+        url: (window.location.origin || '') + '/api/adjuntos.php',
+        type: 'POST',
+        data: {
+            action: 'enviar_adjunto_banco',
+            solicitud_id: solicitudId,
+            adjunto_id: adjuntoId,
+            usuario_banco_id: usuarioBancoId
+        },
+        dataType: 'json',
+        success: function(response) {
+            if (response && response.success) {
+                mostrarAlerta(response.message || 'Adjunto enviado correctamente', 'success');
+                const modalEl = document.getElementById('enviarAdjuntoBancoModal');
+                if (modalEl && window.bootstrap && bootstrap.Modal) {
+                    bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+                } else {
+                    $('#enviarAdjuntoBancoModal').modal('hide');
+                }
+            } else {
+                mostrarAlerta((response && response.message) || 'No se pudo enviar', 'danger');
+            }
+        },
+        error: function(xhr) {
+            let msg = 'Error de conexión al enviar adjunto';
+            try {
+                const j = JSON.parse(xhr.responseText || '{}');
+                if (j.message) msg = j.message;
+            } catch (e) {}
+            if (xhr && xhr.status) msg += ' (HTTP ' + xhr.status + ')';
+            mostrarAlerta(msg, 'danger');
+        },
+        complete: function() {
+            $btn.prop('disabled', false).html(original);
+        }
+    });
 };
 
 // Función para obtener el icono según el tipo de archivo

@@ -1503,6 +1503,41 @@ if ($isBanco && !$isAdmin) {
         </div>
     </div>
 
+    <!-- Modal: enviar adjunto a usuario banco -->
+    <div class="modal fade" id="enviarAdjuntoBancoModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header" style="background: linear-gradient(135deg, #0d6efd 0%, #6610f2 100%);">
+                    <h5 class="modal-title text-white">
+                        <i class="fas fa-envelope me-2"></i>Enviar adjunto al banco
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="enviar_adjunto_id">
+                    <input type="hidden" id="enviar_adjunto_solicitud_id">
+                    <p class="mb-2">
+                        <strong>Archivo:</strong>
+                        <span id="enviar_adjunto_nombre">—</span>
+                    </p>
+                    <div class="mb-3">
+                        <label for="enviar_adjunto_usuario_banco" class="form-label">Usuario banco *</label>
+                        <select class="form-select" id="enviar_adjunto_usuario_banco" required>
+                            <option value="">Cargando...</option>
+                        </select>
+                        <div class="form-text">Solo usuarios banco asignados activamente a esta solicitud.</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" id="btnConfirmarEnviarAdjuntoBanco" onclick="confirmarEnviarAdjuntoBanco()">
+                        <i class="fas fa-paper-plane me-2"></i>Enviar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal de Aprobación/Rechazo -->
     <div class="modal fade" id="aprobacionModal" tabindex="-1">
         <div class="modal-dialog modal-lg">

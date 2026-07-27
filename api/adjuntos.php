@@ -64,6 +64,25 @@ switch ($method) {
         break;
         
     case 'POST':
+        // Enviar un adjunto concreto a un usuario banco asignado
+        if (($_POST['action'] ?? '') === 'enviar_adjunto_banco') {
+            try {
+                $resultado = enviarAdjuntoActualizacionBanco(
+                    (int) ($_POST['solicitud_id'] ?? 0),
+                    (int) ($_POST['adjunto_id'] ?? 0),
+                    (int) ($_POST['usuario_banco_id'] ?? 0)
+                );
+                echo json_encode([
+                    'success' => !empty($resultado['success']),
+                    'message' => $resultado['message'] ?? (!empty($resultado['success']) ? 'Enviado' : 'No se pudo enviar'),
+                ]);
+            } catch (Throwable $e) {
+                error_log('enviar_adjunto_banco: ' . $e->getMessage());
+                http_response_code(500);
+                echo json_encode(['success' => false, 'message' => 'Error interno al enviar adjunto']);
+            }
+            break;
+        }
         // Corredor: envío con Resend (multipart por adjuntos.php — Cloudflare bloquea el endpoint dedicado)
         if (($_POST['action'] ?? '') === 'corredor_enviar') {
             require_once __DIR__ . '/../includes/email_helper.php';
