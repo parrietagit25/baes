@@ -40,7 +40,10 @@ class ReservasProformaProcessor
         if ($v === null || trim((string) $v) === '') {
             return null;
         }
-        $x = str_replace([',', '$', ' '], ['', '', ''], trim((string) $v));
+        // Excel Panamá: "B/.20,498.0" o "B/. 21,300.00"
+        $x = trim((string) $v);
+        $x = preg_replace('/^B\/\.?\s*/i', '', $x) ?? $x;
+        $x = str_replace(['$', ' ', ','], ['', '', ''], $x);
         return is_numeric($x) ? (float) $x : null;
     }
 
@@ -60,11 +63,40 @@ class ReservasProformaProcessor
                 }
             }
         }
+        // Formato local Panamá: DD/MM/YYYY (p. ej. 19/06/2026).
         if (preg_match('/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/', $v, $m)) {
-            return sprintf('%04d-%02d-%02d', (int) $m[3], (int) $m[1], (int) $m[2]);
+            $a = (int) $m[1];
+            $b = (int) $m[2];
+            $anio = (int) $m[3];
+            // Si el primer número > 12, solo puede ser día → DD/MM.
+            // Si el segundo > 12, solo puede ser MM/DD.
+            // Ambiguo (ambos ≤ 12): asumir DD/MM (formato Panamá).
+            if ($a > 12 && $b >= 1 && $b <= 12) {
+                $dia = $a;
+                $mes = $b;
+            } elseif ($b > 12 && $a >= 1 && $a <= 12) {
+                $mes = $a;
+                $dia = $b;
+            } else {
+                $dia = $a;
+                $mes = $b;
+            }
+            if ($mes < 1 || $mes > 12 || $dia < 1 || $dia > 31) {
+                return null;
+            }
+            if (!checkdate($mes, $dia, $anio)) {
+                return null;
+            }
+            return sprintf('%04d-%02d-%02d', $anio, $mes, $dia);
         }
         if (preg_match('/^(\d{4})-(\d{2})-(\d{2})/', $v, $m)) {
-            return sprintf('%04d-%02d-%02d', (int) $m[1], (int) $m[2], (int) $m[3]);
+            $anio = (int) $m[1];
+            $mes = (int) $m[2];
+            $dia = (int) $m[3];
+            if (!checkdate($mes, $dia, $anio)) {
+                return null;
+            }
+            return sprintf('%04d-%02d-%02d', $anio, $mes, $dia);
         }
         $ts = strtotime($v);
         return $ts ? date('Y-m-d', $ts) : null;
