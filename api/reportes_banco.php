@@ -105,6 +105,7 @@ switch ($action) {
         try {
             echo json_encode(rep_fin_build_reporte_enlazada_banco($pdo, $bancoId), JSON_UNESCAPED_UNICODE);
         } catch (PDOException $e) {
+            error_log('reporte_fin_enlazada banco: ' . $e->getMessage());
             http_response_code(500);
             echo json_encode(['success' => false, 'message' => 'Error de base de datos']);
         }

@@ -121,11 +121,16 @@ function rep_fin_fetch_enlazada_banco(PDO $pdo, string $d1, string $d2, int $ban
             {$vehCols}
         FROM financiamiento_registros fr
         INNER JOIN solicitudes_credito sc ON sc.financiamiento_registro_id = fr.id
-        INNER JOIN usuarios_banco_solicitudes ubs ON ubs.solicitud_id = sc.id AND ubs.estado = 'activo'
-        INNER JOIN usuarios u ON u.id = ubs.usuario_banco_id AND u.banco_id = :banco_id
         {$joinVehSql}
         WHERE DATE(fr.fecha_creacion) BETWEEN :d1 AND :d2
-        GROUP BY fr.id, sc.id
+          AND EXISTS (
+            SELECT 1
+            FROM usuarios_banco_solicitudes ubs
+            INNER JOIN usuarios u ON u.id = ubs.usuario_banco_id
+            WHERE ubs.solicitud_id = sc.id
+              AND ubs.estado = 'activo'
+              AND u.banco_id = :banco_id
+          )
         ORDER BY fr.fecha_creacion DESC
         LIMIT 15000
     ";
