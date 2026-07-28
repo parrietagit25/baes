@@ -256,7 +256,7 @@ function exportarMisPropuestasBancoXlsx(): void {
         'Cédula',
     ];
     if ($esAdminBanco) {
-        $headers[] = 'Analista';
+        $headers[] = 'Encargado';
     }
     $headers = array_merge($headers, [
         'Estado solicitud',

@@ -64,7 +64,7 @@ $esAdminBancoPagina = motus_es_admin_banco($userRoles);
                                         <th>Solicitud</th>
                                         <th>Cliente</th>
                                         <th>Cédula</th>
-                                        <?php if ($esAdminBancoPagina): ?><th>Analista</th><?php endif; ?>
+                                        <?php if ($esAdminBancoPagina): ?><th>Encargado</th><?php endif; ?>
                                         <th>Estado</th>
                                         <th>Vehículo</th>
                                         <th>Decisión</th>
