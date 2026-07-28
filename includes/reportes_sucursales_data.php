@@ -372,8 +372,27 @@ function reportes_sucursales_obtener_datos(PDO $pdo, ?string $desde = null, ?str
     $cerradas = $totalSolicitudes - $pendientes;
     $tasaAprobacion = $cerradas > 0 ? round(100 * $aprobadas / $cerradas, 1) : 0;
 
-    $mesesLabels = [];
+    // Solo meses con actividad (evita cola vacía cuando el rango es muy amplio).
+    $mesesConDatos = [];
     foreach ($mesesKeys as $ym) {
+        $suma = 0;
+        foreach ($serieMensual as $cod => $meses) {
+            if ($cod === 'NN') {
+                continue;
+            }
+            $suma += (int) ($meses[$ym] ?? 0);
+        }
+        if ($suma > 0) {
+            $mesesConDatos[] = $ym;
+        }
+    }
+    // Si no hay datos, conservar el rango pedido (un mes) para no romper el chart.
+    if ($mesesConDatos === [] && $mesesKeys !== []) {
+        $mesesConDatos = [end($mesesKeys)];
+    }
+
+    $mesesLabels = [];
+    foreach ($mesesConDatos as $ym) {
         try {
             $mesesLabels[] = (new DateTimeImmutable($ym . '-01'))->format('M Y');
         } catch (Throwable $e) {
@@ -386,7 +405,7 @@ function reportes_sucursales_obtener_datos(PDO $pdo, ?string $desde = null, ?str
             continue;
         }
         $datos = [];
-        foreach ($mesesKeys as $ym) {
+        foreach ($mesesConDatos as $ym) {
             $datos[] = (int) ($meses[$ym] ?? 0);
         }
         $seriesLinea[] = [
@@ -396,7 +415,31 @@ function reportes_sucursales_obtener_datos(PDO $pdo, ?string $desde = null, ?str
         ];
     }
 
-    $topAgentes = array_slice($porAgente, 0, 12);
+    $topAgentes = array_slice(array_values($porAgente), 0, 12);
+    $agentesConActividad = count($porAgente);
+    $supervisoresConActividad = count(array_filter(
+        $porSupervisor,
+        static fn($s) => ((int) ($s['total'] ?? 0)) > 0
+    ));
+
+    // Agentes con actividad por sucursal (en el rango).
+    $agentesActivosPorCodigo = [];
+    foreach ($porAgente as $ag) {
+        $c = (string) ($ag['codigo_sucursal'] ?? '');
+        if ($c === '') {
+            continue;
+        }
+        $agentesActivosPorCodigo[$c] = ($agentesActivosPorCodigo[$c] ?? 0) + 1;
+    }
+    foreach ($porSupervisor as &$supRow) {
+        $c = (string) ($supRow['codigo_sucursal'] ?? '');
+        if (($supRow['sigla'] ?? '') === 'SP-NN') {
+            $supRow['agentes_en_sucursal'] = $agentesConActividad;
+        } else {
+            $supRow['agentes_en_sucursal'] = $agentesActivosPorCodigo[$c] ?? 0;
+        }
+    }
+    unset($supRow);
 
     return [
         'fecha_desde' => $d1,
@@ -410,10 +453,10 @@ function reportes_sucursales_obtener_datos(PDO $pdo, ?string $desde = null, ?str
             'total_anio' => $totalConSucursal,
             'total_en_rango' => $totalConSucursal,
             'sin_ejecutivo' => $sinEjecutivo,
-            'total_agentes' => count(array_filter($mapEjecutivo, static fn($e) => $e['tipo'] === 'agente')),
-            'total_supervisores' => count($porSupervisor),
+            'total_agentes' => $agentesConActividad,
+            'total_supervisores' => $supervisoresConActividad,
             'tasa_aprobacion' => $tasaAprobacion,
-            'sucursal_lider' => $lider ? [
+            'sucursal_lider' => $lider && ((int) ($lider['total'] ?? 0)) > 0 ? [
                 'codigo' => $lider['codigo'],
                 'nombre' => $lider['nombre'],
                 'total' => $lider['total'],

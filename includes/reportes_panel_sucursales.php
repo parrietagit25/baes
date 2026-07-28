@@ -1,6 +1,8 @@
 ﻿<?php
 /** Panel Rep. Sucursales — incluir desde reportes.php */
 $panelSucVisible = ($submenu ?? '') === 'sucursales';
+$sucDesdeDefault = (new DateTimeImmutable('first day of this month'))->format('Y-m-d');
+$sucHastaDefault = (new DateTimeImmutable('today'))->format('Y-m-d');
 ?>
 <div id="panel-sucursales" class="report-panel" style="display: <?php echo $panelSucVisible ? 'block' : 'none'; ?>;">
     <ul class="nav nav-tabs mb-3" id="sucTabsFuente" role="tablist">
@@ -18,6 +20,7 @@ $panelSucVisible = ($submenu ?? '') === 'sucursales';
     <div class="alert alert-secondary small mb-3">
         <strong>Siglas:</strong> CH, CV, TBM, VIS, BDC = agentes · SP-CH, SP-CV, SP-TBM, SP-VIS, SP-BDC = supervisores · SP-NN = supervisor nacional.
         El total del supervisor es la suma de solicitudes de los agentes de su sucursal.
+        Todos los indicadores y gráficas usan el rango de fechas seleccionado.
         <span id="sucFuenteNotaFin" class="d-none"> En Sol. Financiamiento, «Solo Sol. Financiamiento» son envíos del formulario público aún sin solicitud Motus vinculada.</span>
     </div>
     <div class="card mb-3">
@@ -26,11 +29,11 @@ $panelSucVisible = ($submenu ?? '') === 'sucursales';
                 <div class="row g-2 align-items-end">
                     <div class="col-md-2">
                         <label class="form-label small mb-0" for="sucFiltroDesde">Desde</label>
-                        <input type="date" id="sucFiltroDesde" name="desde" class="form-control form-control-sm" value="<?php echo htmlspecialchars($finRepDesde); ?>">
+                        <input type="date" id="sucFiltroDesde" name="desde" class="form-control form-control-sm" value="<?php echo htmlspecialchars($sucDesdeDefault); ?>">
                     </div>
                     <div class="col-md-2">
                         <label class="form-label small mb-0" for="sucFiltroHasta">Hasta</label>
-                        <input type="date" id="sucFiltroHasta" name="hasta" class="form-control form-control-sm" value="<?php echo htmlspecialchars($finRepHasta); ?>">
+                        <input type="date" id="sucFiltroHasta" name="hasta" class="form-control form-control-sm" value="<?php echo htmlspecialchars($sucHastaDefault); ?>">
                     </div>
                     <div class="col-md-2">
                         <button type="submit" class="btn btn-primary btn-sm w-100" id="btnSucFiltrar">
@@ -62,7 +65,7 @@ $panelSucVisible = ($submenu ?? '') === 'sucursales';
         <div class="col-md-2">
             <div class="card h-100">
                 <div class="card-body text-center">
-                    <div class="text-muted small">Agentes activos</div>
+                    <div class="text-muted small">Agentes con actividad</div>
                     <div class="h5 mb-0" id="sucKpiAgentes">0</div>
                 </div>
             </div>
