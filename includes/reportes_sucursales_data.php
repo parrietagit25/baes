@@ -77,14 +77,19 @@ function reportes_sucursales_columna_existe(PDO $pdo, string $tabla, string $col
 /**
  * @return list<array{estado: string, fecha_creacion: string, ejecutivo_ventas_id: int|null}>
  */
-function reportes_sucursales_cargar_filas(PDO $pdo, string $fuente): array
+function reportes_sucursales_cargar_filas(PDO $pdo, string $fuente, string $d1, string $d2): array
 {
     $fuente = reportes_sucursales_normalizar_fuente($fuente);
     if ($fuente === 'credito') {
-        return $pdo->query('
+        $st = $pdo->prepare('
             SELECT s.estado, s.fecha_creacion, s.ejecutivo_ventas_id
             FROM solicitudes_credito s
-        ')->fetchAll(PDO::FETCH_ASSOC);
+            WHERE s.fecha_creacion IS NOT NULL
+              AND DATE(s.fecha_creacion) BETWEEN ? AND ?
+        ');
+        $st->execute([$d1, $d2]);
+
+        return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
     if (!reportes_sucursales_tabla_existe($pdo, 'financiamiento_registros')) {
@@ -107,6 +112,8 @@ function reportes_sucursales_cargar_filas(PDO $pdo, string $fuente): array
                 fr.id_vendedor AS ejecutivo_ventas_id
             FROM financiamiento_registros fr
             LEFT JOIN solicitudes_credito sc ON sc.id = fr.solicitud_credito_id
+            WHERE fr.fecha_creacion IS NOT NULL
+              AND DATE(fr.fecha_creacion) BETWEEN ? AND ?
         ";
     } else {
         $sql = '
@@ -115,10 +122,48 @@ function reportes_sucursales_cargar_filas(PDO $pdo, string $fuente): array
                 fr.fecha_creacion,
                 fr.id_vendedor AS ejecutivo_ventas_id
             FROM financiamiento_registros fr
+            WHERE fr.fecha_creacion IS NOT NULL
+              AND DATE(fr.fecha_creacion) BETWEEN ? AND ?
         ';
     }
+    $st = $pdo->prepare($sql);
+    $st->execute([$d1, $d2]);
 
-    return $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+    return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+}
+
+/**
+ * @return array{0:string,1:string} Y-m-d
+ */
+function reportes_sucursales_rango_fechas(?string $desde, ?string $hasta): array
+{
+    require_once __DIR__ . '/reportes_fin_demografia_data.php';
+
+    return rep_fin_rango_fechas_efectivo((string) ($desde ?? ''), (string) ($hasta ?? ''));
+}
+
+/**
+ * Meses (Y-m) entre dos fechas inclusive, máx. 36.
+ *
+ * @return array<int,string>
+ */
+function reportes_sucursales_meses_en_rango(string $d1, string $d2): array
+{
+    $out = [];
+    try {
+        $cur = new DateTimeImmutable(substr($d1, 0, 7) . '-01');
+        $end = new DateTimeImmutable(substr($d2, 0, 7) . '-01');
+    } catch (Throwable $e) {
+        return $out;
+    }
+    $n = 0;
+    while ($cur <= $end && $n < 36) {
+        $out[] = $cur->format('Y-m');
+        $cur = $cur->modify('+1 month');
+        $n++;
+    }
+
+    return $out;
 }
 
 /**
@@ -180,12 +225,13 @@ function reportes_sucursales_sumar_estado(array &$bucket, ?string $estado): void
 /**
  * @return array<string, mixed>
  */
-function reportes_sucursales_obtener_datos(PDO $pdo, ?int $anio = null, string $fuente = 'credito'): array
+function reportes_sucursales_obtener_datos(PDO $pdo, ?string $desde = null, ?string $hasta = null, string $fuente = 'credito'): array
 {
-    $anio = $anio ?: (int) date('Y');
+    [$d1, $d2] = reportes_sucursales_rango_fechas($desde, $hasta);
     $fuente = reportes_sucursales_normalizar_fuente($fuente);
     $listaEstados = reportes_sucursales_lista_estados($fuente);
     $estadosVacios = reportes_sucursales_estados_vacios($fuente);
+    $mesesKeys = reportes_sucursales_meses_en_rango($d1, $d2);
 
     $ejecutivos = $pdo->query("
         SELECT id, nombre, email, sucursal
@@ -204,14 +250,14 @@ function reportes_sucursales_obtener_datos(PDO $pdo, ?int $anio = null, string $
         }
     }
 
-    $solicitudes = reportes_sucursales_cargar_filas($pdo, $fuente);
+    $solicitudes = reportes_sucursales_cargar_filas($pdo, $fuente, $d1, $d2);
 
     $porSucursal = [];
     $porAgente = [];
     $porSupervisor = [];
     $porEstado = array_fill_keys($listaEstados, 0);
     $sinEjecutivo = 0;
-    $totalAnio = 0;
+    $totalConSucursal = 0;
     $serieMensual = [];
 
     foreach (array_keys(REPORTES_SUCURSALES_NOMBRES) as $cod) {
@@ -222,7 +268,7 @@ function reportes_sucursales_obtener_datos(PDO $pdo, ?int $anio = null, string $
             ['codigo' => $cod, 'nombre' => REPORTES_SUCURSALES_NOMBRES[$cod], 'siglas_agentes' => $cod],
             $estadosVacios
         );
-        $serieMensual[$cod] = array_fill(1, 12, 0);
+        $serieMensual[$cod] = array_fill_keys($mesesKeys, 0);
     }
 
     foreach ($solicitudes as $s) {
@@ -240,8 +286,13 @@ function reportes_sucursales_obtener_datos(PDO $pdo, ?int $anio = null, string $
         $ev = $mapEjecutivo[$evId];
         $codigo = (string) $ev['codigo'];
         $fecha = $s['fecha_creacion'] ?? '';
-        $anioSol = $fecha ? (int) date('Y', strtotime($fecha)) : 0;
-        $mes = $fecha ? (int) date('n', strtotime($fecha)) : 0;
+        $ym = '';
+        if ($fecha) {
+            $ts = strtotime((string) $fecha);
+            if ($ts !== false) {
+                $ym = date('Y-m', $ts);
+            }
+        }
 
         if ($ev['tipo'] === 'agente') {
             if (!isset($porAgente[$evId])) {
@@ -261,9 +312,9 @@ function reportes_sucursales_obtener_datos(PDO $pdo, ?int $anio = null, string $
 
             if ($codigo !== '' && isset($porSucursal[$codigo])) {
                 reportes_sucursales_sumar_estado($porSucursal[$codigo], $estado);
-                if ($anioSol === $anio && $mes >= 1 && $mes <= 12) {
-                    $serieMensual[$codigo][$mes]++;
-                    $totalAnio++;
+                $totalConSucursal++;
+                if ($ym !== '' && isset($serieMensual[$codigo][$ym])) {
+                    $serieMensual[$codigo][$ym]++;
                 }
             }
         }
@@ -322,32 +373,42 @@ function reportes_sucursales_obtener_datos(PDO $pdo, ?int $anio = null, string $
     $tasaAprobacion = $cerradas > 0 ? round(100 * $aprobadas / $cerradas, 1) : 0;
 
     $mesesLabels = [];
-    $seriesLinea = [];
-    for ($m = 1; $m <= 12; $m++) {
-        $mesesLabels[] = date('M', mktime(0, 0, 0, $m, 1));
+    foreach ($mesesKeys as $ym) {
+        try {
+            $mesesLabels[] = (new DateTimeImmutable($ym . '-01'))->format('M Y');
+        } catch (Throwable $e) {
+            $mesesLabels[] = $ym;
+        }
     }
+    $seriesLinea = [];
     foreach ($serieMensual as $cod => $meses) {
         if ($cod === 'NN') {
             continue;
         }
+        $datos = [];
+        foreach ($mesesKeys as $ym) {
+            $datos[] = (int) ($meses[$ym] ?? 0);
+        }
         $seriesLinea[] = [
             'codigo' => $cod,
             'nombre' => REPORTES_SUCURSALES_NOMBRES[$cod] ?? $cod,
-            'datos' => array_values($meses),
+            'datos' => $datos,
         ];
     }
 
     $topAgentes = array_slice($porAgente, 0, 12);
 
     return [
-        'anio' => $anio,
+        'fecha_desde' => $d1,
+        'fecha_hasta' => $d2,
         'fuente' => $fuente,
         'fuente_label' => $fuente === 'financiamiento' ? 'Sol. Financiamiento' : 'Solicitudes de crédito',
         'estados' => $listaEstados,
         'catalogo_sucursales' => REPORTES_SUCURSALES_NOMBRES,
         'kpis' => [
             'total_solicitudes' => $totalSolicitudes,
-            'total_anio' => $totalAnio,
+            'total_anio' => $totalConSucursal,
+            'total_en_rango' => $totalConSucursal,
             'sin_ejecutivo' => $sinEjecutivo,
             'total_agentes' => count(array_filter($mapEjecutivo, static fn($e) => $e['tipo'] === 'agente')),
             'total_supervisores' => count($porSupervisor),

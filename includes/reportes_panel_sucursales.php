@@ -22,19 +22,24 @@ $panelSucVisible = ($submenu ?? '') === 'sucursales';
     </div>
     <div class="card mb-3">
         <div class="card-body">
-            <div class="row g-2 align-items-end">
-                <div class="col-md-2">
-                    <label class="form-label small mb-0">Año</label>
-                    <select id="sucFiltroAnio" class="form-select form-select-sm">
-                        <?php for ($y = (int) date('Y'); $y >= (int) date('Y') - 4; $y--): ?>
-                        <option value="<?php echo $y; ?>"<?php echo $y === (int) date('Y') ? ' selected' : ''; ?>><?php echo $y; ?></option>
-                        <?php endfor; ?>
-                    </select>
+            <form id="formSucFiltros" action="#" method="get" autocomplete="off">
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-2">
+                        <label class="form-label small mb-0" for="sucFiltroDesde">Desde</label>
+                        <input type="date" id="sucFiltroDesde" name="desde" class="form-control form-control-sm" value="<?php echo htmlspecialchars($finRepDesde); ?>">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small mb-0" for="sucFiltroHasta">Hasta</label>
+                        <input type="date" id="sucFiltroHasta" name="hasta" class="form-control form-control-sm" value="<?php echo htmlspecialchars($finRepHasta); ?>">
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-primary btn-sm w-100" id="btnSucFiltrar">
+                            <i class="fas fa-filter me-1"></i>Filtrar
+                        </button>
+                    </div>
                 </div>
-                <div class="col-md-2">
-                    <button type="button" class="btn btn-primary btn-sm w-100" id="btnSucFiltrar"><i class="fas fa-sync me-1"></i>Actualizar</button>
-                </div>
-            </div>
+            </form>
+            <p class="small text-muted mb-0 mt-2" id="sucFiltrosAplicados">Filtros: —</p>
         </div>
     </div>
     <div class="row g-3 mb-3">
@@ -49,7 +54,7 @@ $panelSucVisible = ($submenu ?? '') === 'sucursales';
         <div class="col-md-2">
             <div class="card h-100">
                 <div class="card-body text-center">
-                    <div class="text-muted small">En <span id="sucAnioLabel"><?php echo date('Y'); ?></span></div>
+                    <div class="text-muted small">Con sucursal</div>
                     <div class="h5 mb-0 text-primary" id="sucKpiAnio">0</div>
                 </div>
             </div>
@@ -117,7 +122,7 @@ $panelSucVisible = ($submenu ?? '') === 'sucursales';
         <div class="col-12">
             <div class="card">
                 <div class="card-body">
-                    <h6 class="mb-2">Línea de tiempo — solicitudes por mes y sucursal (<span id="sucAnioLabel2"><?php echo date('Y'); ?></span>)</h6>
+                    <h6 class="mb-2">Línea de tiempo — solicitudes por mes y sucursal (<span id="sucAnioLabel2">rango</span>)</h6>
                     <div class="fin-chart-wrap" style="min-height:320px"><canvas id="sucChartLineMes"></canvas></div>
                 </div>
             </div>

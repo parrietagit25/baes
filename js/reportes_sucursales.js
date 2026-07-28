@@ -234,11 +234,13 @@
         }
     }
 
-    function actualizarExportLink(anio, fuente) {
+    function actualizarExportLink(desde, hasta, fuente) {
         const link = document.querySelector('.reportes-header a[href*="exportar_excel_sucursales"]');
         if (link) {
-            link.href = 'api/reportes.php?action=exportar_excel_sucursales&anio=' + encodeURIComponent(anio) +
-                '&fuente=' + encodeURIComponent(fuente);
+            link.href = 'api/reportes.php?action=exportar_excel_sucursales'
+                + '&desde=' + encodeURIComponent(desde)
+                + '&hasta=' + encodeURIComponent(hasta)
+                + '&fuente=' + encodeURIComponent(fuente);
         }
     }
 
@@ -247,28 +249,68 @@
         return tab ? tab.getAttribute('data-suc-fuente') : 'credito';
     }
 
-    window.loadReporteSucursales = function () {
-        const anio = document.getElementById('sucFiltroAnio').value || new Date().getFullYear();
+    function obtenerRangoFechas() {
+        const d = document.getElementById('sucFiltroDesde');
+        const h = document.getElementById('sucFiltroHasta');
+        return {
+            desde: d && d.value ? d.value : '',
+            hasta: h && h.value ? h.value : ''
+        };
+    }
+
+    window.loadReporteSucursales = function (ev) {
+        if (ev && typeof ev.preventDefault === 'function') {
+            ev.preventDefault();
+            ev.stopPropagation();
+        }
+
+        const rango = obtenerRangoFechas();
         fuenteActiva = obtenerFuenteActiva();
-        document.getElementById('sucAnioLabel').textContent = anio;
         const el2 = document.getElementById('sucAnioLabel2');
-        if (el2) el2.textContent = anio;
-        actualizarExportLink(anio, fuenteActiva);
+        if (el2) {
+            el2.textContent = (rango.desde || '…') + ' → ' + (rango.hasta || '…');
+        }
+        const aplicados = document.getElementById('sucFiltrosAplicados');
+        if (aplicados) {
+            aplicados.textContent = 'Aplicando filtros…';
+        }
+        actualizarExportLink(rango.desde, rango.hasta, fuenteActiva);
+
+        const btn = document.getElementById('btnSucFiltrar');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Filtrando…';
+        }
 
         const colRes = colspanTabla(2);
         document.querySelector('#tabla-sucursal-resumen tbody').innerHTML =
             '<tr><td colspan="' + colRes + '" class="text-center text-muted">Cargando…</td></tr>';
 
-        fetch('api/reportes.php?action=reporte_sucursales&anio=' + encodeURIComponent(anio) +
-            '&fuente=' + encodeURIComponent(fuenteActiva))
+        const qs = 'action=reporte_sucursales'
+            + '&desde=' + encodeURIComponent(rango.desde)
+            + '&hasta=' + encodeURIComponent(rango.hasta)
+            + '&fuente=' + encodeURIComponent(fuenteActiva)
+            + '&_ts=' + Date.now();
+
+        fetch('api/reportes.php?' + qs)
             .then(function (r) { return r.json(); })
             .then(function (res) {
                 if (!res.success || !res.data) {
                     document.querySelector('#tabla-sucursal-resumen tbody').innerHTML =
                         '<tr><td colspan="' + colRes + '" class="text-center text-danger">Error al cargar</td></tr>';
+                    if (aplicados) aplicados.textContent = 'No se pudieron aplicar los filtros.';
                     return;
                 }
                 datosCache = res.data;
+                if (aplicados) {
+                    aplicados.textContent = 'Filtros aplicados: '
+                        + (res.data.fecha_desde || rango.desde) + ' → '
+                        + (res.data.fecha_hasta || rango.hasta)
+                        + ' · ' + String((res.data.kpis && res.data.kpis.total_solicitudes) || 0) + ' registros';
+                }
+                if (el2) {
+                    el2.textContent = (res.data.fecha_desde || rango.desde) + ' → ' + (res.data.fecha_hasta || rango.hasta);
+                }
                 actualizarTheadEstados(res.data.estados || ESTADOS_CREDITO);
                 renderKpis(res.data.kpis || {}, res.data);
                 renderTablas(res.data);
@@ -277,10 +319,22 @@
             .catch(function () {
                 document.querySelector('#tabla-sucursal-resumen tbody').innerHTML =
                     '<tr><td colspan="' + colRes + '" class="text-center text-danger">Error de conexión</td></tr>';
+                if (aplicados) aplicados.textContent = 'Error al filtrar. Intente de nuevo.';
+            })
+            .finally(function () {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-filter me-1"></i>Filtrar';
+                }
             });
     };
 
-    document.getElementById('btnSucFiltrar')?.addEventListener('click', window.loadReporteSucursales);
+    const formSuc = document.getElementById('formSucFiltros');
+    if (formSuc) {
+        formSuc.addEventListener('submit', window.loadReporteSucursales);
+    } else {
+        document.getElementById('btnSucFiltrar')?.addEventListener('click', window.loadReporteSucursales);
+    }
 
     document.querySelectorAll('#sucTabsFuente [data-suc-fuente]').forEach(function (btn) {
         btn.addEventListener('click', function () {
