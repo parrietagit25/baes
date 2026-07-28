@@ -44,12 +44,53 @@ $filtroEstadoLista = $esHistorico
     ? "estado IN ($estadosHistoricoSql)"
     : "estado NOT IN ($estadosHistoricoSql)";
 
-// Obtener estadísticas (filtrar por usuario banco / admin banco si aplica)
+// Estados activos (orden de flujo) y de histórico para las tarjetas
+$estadosActivosTarjetas = [
+    'Nueva',
+    'En Revisión Banco',
+    'Reevaluación por los Bancos',
+    'Evaluacion',
+    'Comité',
+    'Reconsideración',
+    'Pre Aprobado',
+    'Aprobado con Condición',
+    'Pend. Firma',
+    'Pend. Poliza',
+    'Pend. Abono',
+    'Pend. Abono y poliza',
+    'Pend. CPP',
+    'Aprobada',
+];
+$estadosHistoricoTarjetas = ['Completada', 'Rechazada', 'Desistimiento'];
+
+$statsGradientes = [
+    'Total' => 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    'Nueva' => 'linear-gradient(135deg, #6c5ce7 0%, #a29bfe 100%)',
+    'En Revisión Banco' => 'linear-gradient(135deg, #fdcb6e 0%, #e17055 100%)',
+    'Reevaluación por los Bancos' => 'linear-gradient(135deg, #f6d365 0%, #fda085 100%)',
+    'Evaluacion' => 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+    'Comité' => 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+    'Reconsideración' => 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+    'Pre Aprobado' => 'linear-gradient(135deg, #00b894 0%, #55efc4 100%)',
+    'Aprobado con Condición' => 'linear-gradient(135deg, #00cec9 0%, #81ecec 100%)',
+    'Pend. Firma' => 'linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)',
+    'Pend. Poliza' => 'linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%)',
+    'Pend. Abono' => 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+    'Pend. Abono y poliza' => 'linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)',
+    'Pend. CPP' => 'linear-gradient(135deg, #c79081 0%, #dfa579 100%)',
+    'Aprobada' => 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
+    'Completada' => 'linear-gradient(135deg, #2d3436 0%, #636e72 100%)',
+    'Rechazada' => 'linear-gradient(135deg, #e84393 0%, #fd79a8 100%)',
+    'Desistimiento' => 'linear-gradient(135deg, #636e72 0%, #b2bec3 100%)',
+];
+
+// Alcance por rol (banco / gestor / admin)
+$filtroAlcanceStats = '';
 if ($isBanco && !$isAdmin) {
     if ($isAdminBanco) {
         $bancoIdFiltro = (int) ($bancoIdSesion ?? 0);
         if ($bancoIdFiltro > 0) {
-            $filtroBanco = "AND EXISTS (
+            $filtroAlcanceStats = "AND EXISTS (
                 SELECT 1 FROM usuarios_banco_solicitudes ubs
                 INNER JOIN usuarios u_banco ON u_banco.id = ubs.usuario_banco_id
                 WHERE ubs.solicitud_id = solicitudes_credito.id
@@ -57,85 +98,37 @@ if ($isBanco && !$isAdmin) {
                 AND u_banco.banco_id = {$bancoIdFiltro}
             )";
         } else {
-            $filtroBanco = "AND 1=0";
+            $filtroAlcanceStats = "AND 1=0";
         }
     } else {
-        // Analista banco solo ve sus solicitudes asignadas
-        $filtroBanco = "AND EXISTS (
-            SELECT 1 FROM usuarios_banco_solicitudes ubs 
-            WHERE ubs.solicitud_id = solicitudes_credito.id 
+        $filtroAlcanceStats = "AND EXISTS (
+            SELECT 1 FROM usuarios_banco_solicitudes ubs
+            WHERE ubs.solicitud_id = solicitudes_credito.id
             AND ubs.usuario_banco_id = " . (int) $_SESSION['user_id'] . "
             AND ubs.estado = 'activo'
         )";
     }
-    
-    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE $filtroEstadoLista $filtroBanco");
-    $totalSolicitudes = $stmt->fetch()['total'];
-
-    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE estado = 'Nueva' $filtroBanco");
-    $solicitudesNuevas = $stmt->fetch()['total'];
-
-    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE respuesta_banco = 'Aprobado' AND $filtroEstadoLista $filtroBanco");
-    $solicitudesAprobadas = $stmt->fetch()['total'];
-
-    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE respuesta_banco = 'Rechazado' AND $filtroEstadoLista $filtroBanco");
-    $solicitudesRechazadasBanco = $stmt->fetch()['total'];
-
-    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE estado = 'Rechazada' $filtroBanco");
-    $solicitudesRechazadas = $stmt->fetch()['total'];
-
-    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE estado = 'Completada' $filtroBanco");
-    $solicitudesCompletadas = $stmt->fetch()['total'];
-
-    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE estado = 'Desistimiento' $filtroBanco");
-    $solicitudesDesistimiento = $stmt->fetch()['total'];
 } elseif ($isGestor && !$isAdmin) {
-    // Gestor solo ve sus solicitudes asignadas
-    $filtroGestor = "AND gestor_id = " . $_SESSION['user_id'];
-    
-    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE $filtroEstadoLista $filtroGestor");
-    $totalSolicitudes = $stmt->fetch()['total'];
-
-    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE estado = 'Nueva' $filtroGestor");
-    $solicitudesNuevas = $stmt->fetch()['total'];
-
-    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE respuesta_banco = 'Aprobado' AND $filtroEstadoLista $filtroGestor");
-    $solicitudesAprobadas = $stmt->fetch()['total'];
-
-    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE respuesta_banco = 'Rechazado' AND $filtroEstadoLista $filtroGestor");
-    $solicitudesRechazadasBanco = $stmt->fetch()['total'];
-
-    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE estado = 'Rechazada' $filtroGestor");
-    $solicitudesRechazadas = $stmt->fetch()['total'];
-
-    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE estado = 'Completada' $filtroGestor");
-    $solicitudesCompletadas = $stmt->fetch()['total'];
-
-    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE estado = 'Desistimiento' $filtroGestor");
-    $solicitudesDesistimiento = $stmt->fetch()['total'];
-} else {
-    // Admin ve todas las solicitudes
-    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE $filtroEstadoLista");
-    $totalSolicitudes = $stmt->fetch()['total'];
-
-    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE estado = 'Nueva'");
-    $solicitudesNuevas = $stmt->fetch()['total'];
-
-    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE respuesta_banco = 'Aprobado' AND $filtroEstadoLista");
-    $solicitudesAprobadas = $stmt->fetch()['total'];
-
-    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE respuesta_banco = 'Rechazado' AND $filtroEstadoLista");
-    $solicitudesRechazadasBanco = $stmt->fetch()['total'];
-
-    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE estado = 'Rechazada'");
-    $solicitudesRechazadas = $stmt->fetch()['total'];
-
-    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE estado = 'Completada'");
-    $solicitudesCompletadas = $stmt->fetch()['total'];
-
-    $stmt = $pdo->query("SELECT COUNT(*) as total FROM solicitudes_credito WHERE estado = 'Desistimiento'");
-    $solicitudesDesistimiento = $stmt->fetch()['total'];
+    $filtroAlcanceStats = "AND gestor_id = " . (int) $_SESSION['user_id'];
 }
+
+$conteoPorEstado = [];
+$stmt = $pdo->query("
+    SELECT estado, COUNT(*) AS total
+    FROM solicitudes_credito
+    WHERE $filtroEstadoLista $filtroAlcanceStats
+    GROUP BY estado
+");
+foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $fila) {
+    $conteoPorEstado[$fila['estado']] = (int) $fila['total'];
+}
+
+$totalSolicitudes = array_sum($conteoPorEstado);
+
+$estadosBaseTarjetas = $esHistorico ? $estadosHistoricoTarjetas : $estadosActivosTarjetas;
+$estadosExtra = array_diff(array_keys($conteoPorEstado), $estadosBaseTarjetas);
+sort($estadosExtra);
+$estadosParaTarjetas = array_merge($estadosBaseTarjetas, array_values($estadosExtra));
 ?>
 
 <!DOCTYPE html>
@@ -189,21 +182,43 @@ if ($isBanco && !$isAdmin) {
             color: white;
             border-radius: 15px 15px 0 0;
         }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+            gap: 12px;
+            margin-bottom: 1.5rem;
+        }
         .stats-card {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            border-radius: 15px;
-            padding: 20px;
-            margin-bottom: 20px;
+            border-radius: 12px;
+            padding: 14px 12px;
+            margin-bottom: 0;
+            min-height: 92px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+        .stats-card.stats-card-total {
+            grid-column: span 1;
         }
         .stats-number {
-            font-size: 2.5rem;
-            font-weight: bold;
-            margin-bottom: 10px;
+            font-size: 1.75rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+            line-height: 1.1;
         }
         .stats-label {
-            font-size: 1rem;
-            opacity: 0.9;
+            font-size: 0.78rem;
+            opacity: 0.95;
+            line-height: 1.25;
+            word-break: break-word;
+        }
+        @media (min-width: 1200px) {
+            .stats-grid {
+                grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            }
         }
         .badge-estado {
             font-size: 0.85em;
@@ -359,62 +374,22 @@ if ($isBanco && !$isAdmin) {
                         <?php endif; ?>
                     </div>
 
-                    <!-- Estadísticas -->
-                    <?php if ($esHistorico): ?>
-                    <div class="row mb-4">
-                        <div class="col-md-3">
-                            <div class="stats-card text-center">
-                                <div class="stats-number"><?php echo $totalSolicitudes; ?></div>
-                                <div class="stats-label">Total en histórico</div>
-                            </div>
+                    <!-- Estadísticas por estado -->
+                    <div class="stats-grid">
+                        <div class="stats-card stats-card-total text-center" style="background: <?php echo htmlspecialchars($statsGradientes['Total']); ?>;">
+                            <div class="stats-number"><?php echo (int) $totalSolicitudes; ?></div>
+                            <div class="stats-label"><?php echo $esHistorico ? 'Total en histórico' : 'Total Solicitudes'; ?></div>
                         </div>
-                        <div class="col-md-3">
-                            <div class="stats-card text-center" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
-                                <div class="stats-number"><?php echo $solicitudesCompletadas; ?></div>
-                                <div class="stats-label">Completadas</div>
-                            </div>
+                        <?php foreach ($estadosParaTarjetas as $estadoTarjeta):
+                            $countEstado = $conteoPorEstado[$estadoTarjeta] ?? 0;
+                            $gradiente = $statsGradientes[$estadoTarjeta] ?? 'linear-gradient(135deg, #636e72 0%, #b2bec3 100%)';
+                        ?>
+                        <div class="stats-card text-center" style="background: <?php echo htmlspecialchars($gradiente); ?>;">
+                            <div class="stats-number"><?php echo (int) $countEstado; ?></div>
+                            <div class="stats-label"><?php echo htmlspecialchars($estadoTarjeta); ?></div>
                         </div>
-                        <div class="col-md-3">
-                            <div class="stats-card text-center" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);">
-                                <div class="stats-number"><?php echo $solicitudesRechazadas; ?></div>
-                                <div class="stats-label">Rechazadas</div>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="stats-card text-center" style="background: linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%);">
-                                <div class="stats-number"><?php echo $solicitudesDesistimiento; ?></div>
-                                <div class="stats-label">Desistimiento</div>
-                            </div>
-                        </div>
+                        <?php endforeach; ?>
                     </div>
-                    <?php else: ?>
-                    <div class="row mb-4">
-                        <div class="col-md-3">
-                            <div class="stats-card text-center">
-                                <div class="stats-number"><?php echo $totalSolicitudes; ?></div>
-                                <div class="stats-label">Total Solicitudes</div>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="stats-card text-center" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
-                                <div class="stats-number"><?php echo $solicitudesNuevas; ?></div>
-                                <div class="stats-label">Nuevas</div>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="stats-card text-center" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
-                                <div class="stats-number"><?php echo $solicitudesAprobadas; ?></div>
-                                <div class="stats-label">Aprobadas</div>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="stats-card text-center" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
-                                <div class="stats-number"><?php echo $solicitudesRechazadasBanco; ?></div>
-                                <div class="stats-label">Rechazadas banco</div>
-                            </div>
-                        </div>
-                    </div>
-                    <?php endif; ?>
 
                     <!-- Tabla de Solicitudes -->
                     <div class="card">
