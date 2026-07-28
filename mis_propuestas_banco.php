@@ -41,11 +41,18 @@ $esAdminBancoPagina = motus_es_admin_banco($userRoles);
         <?php include __DIR__ . '/includes/sidebar.php'; ?>
         <div class="col-md-9 col-lg-10 main-content">
             <div class="container-fluid py-4">
-                <div class="page-header">
-                    <h2 class="mb-1"><i class="fas fa-file-contract me-2"></i><?php echo $esAdminBancoPagina ? 'Propuestas del banco' : 'Mis propuestas'; ?></h2>
-                    <p class="mb-0 opacity-90"><?php echo $esAdminBancoPagina
-                        ? 'Evaluaciones registradas por los usuarios banco de su entidad, en cualquier solicitud asignada.'
-                        : 'Todas las evaluaciones que has registrado como usuario banco, en cualquier solicitud asignada.'; ?></p>
+                <div class="page-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+                    <div>
+                        <h2 class="mb-1"><i class="fas fa-file-contract me-2"></i><?php echo $esAdminBancoPagina ? 'Propuestas del banco' : 'Mis propuestas'; ?></h2>
+                        <p class="mb-0 opacity-90"><?php echo $esAdminBancoPagina
+                            ? 'Evaluaciones registradas por los usuarios banco de su entidad, en cualquier solicitud asignada.'
+                            : 'Todas las evaluaciones que has registrado como usuario banco, en cualquier solicitud asignada.'; ?></p>
+                    </div>
+                    <a class="btn btn-light text-success fw-semibold"
+                       href="api/evaluaciones_banco.php?mis_propuestas=1&exportar_xlsx=1"
+                       id="btnExportarPropuestasXlsx">
+                        <i class="fas fa-file-excel me-1"></i>Descargar Excel
+                    </a>
                 </div>
                 <div class="card shadow-sm">
                     <div class="card-body">

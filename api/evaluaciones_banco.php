@@ -1,21 +1,30 @@
 <?php
 session_start();
 
-// Suprimir warnings de deprecación que pueden romper el JSON
+// Suprimir warnings de deprecación que pueden romper el JSON / binarios
 error_reporting(E_ALL & ~E_DEPRECATED & ~E_STRICT);
 ini_set('display_errors', 0);
-
-header('Content-Type: application/json');
 
 // Verificar si el usuario está logueado
 if (!isset($_SESSION['user_id'])) {
     http_response_code(401);
+    header('Content-Type: application/json');
     echo json_encode(['success' => false, 'message' => 'No autorizado']);
     exit();
 }
 
 require_once '../config/database.php';
 require_once '../includes/banco_scope_helper.php';
+
+$exportarXlsxMisPropuestas = ($_SERVER['REQUEST_METHOD'] ?? '') === 'GET'
+    && !empty($_GET['mis_propuestas'])
+    && (string) $_GET['mis_propuestas'] === '1'
+    && !empty($_GET['exportar_xlsx'])
+    && (string) $_GET['exportar_xlsx'] === '1';
+
+if (!$exportarXlsxMisPropuestas) {
+    header('Content-Type: application/json');
+}
 
 function evaluaciones_tiene_letra_quincenal(PDO $pdo): bool
 {
@@ -82,7 +91,11 @@ $method = $_SERVER['REQUEST_METHOD'];
 switch ($method) {
     case 'GET':
         if (!empty($_GET['mis_propuestas']) && $_GET['mis_propuestas'] === '1') {
-            listarMisPropuestasBanco();
+            if (!empty($_GET['exportar_xlsx']) && (string) $_GET['exportar_xlsx'] === '1') {
+                exportarMisPropuestasBancoXlsx();
+            } else {
+                listarMisPropuestasBanco();
+            }
         } elseif (isset($_GET['solicitud_id'])) {
             $usuarioBancoId = isset($_GET['usuario_banco_id']) ? $_GET['usuario_banco_id'] : null;
             obtenerEvaluaciones($_GET['solicitud_id'], $usuarioBancoId);
@@ -119,28 +132,26 @@ switch ($method) {
 }
 
 /**
- * Lista evaluaciones (propuestas) del usuario banco logueado,
- * o de toda la entidad si es ROLE_ADMIN_BANCO.
+ * Datos de propuestas del usuario banco (o toda la entidad si ROLE_ADMIN_BANCO).
+ *
+ * @return array{ok:bool,message?:string,http?:int,es_admin_banco?:bool,data?:array<int,array>}
  */
-function listarMisPropuestasBanco(): void {
+function obtenerDatosMisPropuestasBanco(): array {
     global $pdo;
 
     $roles = $_SESSION['user_roles'] ?? [];
     if (!motus_es_vista_banco($roles)) {
-        http_response_code(403);
-        echo json_encode(['success' => false, 'message' => 'Solo usuarios banco pueden ver esta lista']);
-        return;
+        return ['ok' => false, 'http' => 403, 'message' => 'Solo usuarios banco pueden ver esta lista'];
     }
 
     $uid = (int) $_SESSION['user_id'];
+    $esAdminBanco = motus_es_admin_banco($roles);
 
     try {
-        if (motus_es_admin_banco($roles)) {
+        if ($esAdminBanco) {
             $bancoId = motus_obtener_banco_id_usuario($pdo, $uid);
             if (!$bancoId) {
-                http_response_code(403);
-                echo json_encode(['success' => false, 'message' => 'Admin banco sin entidad bancaria asignada']);
-                return;
+                return ['ok' => false, 'http' => 403, 'message' => 'Admin banco sin entidad bancaria asignada'];
             }
             $sql = "
                 SELECT
@@ -196,15 +207,123 @@ function listarMisPropuestasBanco(): void {
         }
         unset($r);
 
-        echo json_encode([
-            'success' => true,
+        return [
+            'ok' => true,
+            'es_admin_banco' => $esAdminBanco,
             'data' => $rows,
-        ]);
-    } catch (PDOException $e) {
-        http_response_code(500);
-        error_log('listarMisPropuestasBanco: ' . $e->getMessage());
-        echo json_encode(['success' => false, 'message' => 'Error al cargar sus propuestas']);
+        ];
+    } catch (Throwable $e) {
+        error_log('obtenerDatosMisPropuestasBanco: ' . $e->getMessage());
+        return ['ok' => false, 'http' => 500, 'message' => 'Error al cargar propuestas'];
     }
+}
+
+/**
+ * Lista evaluaciones (propuestas) del usuario banco logueado,
+ * o de toda la entidad si es ROLE_ADMIN_BANCO.
+ */
+function listarMisPropuestasBanco(): void {
+    $result = obtenerDatosMisPropuestasBanco();
+    if (empty($result['ok'])) {
+        http_response_code((int) ($result['http'] ?? 500));
+        echo json_encode(['success' => false, 'message' => $result['message'] ?? 'Error']);
+        return;
+    }
+
+    echo json_encode([
+        'success' => true,
+        'es_admin_banco' => !empty($result['es_admin_banco']),
+        'data' => $result['data'] ?? [],
+    ]);
+}
+
+function exportarMisPropuestasBancoXlsx(): void {
+    require_once __DIR__ . '/../includes/xlsx_export.php';
+
+    $result = obtenerDatosMisPropuestasBanco();
+    if (empty($result['ok'])) {
+        http_response_code((int) ($result['http'] ?? 500));
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => false, 'message' => $result['message'] ?? 'Error']);
+        return;
+    }
+
+    $esAdminBanco = !empty($result['es_admin_banco']);
+    $headers = [
+        'Fecha',
+        'Solicitud',
+        'Cliente',
+        'Cédula',
+    ];
+    if ($esAdminBanco) {
+        $headers[] = 'Analista';
+    }
+    $headers = array_merge($headers, [
+        'Estado solicitud',
+        'Vehículo',
+        'Decisión',
+        'Razón',
+        'Tasa %',
+        'Valor a financiar',
+        'Abono',
+        'Plazo (meses)',
+        'Letra mensual',
+        'Letra quincenal',
+        'Promoción',
+        'Cuantía',
+        'Comentarios',
+        'Seleccionada',
+    ]);
+
+    $rows = [];
+    foreach ($result['data'] as $r) {
+        $vehiculo = trim(implode(' ', array_filter([
+            $r['vehiculo_marca'] ?? '',
+            $r['vehiculo_modelo'] ?? '',
+            isset($r['vehiculo_anio']) && $r['vehiculo_anio'] !== '' && $r['vehiculo_anio'] !== null
+                ? (string) $r['vehiculo_anio']
+                : '',
+        ], static function ($v) {
+            return $v !== null && $v !== '';
+        })));
+        $decision = strtoupper(str_replace('_', ' ', (string) ($r['decision'] ?? '')));
+        $row = [
+            (string) ($r['fecha_evaluacion'] ?? ''),
+            (int) ($r['solicitud_id'] ?? 0),
+            (string) ($r['nombre_cliente'] ?? ''),
+            (string) ($r['cedula'] ?? ''),
+        ];
+        if ($esAdminBanco) {
+            $row[] = trim(((string) ($r['analista_nombre'] ?? '')) . ' ' . ((string) ($r['analista_apellido'] ?? '')));
+        }
+        $row = array_merge($row, [
+            (string) ($r['solicitud_estado'] ?? ''),
+            $vehiculo !== '' ? $vehiculo : '-',
+            $decision !== '' ? $decision : '-',
+            (string) ($r['razon'] ?? ''),
+            $r['tasa_bancaria'] !== null && $r['tasa_bancaria'] !== '' ? (float) $r['tasa_bancaria'] : '',
+            $r['valor_financiar'] !== null && $r['valor_financiar'] !== '' ? (float) $r['valor_financiar'] : '',
+            $r['abono'] !== null && $r['abono'] !== '' ? (float) $r['abono'] : '',
+            $r['plazo'] !== null && $r['plazo'] !== '' ? (int) $r['plazo'] : '',
+            $r['letra'] !== null && $r['letra'] !== '' ? (float) $r['letra'] : '',
+            isset($r['letra_quincenal']) && $r['letra_quincenal'] !== null && $r['letra_quincenal'] !== ''
+                ? (float) $r['letra_quincenal']
+                : '',
+            (string) ($r['promocion'] ?? ''),
+            $r['cuantia'] !== null && $r['cuantia'] !== '' ? (float) $r['cuantia'] : '',
+            (string) ($r['comentarios'] ?? ''),
+            !empty($r['es_propuesta_seleccionada']) ? 'Sí' : 'No',
+        ]);
+        $rows[] = $row;
+    }
+
+    $fileName = $esAdminBanco
+        ? ('propuestas_banco_' . date('Ymd_His') . '.xlsx')
+        : ('mis_propuestas_' . date('Ymd_His') . '.xlsx');
+    $sheetName = $esAdminBanco ? 'Propuestas banco' : 'Mis propuestas';
+
+    motus_output_xlsx_download($fileName, $sheetName, $headers, $rows);
+    exit;
 }
 
 function obtenerEvaluaciones($solicitudId, $usuarioBancoId = null) {
