@@ -1,12 +1,16 @@
 <?php
 /**
- * API de reportes (solo administrador)
+ * API de reportes (administrador y gestor)
  */
 
 session_start();
 $action = $_GET['action'] ?? '';
 
-if (!isset($_SESSION['user_id']) || !in_array('ROLE_ADMIN', $_SESSION['user_roles'] ?? [])) {
+$roles = $_SESSION['user_roles'] ?? [];
+$puedeReportes = isset($_SESSION['user_id'])
+    && (in_array('ROLE_ADMIN', $roles, true) || in_array('ROLE_GESTOR', $roles, true));
+
+if (!$puedeReportes) {
     http_response_code(403);
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode(['success' => false, 'message' => 'Acceso denegado']);

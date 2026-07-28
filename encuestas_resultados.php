@@ -7,7 +7,8 @@ if (!isset($_SESSION['user_id'])) {
     header('Location: index.php');
     exit();
 }
-if (!in_array('ROLE_ADMIN', $_SESSION['user_roles'] ?? [], true)) {
+if (!in_array('ROLE_ADMIN', $_SESSION['user_roles'] ?? [], true)
+    && !in_array('ROLE_GESTOR', $_SESSION['user_roles'] ?? [], true)) {
     header('Location: dashboard.php');
     exit();
 }

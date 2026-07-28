@@ -9,7 +9,8 @@ if (!isset($_SESSION['user_id'])) {
 require_once 'config/database.php';
 require_once 'includes/validar_acceso.php';
 
-if (!in_array('ROLE_ADMIN', $_SESSION['user_roles'])) {
+if (!in_array('ROLE_ADMIN', $_SESSION['user_roles'] ?? [], true)
+    && !in_array('ROLE_GESTOR', $_SESSION['user_roles'] ?? [], true)) {
     header('Location: dashboard.php');
     exit();
 }

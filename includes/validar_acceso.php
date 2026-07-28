@@ -34,7 +34,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
 // Definir páginas permitidas por rol
 $paginasAdmin = ['dashboard.php', 'usuarios.php', 'roles.php', 'bancos.php', 'ejecutivos_ventas.php', 'solicitudes.php', 'historico_solicitudes.php', 'sol_financiamiento.php', 'seguimiento_financiamiento.php', 'subir_reporte_reservas.php', 'ferias.php', 'feria_panel.php', 'pipedrive.php', 'configuracion.php', 'reportes.php', 'encuestas_resultados.php'];
-$paginasGestor = ['dashboard.php', 'solicitudes.php', 'historico_solicitudes.php', 'sol_financiamiento.php', 'seguimiento_financiamiento.php', 'subir_reporte_reservas.php', 'ferias.php', 'feria_panel.php', 'usuarios_banco.php', 'ejecutivos_ventas.php'];
+$paginasGestor = ['dashboard.php', 'solicitudes.php', 'historico_solicitudes.php', 'sol_financiamiento.php', 'seguimiento_financiamiento.php', 'subir_reporte_reservas.php', 'ferias.php', 'feria_panel.php', 'usuarios_banco.php', 'ejecutivos_ventas.php', 'reportes.php', 'encuestas_resultados.php'];
 $paginasBanco = ['dashboard.php', 'solicitudes.php', 'historico_solicitudes.php', 'mis_propuestas_banco.php', 'usuarios_banco.php', 'reportes_banco.php', 'reportes_banco_fin_enlazada.php', 'seguimiento_banco.php'];
 $paginasVendedor = ['dashboard.php', 'solicitudes.php', 'historico_solicitudes.php'];
 

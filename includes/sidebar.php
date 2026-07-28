@@ -162,7 +162,7 @@ $reportSubmenu = $enReportes ? ($_GET['submenu'] ?? 'usuarios') : '';
                 <i class="fas fa-link me-1"></i> Sol. Fin. + Motus
             </a>
             <?php endif; ?>
-            <?php if ($isAdmin): ?>
+            <?php if ($isAdmin || $isGestor): ?>
             <a class="nav-link ps-4 py-1 small <?php echo ($reportSubmenu === 'usuarios') ? 'active' : ''; ?>" href="reportes.php?submenu=usuarios">
                 <i class="fas fa-users me-1"></i> Rep. Usuarios
             </a>
