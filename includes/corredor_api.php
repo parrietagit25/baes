@@ -149,17 +149,6 @@ function enviarResumenCorredorApi(PDO $pdo): void {
     $stmt->execute([$solicitudId]);
     $vehiculos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    $stmt = $pdo->prepare("
-        SELECT e.*, u.nombre as banco_nombre, u.apellido as banco_apellido
-        FROM evaluaciones_banco e
-        INNER JOIN usuarios_banco_solicitudes ubs ON e.usuario_banco_id = ubs.id
-        INNER JOIN usuarios u ON ubs.usuario_banco_id = u.id
-        WHERE e.solicitud_id = ?
-        ORDER BY e.fecha_evaluacion DESC
-    ");
-    $stmt->execute([$solicitudId]);
-    $evaluaciones = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
     $cfg = file_exists(__DIR__ . '/../config/email.php') ? require __DIR__ . '/../config/email.php' : [];
     $app_url = (function_exists('getenv') && getenv('APP_URL')) ? getenv('APP_URL') : '';
     if ($app_url === '' || $app_url === false) {
@@ -167,11 +156,11 @@ function enviarResumenCorredorApi(PDO $pdo): void {
     }
     $mostrarEnlaceMotus = !empty($cfg['mail_show_app_link_in_emails']);
 
-    // Resumen igual al de bancos, pero sin listar/adjuntar los adjuntos de la solicitud.
+    // Resumen sin adjuntos de la solicitud y sin bloque Análisis / Evaluaciones.
     $html = construirResumenSolicitudHtml(
         $solicitud,
         $vehiculos,
-        $evaluaciones,
+        [],
         [],
         'Corredor',
         $app_url,
