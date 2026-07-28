@@ -465,11 +465,14 @@ function cargarSolicitudes() {
 
                     let row;
                     if (isBancoNoAdmin) {
+                        const estadoBancoLabel = solicitud.estado_banco_label || 'Revisión de los bancos';
+                        const estadoBancoClass = solicitud.estado_banco_class || 'estado-revision';
                         row = `
                         <tr${filaAlertaAttr}>
                             <td data-order="${solicitud.id}">${idCelda}</td>
                             <td>${solicitud.nombre_cliente}</td>
                             <td>${solicitud.cedula}</td>
+                            <td><span class="badge badge-estado ${estadoBancoClass}">${escapeHtml(estadoBancoLabel)}</span></td>
                             <td>
                                 <button type="button" class="btn btn-sm btn-primary" onclick="verRespuestasBanco(${solicitud.id})" title="Ver mis evaluaciones en esta solicitud">
                                     <i class="fas fa-clipboard-list me-1"></i>Ver mis respuestas

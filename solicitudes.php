@@ -453,6 +453,7 @@ if ($isBanco && !$isAdmin) {
                                             <th>Cliente</th>
                                             <?php if ($esUsuarioBancoLista): ?>
                                             <th>Cédula</th>
+                                            <th>Estado</th>
                                             <th>Mis respuestas</th>
                                             <?php endif; ?>
                                             <th>Vehículo</th>
@@ -507,6 +508,9 @@ if ($isBanco && !$isAdmin) {
                                                      (SELECT ubs.usuario_banco_id FROM evaluaciones_banco e 
                                                       INNER JOIN usuarios_banco_solicitudes ubs ON e.usuario_banco_id = ubs.id 
                                                       WHERE e.id = s.evaluacion_seleccionada) as usuario_banco_id_seleccionado,
+                                                     " . ($esUsuarioBancoLista
+                                                         ? motus_sql_decision_banco_lista($isAdminBanco, (int) $_SESSION['user_id'], (int) ($bancoIdSesion ?? 0)) . ','
+                                                         : '') . "
                                                      " . solicitud_sql_campos_vehiculo_reserva() . "
                                               FROM solicitudes_credito s
                                               LEFT JOIN usuarios u ON s.gestor_id = u.id
@@ -607,6 +611,14 @@ if ($isBanco && !$isAdmin) {
                                             <td><?php echo htmlspecialchars($solicitud['nombre_cliente']); ?></td>
                                             <?php if ($esUsuarioBancoLista): ?>
                                             <td><?php echo htmlspecialchars($solicitud['cedula']); ?></td>
+                                            <td>
+                                                <?php
+                                                $estadoBancoVista = motus_estado_vista_banco($solicitud['decision_banco_vista'] ?? null);
+                                                ?>
+                                                <span class="badge badge-estado <?php echo htmlspecialchars($estadoBancoVista['class']); ?>">
+                                                    <?php echo htmlspecialchars($estadoBancoVista['label']); ?>
+                                                </span>
+                                            </td>
                                             <td>
                                                 <button type="button" class="btn btn-sm btn-primary" onclick="verRespuestasBanco(<?php echo (int) $solicitud['id']; ?>)" title="Ver mis evaluaciones en esta solicitud">
                                                     <i class="fas fa-clipboard-list me-1"></i>Ver mis respuestas

@@ -195,6 +195,14 @@ function obtenerSolicitudes() {
         $userRoles = $_SESSION['user_roles'];
         
         // Construir query según el rol del usuario
+        $sqlDecisionBanco = 'NULL AS decision_banco_vista';
+        if (motus_es_admin_banco($userRoles)) {
+            $bancoIdDec = (int) (motus_obtener_banco_id_usuario($pdo, (int) $usuarioId) ?? 0);
+            $sqlDecisionBanco = motus_sql_decision_banco_lista(true, (int) $usuarioId, $bancoIdDec);
+        } elseif (in_array('ROLE_BANCO', $userRoles, true)) {
+            $sqlDecisionBanco = motus_sql_decision_banco_lista(false, (int) $usuarioId, 0);
+        }
+
         $sql = "
             SELECT s.*, u.nombre as gestor_nombre, u.apellido as gestor_apellido,
                    ev.nombre as vendedor_nombre,
@@ -223,6 +231,7 @@ function obtenerSolicitudes() {
                        ) <= DATE_SUB(NOW(), INTERVAL 2 HOUR)
                        THEN 1 ELSE 0
                    END as alerta_sin_respuesta_2h,
+                   {$sqlDecisionBanco},
                    " . solicitud_sql_campos_vehiculo_reserva() . "
             FROM solicitudes_credito s
             LEFT JOIN usuarios u ON s.gestor_id = u.id
@@ -293,6 +302,9 @@ function obtenerSolicitudes() {
             }
             $s['texto_vehiculo'] = solicitud_texto_vehiculo_lista($s);
             $s['alerta_sin_respuesta_2h'] = !empty($s['alerta_sin_respuesta_2h']);
+            $vistaBanco = motus_estado_vista_banco($s['decision_banco_vista'] ?? null);
+            $s['estado_banco_label'] = $vistaBanco['label'];
+            $s['estado_banco_class'] = $vistaBanco['class'];
         }
         unset($s);
         echo json_encode(['success' => true, 'data' => $solicitudes]);

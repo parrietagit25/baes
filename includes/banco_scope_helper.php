@@ -133,3 +133,65 @@ function motus_solicitud_en_alcance_banco(PDO $pdo, int $solicitudId, ?array $ro
     $stmt->execute([$solicitudId, $usuarioId]);
     return (bool) $stmt->fetchColumn();
 }
+
+/**
+ * Etiqueta de estado para lista banco: solo revisión o decisión del martillo.
+ *
+ * @return array{label:string,class:string,decision:?string}
+ */
+function motus_estado_vista_banco(?string $decision): array
+{
+    $d = strtolower(trim((string) $decision));
+    $map = [
+        'preaprobado' => ['label' => 'Preaprobado', 'class' => 'estado-aprobada'],
+        'aprobado' => ['label' => 'Aprobada', 'class' => 'estado-aprobada'],
+        'aprobado_condicional' => ['label' => 'Aprobado Condicional', 'class' => 'estado-aprobada'],
+        'rechazado' => ['label' => 'Rechazada', 'class' => 'estado-rechazada'],
+    ];
+    if ($d !== '' && isset($map[$d])) {
+        return [
+            'label' => $map[$d]['label'],
+            'class' => $map[$d]['class'],
+            'decision' => $d,
+        ];
+    }
+
+    return [
+        'label' => 'Revisión de los bancos',
+        'class' => 'estado-revision',
+        'decision' => null,
+    ];
+}
+
+/**
+ * Fragmento SQL: última decisión del martillo para el alcance del usuario banco.
+ */
+function motus_sql_decision_banco_lista(bool $esAdminBanco, int $usuarioId, int $bancoId = 0): string
+{
+    if ($esAdminBanco && $bancoId > 0) {
+        $bancoId = (int) $bancoId;
+
+        return "(
+            SELECT eb.decision
+            FROM evaluaciones_banco eb
+            INNER JOIN usuarios_banco_solicitudes ubs_dec ON ubs_dec.id = eb.usuario_banco_id
+            INNER JOIN usuarios u_dec ON u_dec.id = ubs_dec.usuario_banco_id
+            WHERE eb.solicitud_id = s.id
+              AND u_dec.banco_id = {$bancoId}
+            ORDER BY eb.fecha_evaluacion DESC, eb.id DESC
+            LIMIT 1
+        ) AS decision_banco_vista";
+    }
+
+    $usuarioId = (int) $usuarioId;
+
+    return "(
+        SELECT eb.decision
+        FROM evaluaciones_banco eb
+        INNER JOIN usuarios_banco_solicitudes ubs_dec ON ubs_dec.id = eb.usuario_banco_id
+        WHERE eb.solicitud_id = s.id
+          AND ubs_dec.usuario_banco_id = {$usuarioId}
+        ORDER BY eb.fecha_evaluacion DESC, eb.id DESC
+        LIMIT 1
+    ) AS decision_banco_vista";
+}
