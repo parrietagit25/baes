@@ -58,52 +58,55 @@ $finRepHasta = (new DateTimeImmutable('today'))->format('Y-m-d');
 
                 <div class="card mb-3">
                     <div class="card-body">
-                        <div class="row g-2 align-items-end flex-wrap">
-                            <div class="col-md-2">
-                                <label class="form-label small mb-0">Desde</label>
-                                <input type="date" id="finEnlDesde" class="form-control form-control-sm" value="<?php echo htmlspecialchars($finRepDesde); ?>">
-                            </div>
-                            <div class="col-md-2">
-                                <label class="form-label small mb-0">Hasta</label>
-                                <input type="date" id="finEnlHasta" class="form-control form-control-sm" value="<?php echo htmlspecialchars($finRepHasta); ?>">
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label small mb-0">Género (formulario)</label>
-                                <div class="d-flex flex-wrap gap-2 small">
-                                    <label class="mb-0"><input type="checkbox" class="form-check-input fin-enl-gen" value="Femenino" checked> F</label>
-                                    <label class="mb-0"><input type="checkbox" class="form-check-input fin-enl-gen" value="Masculino" checked> M</label>
-                                    <label class="mb-0"><input type="checkbox" class="form-check-input fin-enl-gen" value="Otro" checked> Otro</label>
-                                    <label class="mb-0"><input type="checkbox" class="form-check-input fin-enl-gen" value="Sin dato" checked> Sin dato</label>
+                        <form id="formFinEnlFiltros" action="#" method="get" autocomplete="off">
+                            <div class="row g-2 align-items-end flex-wrap">
+                                <div class="col-md-2">
+                                    <label class="form-label small mb-0" for="finEnlDesde">Desde</label>
+                                    <input type="date" id="finEnlDesde" name="desde" class="form-control form-control-sm" value="<?php echo htmlspecialchars($finRepDesde); ?>">
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label small mb-0" for="finEnlHasta">Hasta</label>
+                                    <input type="date" id="finEnlHasta" name="hasta" class="form-control form-control-sm" value="<?php echo htmlspecialchars($finRepHasta); ?>">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small mb-0">Género (formulario)</label>
+                                    <div class="d-flex flex-wrap gap-2 small">
+                                        <label class="mb-0"><input type="checkbox" class="form-check-input fin-enl-gen" value="Femenino" checked> F</label>
+                                        <label class="mb-0"><input type="checkbox" class="form-check-input fin-enl-gen" value="Masculino" checked> M</label>
+                                        <label class="mb-0"><input type="checkbox" class="form-check-input fin-enl-gen" value="Otro" checked> Otro</label>
+                                        <label class="mb-0"><input type="checkbox" class="form-check-input fin-enl-gen" value="Sin dato" checked> Sin dato</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label small mb-0" for="finEnlPerfil">Perfil estimado</label>
+                                    <select id="finEnlPerfil" name="perfil" class="form-select form-select-sm">
+                                        <option value="">Todos</option>
+                                        <option value="asalariado">Asalariado</option>
+                                        <option value="independiente">Independiente</option>
+                                        <option value="jubilado">Jubilado</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label small mb-0" for="finEnlSector">Sector estimado</label>
+                                    <select id="finEnlSector" name="sector" class="form-select form-select-sm">
+                                        <option value="">Todos</option>
+                                        <option value="gobierno">Público estimado</option>
+                                        <option value="privado">Privado estimado</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-2">
+                                    <button type="submit" class="btn btn-primary btn-sm w-100" id="btnFinEnlFiltrar">
+                                        <i class="fas fa-filter me-1"></i>Filtrar
+                                    </button>
+                                </div>
+                                <div class="col-md-2">
+                                    <a href="api/reportes_banco.php?action=exportar_excel_fin_enlazada" class="btn btn-outline-success btn-sm w-100" id="finEnlExportXlsx">
+                                        <i class="fas fa-file-excel me-1"></i>Excel
+                                    </a>
                                 </div>
                             </div>
-                            <div class="col-md-2">
-                                <label class="form-label small mb-0">Perfil estimado</label>
-                                <select id="finEnlPerfil" class="form-select form-select-sm">
-                                    <option value="">Todos</option>
-                                    <option value="asalariado">Asalariado</option>
-                                    <option value="independiente">Independiente</option>
-                                    <option value="jubilado">Jubilado</option>
-                                </select>
-                            </div>
-                            <div class="col-md-2">
-                                <label class="form-label small mb-0">Sector estimado</label>
-                                <select id="finEnlSector" class="form-select form-select-sm">
-                                    <option value="">Todos</option>
-                                    <option value="gobierno">Público estimado</option>
-                                    <option value="privado">Privado estimado</option>
-                                </select>
-                            </div>
-                            <div class="col-md-2">
-                                <button type="button" class="btn btn-primary btn-sm w-100 mt-2" id="btnFinEnlFiltrar">
-                                    <i class="fas fa-sync me-1"></i>Actualizar
-                                </button>
-                            </div>
-                            <div class="col-md-2">
-                                <a href="#" class="btn btn-outline-success btn-sm w-100 mt-1" id="finEnlExportXlsx">
-                                    <i class="fas fa-file-excel me-1"></i>Excel
-                                </a>
-                            </div>
-                        </div>
+                        </form>
+                        <p class="text-muted small mb-0 mt-2" id="finEnlFiltrosActivos">Rango: <?php echo htmlspecialchars($finRepDesde); ?> → <?php echo htmlspecialchars($finRepHasta); ?></p>
                     </div>
                 </div>
 
@@ -388,18 +391,33 @@ $finRepHasta = (new DateTimeImmutable('today'))->format('Y-m-d');
         });
     }
 
-    function loadFinEnlazadaDemografia() {
+    function loadFinEnlazadaDemografia(ev) {
+        if (ev && typeof ev.preventDefault === 'function') {
+            ev.preventDefault();
+            ev.stopPropagation();
+        }
+
+        const btn = document.getElementById('btnFinEnlFiltrar');
         const qs = finEnlQueryString();
         const ex = document.getElementById('finEnlExportXlsx');
         if (ex) ex.href = 'api/reportes_banco.php?action=exportar_excel_fin_enlazada&' + qs;
         const nota = document.getElementById('finEnlNotaApi');
         if (nota) nota.textContent = '';
+        const activos = document.getElementById('finEnlFiltrosActivos');
+        if (activos) {
+            activos.textContent = 'Aplicando filtros…';
+        }
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Filtrando…';
+        }
 
         fetch('api/reportes_banco.php?action=reporte_fin_enlazada&' + qs)
             .then(function(r) { return r.json(); })
             .then(function(data) {
                 if (!data.success) {
                     if (nota) nota.textContent = data.message || 'No se pudo cargar';
+                    if (activos) activos.textContent = 'No se pudieron aplicar los filtros.';
                     finDestroyCharts(finEnlCharts);
                     return;
                 }
@@ -417,6 +435,12 @@ $finRepHasta = (new DateTimeImmutable('today'))->format('Y-m-d');
                     ? data.abono.abono_pct_promedio + '%'
                     : '—';
                 document.getElementById('finEnlKpiAbono').textContent = abonoProm;
+
+                const f = data.filtros || {};
+                if (activos) {
+                    activos.textContent = 'Filtros aplicados: ' + (f.fecha_desde || '') + ' → ' + (f.fecha_hasta || '')
+                        + ' · ' + String(st.n != null ? st.n : 0) + ' registros';
+                }
 
                 finDestroyCharts(finEnlCharts);
 
@@ -470,10 +494,20 @@ $finRepHasta = (new DateTimeImmutable('today'))->format('Y-m-d');
             .catch(function() {
                 const n2 = document.getElementById('finEnlNotaApi');
                 if (n2) n2.textContent = 'Error de red o servidor';
+                if (activos) activos.textContent = 'Error al filtrar. Intente de nuevo.';
+            })
+            .finally(function() {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-filter me-1"></i>Filtrar';
+                }
             });
     }
 
-    document.getElementById('btnFinEnlFiltrar').addEventListener('click', loadFinEnlazadaDemografia);
+    const formFiltros = document.getElementById('formFinEnlFiltros');
+    if (formFiltros) {
+        formFiltros.addEventListener('submit', loadFinEnlazadaDemografia);
+    }
     loadFinEnlazadaDemografia();
 })();
 </script>
