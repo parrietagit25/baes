@@ -30,7 +30,7 @@ $paginasAdministracionMenu = [
     'configuracion.php',
 ];
 $paginasFeriaMenu = ['ferias.php', 'feria_panel.php'];
-$paginasReportesMenu = ['reportes.php', 'reportes_banco.php', 'reportes_banco_fin_enlazada.php', 'seguimiento_financiamiento.php', 'encuestas_resultados.php'];
+$paginasReportesMenu = ['reportes.php', 'reportes_banco.php', 'reportes_banco_fin_enlazada.php', 'seguimiento_banco.php', 'seguimiento_financiamiento.php', 'encuestas_resultados.php'];
 
 $menuSolicitudesActivo = in_array($current_page, $paginasSolicitudesMenu, true);
 $menuAdministracionActivo = in_array($current_page, $paginasAdministracionMenu, true);
@@ -152,6 +152,9 @@ $reportSubmenu = $enReportes ? ($_GET['submenu'] ?? 'usuarios') : '';
             </a>
             <?php endif; ?>
             <?php if ($isAdminBanco): ?>
+            <a class="nav-link ps-4 py-2 small <?php echo ($current_page === 'seguimiento_banco.php') ? 'active' : ''; ?>" href="seguimiento_banco.php">
+                <i class="fas fa-chart-line me-2"></i>Seguimiento
+            </a>
             <a class="nav-link ps-4 py-1 small <?php echo ($current_page === 'reportes_banco.php') ? 'active' : ''; ?>" href="reportes_banco.php">
                 <i class="fas fa-users me-1"></i> Rep. Usuarios Banco
             </a>

@@ -9,6 +9,7 @@ require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../includes/banco_scope_helper.php';
 require_once __DIR__ . '/../includes/reportes_banco_usuarios_data.php';
 require_once __DIR__ . '/../includes/reportes_banco_fin_enlazada_data.php';
+require_once __DIR__ . '/../includes/reportes_banco_seguimiento_data.php';
 
 if (!isset($_SESSION['user_id']) || !motus_es_admin_banco($_SESSION['user_roles'] ?? [])) {
     http_response_code(403);
@@ -61,6 +62,13 @@ if ($action === 'exportar_excel_fin_enlazada') {
     exit();
 }
 
+if ($action === 'exportar_excel_seguimiento') {
+    require_once __DIR__ . '/../includes/xlsx_export.php';
+    $exp = rep_segbanco_export_pack($pdo, $bancoId);
+    motus_output_xlsx_download('seguimiento_banco.xlsx', 'Seguimiento', $exp['headers'], $exp['rows']);
+    exit();
+}
+
 header('Content-Type: application/json; charset=utf-8');
 
 switch ($action) {
@@ -106,6 +114,16 @@ switch ($action) {
             echo json_encode(rep_fin_build_reporte_enlazada_banco($pdo, $bancoId), JSON_UNESCAPED_UNICODE);
         } catch (PDOException $e) {
             error_log('reporte_fin_enlazada banco: ' . $e->getMessage());
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => 'Error de base de datos']);
+        }
+        break;
+
+    case 'reporte_seguimiento':
+        try {
+            echo json_encode(rep_segbanco_build_reporte($pdo, $bancoId), JSON_UNESCAPED_UNICODE);
+        } catch (PDOException $e) {
+            error_log('reporte_seguimiento banco: ' . $e->getMessage());
             http_response_code(500);
             echo json_encode(['success' => false, 'message' => 'Error de base de datos']);
         }
