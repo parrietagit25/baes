@@ -125,10 +125,68 @@ foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $fila) {
 
 $totalSolicitudes = array_sum($conteoPorEstado);
 
-$estadosBaseTarjetas = $esHistorico ? $estadosHistoricoTarjetas : $estadosActivosTarjetas;
-$estadosExtra = array_diff(array_keys($conteoPorEstado), $estadosBaseTarjetas);
-sort($estadosExtra);
-$estadosParaTarjetas = array_merge($estadosBaseTarjetas, array_values($estadosExtra));
+// Tarjetas a mostrar: bancos ven resumen fijo; resto ve todos los estados de la vista
+$statsTarjetas = [];
+if ($isBanco && !$isAdmin) {
+    // Conteos en todo el alcance del banco (activas + histórico) para el resumen
+    $conteoBancoFull = [];
+    $stmt = $pdo->query("
+        SELECT estado, COUNT(*) AS total
+        FROM solicitudes_credito
+        WHERE 1=1 $filtroAlcanceStats
+        GROUP BY estado
+    ");
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $fila) {
+        $conteoBancoFull[$fila['estado']] = (int) $fila['total'];
+    }
+    $totalBanco = array_sum($conteoBancoFull);
+    $enRevisionBanco = ($conteoBancoFull['En Revisión Banco'] ?? 0)
+        + ($conteoBancoFull['Reevaluación por los Bancos'] ?? 0);
+
+    $statsTarjetas = [
+        [
+            'label' => 'Total de solicitudes',
+            'count' => $totalBanco,
+            'gradient' => $statsGradientes['Total'],
+        ],
+        [
+            'label' => 'En revisión',
+            'count' => $enRevisionBanco,
+            'gradient' => $statsGradientes['En Revisión Banco'],
+        ],
+        [
+            'label' => 'Pre Aprobadas',
+            'count' => $conteoBancoFull['Pre Aprobado'] ?? 0,
+            'gradient' => $statsGradientes['Pre Aprobado'],
+        ],
+        [
+            'label' => 'Aprobadas',
+            'count' => $conteoBancoFull['Aprobada'] ?? 0,
+            'gradient' => $statsGradientes['Aprobada'],
+        ],
+        [
+            'label' => 'Completadas',
+            'count' => $conteoBancoFull['Completada'] ?? 0,
+            'gradient' => $statsGradientes['Completada'],
+        ],
+    ];
+} else {
+    $statsTarjetas[] = [
+        'label' => $esHistorico ? 'Total en histórico' : 'Total Solicitudes',
+        'count' => $totalSolicitudes,
+        'gradient' => $statsGradientes['Total'],
+    ];
+    $estadosBaseTarjetas = $esHistorico ? $estadosHistoricoTarjetas : $estadosActivosTarjetas;
+    $estadosExtra = array_diff(array_keys($conteoPorEstado), $estadosBaseTarjetas);
+    sort($estadosExtra);
+    foreach (array_merge($estadosBaseTarjetas, array_values($estadosExtra)) as $estadoTarjeta) {
+        $statsTarjetas[] = [
+            'label' => $estadoTarjeta,
+            'count' => $conteoPorEstado[$estadoTarjeta] ?? 0,
+            'gradient' => $statsGradientes[$estadoTarjeta] ?? 'linear-gradient(135deg, #636e72 0%, #b2bec3 100%)',
+        ];
+    }
+}
 ?>
 
 <!DOCTYPE html>
@@ -376,17 +434,10 @@ $estadosParaTarjetas = array_merge($estadosBaseTarjetas, array_values($estadosEx
 
                     <!-- Estadísticas por estado -->
                     <div class="stats-grid">
-                        <div class="stats-card stats-card-total text-center" style="background: <?php echo htmlspecialchars($statsGradientes['Total']); ?>;">
-                            <div class="stats-number"><?php echo (int) $totalSolicitudes; ?></div>
-                            <div class="stats-label"><?php echo $esHistorico ? 'Total en histórico' : 'Total Solicitudes'; ?></div>
-                        </div>
-                        <?php foreach ($estadosParaTarjetas as $estadoTarjeta):
-                            $countEstado = $conteoPorEstado[$estadoTarjeta] ?? 0;
-                            $gradiente = $statsGradientes[$estadoTarjeta] ?? 'linear-gradient(135deg, #636e72 0%, #b2bec3 100%)';
-                        ?>
-                        <div class="stats-card text-center" style="background: <?php echo htmlspecialchars($gradiente); ?>;">
-                            <div class="stats-number"><?php echo (int) $countEstado; ?></div>
-                            <div class="stats-label"><?php echo htmlspecialchars($estadoTarjeta); ?></div>
+                        <?php foreach ($statsTarjetas as $tarjeta): ?>
+                        <div class="stats-card text-center" style="background: <?php echo htmlspecialchars($tarjeta['gradient']); ?>;">
+                            <div class="stats-number"><?php echo (int) $tarjeta['count']; ?></div>
+                            <div class="stats-label"><?php echo htmlspecialchars($tarjeta['label']); ?></div>
                         </div>
                         <?php endforeach; ?>
                     </div>
