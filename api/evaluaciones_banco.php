@@ -441,6 +441,18 @@ function guardarEvaluacion() {
             return;
         }
 
+        $stmtEstado = $pdo->prepare('SELECT estado FROM solicitudes_credito WHERE id = ? LIMIT 1');
+        $stmtEstado->execute([$solicitudId]);
+        $estadoActual = (string) ($stmtEstado->fetchColumn() ?: '');
+        $estadosSinDecisionBanco = ['Rechazada', 'Completada', 'Desistimiento'];
+        if (in_array($estadoActual, $estadosSinDecisionBanco, true)) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'No se puede registrar decisión cuando la solicitud está en estado "' . $estadoActual . '".',
+            ]);
+            return;
+        }
+
         // Si el gestor ya seleccionó una propuesta de otra entidad, no procesar esta decisión.
         $stmt = $pdo->prepare("
             SELECT s.evaluacion_seleccionada,

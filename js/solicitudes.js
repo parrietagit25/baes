@@ -440,7 +440,7 @@ function cargarSolicitudes() {
                                             <i class="fas fa-paperclip"></i>
                                         </button>
                                     </div>
-                                    ${(window.userRoles && window.userRoles.isBancoAnalista && (solicitud.estado === 'En Revisión Banco' || solicitud.estado === 'Reevaluación por los Bancos' || solicitud.estado === 'Nueva')) ? `
+                                    ${(window.userRoles && window.userRoles.isBancoAnalista && !['Rechazada', 'Completada', 'Desistimiento'].includes(solicitud.estado)) ? `
                                     <div class="btn-group btn-group-sm mb-1" role="group">
                                         <button class="btn btn-success btn-action" onclick="abrirModalAprobacion(${solicitud.id})" title="Aprobar/Rechazar Solicitud">
                                             <i class="fas fa-gavel"></i>

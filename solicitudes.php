@@ -707,10 +707,10 @@ if ($isBanco && !$isAdmin) {
                                                           </button>
                                                       </div>
                                                       <?php 
-                                                      // Usuario banco ve el botón de respuesta si la solicitud está asignada a él y está en revisión o aún en Nueva (por si el estado no se actualizó)
-                                                      $estadosRespuestaBanco = ['En Revisión Banco', 'Reevaluación por los Bancos', 'Nueva'];
-                                                      $puedeResponderBanco = in_array('ROLE_BANCO', $userRoles) &&
-                                                          in_array($solicitud['estado'], $estadosRespuestaBanco, true);
+                                                      // Martillo visible salvo estados finales; la selección de propuesta sigue bloqueando a otros bancos.
+                                                      $estadosSinDecisionBanco = ['Rechazada', 'Completada', 'Desistimiento'];
+                                                      $puedeResponderBanco = in_array('ROLE_BANCO', $userRoles, true) &&
+                                                          !in_array((string) ($solicitud['estado'] ?? ''), $estadosSinDecisionBanco, true);
                                                       if ($puedeResponderBanco): ?>
                                                       <div class="btn-group btn-group-sm" role="group">
                                                           <button class="btn btn-success btn-action" onclick="abrirModalAprobacion(<?php echo $solicitud['id']; ?>)" title="Aprobar/Rechazar Solicitud">
