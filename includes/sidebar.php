@@ -30,7 +30,7 @@ $paginasAdministracionMenu = [
     'configuracion.php',
 ];
 $paginasFeriaMenu = ['ferias.php', 'feria_panel.php'];
-$paginasReportesMenu = ['reportes.php', 'seguimiento_financiamiento.php', 'encuestas_resultados.php'];
+$paginasReportesMenu = ['reportes.php', 'reportes_banco.php', 'reportes_banco_fin_enlazada.php', 'seguimiento_financiamiento.php', 'encuestas_resultados.php'];
 
 $menuSolicitudesActivo = in_array($current_page, $paginasSolicitudesMenu, true);
 $menuAdministracionActivo = in_array($current_page, $paginasAdministracionMenu, true);
@@ -137,7 +137,7 @@ $reportSubmenu = $enReportes ? ($_GET['submenu'] ?? 'usuarios') : '';
         <?php endif; ?>
 
         <!-- Reportes -->
-        <?php if ($isAdmin || $isGestor): ?>
+        <?php if ($isAdmin || $isGestor || $isAdminBanco): ?>
         <button class="nav-link w-100 border-0 text-start d-flex align-items-center <?php echo $menuReportesActivo ? 'active' : ''; ?>"
                 type="button" data-bs-toggle="collapse" data-bs-target="#menuReportes"
                 aria-expanded="<?php echo $menuReportesActivo ? 'true' : 'false'; ?>" aria-controls="menuReportes">
@@ -146,9 +146,19 @@ $reportSubmenu = $enReportes ? ($_GET['submenu'] ?? 'usuarios') : '';
             <i class="fas fa-chevron-down ms-auto small"></i>
         </button>
         <div class="collapse <?php echo $menuReportesActivo ? 'show' : ''; ?>" id="menuReportes" data-bs-parent="#sidebarAccordion">
+            <?php if ($isAdmin || $isGestor): ?>
             <a class="nav-link ps-4 py-2 small <?php echo ($current_page === 'seguimiento_financiamiento.php') ? 'active' : ''; ?>" href="seguimiento_financiamiento.php">
                 <i class="fas fa-chart-line me-2"></i>Seguimiento
             </a>
+            <?php endif; ?>
+            <?php if ($isAdminBanco): ?>
+            <a class="nav-link ps-4 py-1 small <?php echo ($current_page === 'reportes_banco.php') ? 'active' : ''; ?>" href="reportes_banco.php">
+                <i class="fas fa-users me-1"></i> Rep. Usuarios Banco
+            </a>
+            <a class="nav-link ps-4 py-1 small <?php echo ($current_page === 'reportes_banco_fin_enlazada.php') ? 'active' : ''; ?>" href="reportes_banco_fin_enlazada.php">
+                <i class="fas fa-link me-1"></i> Sol. Fin. + Motus
+            </a>
+            <?php endif; ?>
             <?php if ($isAdmin): ?>
             <a class="nav-link ps-4 py-1 small <?php echo ($reportSubmenu === 'usuarios') ? 'active' : ''; ?>" href="reportes.php?submenu=usuarios">
                 <i class="fas fa-users me-1"></i> Rep. Usuarios
