@@ -1467,6 +1467,13 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
             <button type="button" id="btnAgregarFirmante" class="btn btn-sm" style="background:var(--accent);color:#fff;border:0;">Agregar firma de codeudor</button>
           </div>
           <div class="col-12" style="margin-top:14px">
+            <label class="chip" style="display:flex;gap:10px;align-items:flex-start;justify-content:flex-start">
+              <input type="checkbox" id="certifica_firma" name="certifica_firma" required style="margin-top:3px;flex-shrink:0" />
+              <span>Certifico que soy la persona que firma esta solicitud y que la firma es auténtica, realizada por mí de forma personal y voluntaria. *</span>
+            </label>
+            <div class="error" data-error-for="certifica_firma"></div>
+          </div>
+          <div class="col-12" style="margin-top:14px">
             <div class="consent-text" style="font-size:11px;line-height:1.4;color:var(--muted);margin-bottom:12px;padding:12px;background:rgba(0,0,0,.2);border-radius:10px;border:1px solid var(--line);max-height:200px;overflow-y:auto;">
               <p style="margin:0 0 10px 0;">Con la firma de esta solicitud, autorizo a PANAMA CAR RENTAL, S.A., MULTIBANK, INC., THE BANK OF NOVA SCOTIA (PANAMÁ), S.A., BANCO GENERAL, S.A., GLOBAL BANK CORPORATION, BAC International Bank, Inc., BANISTMO, S.A., BANCO DELTA, S.A., BANESCO (Panamá), S.A., BANISI, S.A., MULTIFINANCIAMIENTOS, S.A., FOSTRIAN Apoyo Financiera, CORPORACION DE CREDITO, S.A., CORPORACION DE FINANZAS DEL PAIS, S.A., FINANCIERA PACIFICO, DAVIVIENDA, ALIADO LEASING, CENTRO FINANCIERO EMPRESARIAL, SUMA FINANCIERA; a solicitar, consultar, recopilar, transmitir y revelar cualquier información, datos y documentos brindados en esta solicitud; se trate, comparta, transfiera, intercambie y utilice con terceros, ya sea que se concluya o no la adquisición del producto o servicio.</p>
               <p style="margin:0;">En cumplimiento de lo establecido en la Ley 81 de 2019 de Protección de Datos Personales, le comunicamos que los datos que usted nos facilite quedarán incorporados y serán tratados en nuestra base de datos con el fin de poderle prestar nuevos servicios, así como para mantenerle informado sobre temas relacionados con la empresa y sus servicios. Por este medio exonero expresamente a PANAMA CAR RENTAL, S.A. y/o a sus afiliadas, empleados, ejecutivos, dignatarios y apoderados, de cualquier consecuencia o responsabilidad resultante del ejercicio que ustedes hagan el derecho a solicitar o suministrar información o por razón de cualquier autorización de la presente.</p>
@@ -2798,6 +2805,11 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
             var firmaVal = (firmaDataInput && firmaDataInput.value) ? firmaDataInput.value.trim() : "";
             if(!firmaVal){ ok = false; setError("firma", "Debe firmar en el recuadro con el dedo o el mouse."); }
           }
+          var certificaFirma = form.elements["certifica_firma"];
+          if(certificaFirma && !certificaFirma.checked){
+            ok = false;
+            setError("certifica_firma", "Debe certificar que usted es quien firma y que la firma es auténtica.");
+          }
           var acepta = form.elements["acepta"];
           if(acepta && !acepta.checked){ ok = false; setError("acepta", "Debes confirmar para continuar."); }
         }
@@ -2915,6 +2927,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
           var payload = readFormToObject();
           delete payload.__meta;
           delete payload.acepta;
+          delete payload.certifica_firma;
           aplicarCompatibilidadDireccion(payload);
           payload.__telemetria = buildTelemetryPayloadForSubmit();
           if(TOKEN_LINK) payload.token = TOKEN_LINK;
@@ -2986,6 +2999,7 @@ $apiUrlConfig = defined('FINANCIAMIENTO_API_URL') && FINANCIAMIENTO_API_URL !== 
         var payload = readFormToObject();
         delete payload.__meta;
         if (payload.acepta !== undefined) delete payload.acepta;
+        if (payload.certifica_firma !== undefined) delete payload.certifica_firma;
         aplicarCompatibilidadDireccion(payload);
         if (TOKEN_LINK) payload.token = TOKEN_LINK;
         if (firmaDataInput && firmaDataInput.value) payload.firma = firmaDataInput.value;
