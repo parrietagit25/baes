@@ -19,6 +19,9 @@ class EmailService {
     /** @var int|null ID de solicitudes_credito para CC automático de email_pipedrive */
     private $solicitudContextoId = null;
 
+    /** Si true, no se agrega el CC global de auditoría (p. ej. recuperación de contraseña). */
+    private $omitirCcGlobal = false;
+
     public function __construct() {
         $this->config = require __DIR__ . '/../config/email.php';
         $nombreCorrecto = 'AutoMarket Seminuevos';
@@ -48,6 +51,14 @@ class EmailService {
     public function paraSolicitud($solicitudId): self {
         $id = (int) $solicitudId;
         $this->solicitudContextoId = $id > 0 ? $id : null;
+        return $this;
+    }
+
+    /**
+     * Omite el CC fijo de auditoría (fyi@...). Usar solo en correos sensibles (reset de contraseña).
+     */
+    public function sinCcAuditoria(): self {
+        $this->omitirCcGlobal = true;
         return $this;
     }
 
@@ -161,9 +172,11 @@ class EmailService {
             'text' => $bodyText !== '' ? $bodyText : strip_tags($bodyHTML),
         ];
 
-        // CC global obligatorio para auditoría interna de correos salientes de Motus.
+        // CC global de auditoría (salvo correos sensibles como recuperación de contraseña).
         $ccConGlobal = $cc;
-        $ccConGlobal[] = self::CC_GLOBAL_FIJO;
+        if (!$this->omitirCcGlobal) {
+            $ccConGlobal[] = self::CC_GLOBAL_FIJO;
+        }
         $ccList = $this->normalizarListaCorreosCc($ccConGlobal, $toAddr, $fromEmail);
         if ($ccList !== []) {
             $params['cc'] = $ccList;

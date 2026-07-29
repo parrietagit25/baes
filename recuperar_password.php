@@ -7,53 +7,40 @@ if (motus_mantenimiento_activo()) {
     exit();
 }
 
-// Verificar si el usuario ya está logueado
 if (isset($_SESSION['user_id'])) {
     header('Location: dashboard.php');
     exit();
 }
 
-// Procesar el login
 $error = '';
-if ($_POST) {
-    require_once 'config/database.php';
+$success = '';
+$emailValue = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    require_once __DIR__ . '/config/database.php';
+    require_once __DIR__ . '/includes/password_reset_helper.php';
+
     if (!isset($pdo) || !($pdo instanceof PDO)) {
-        error_log('Login: PDO no inicializado en index.php');
         $error = 'No se pudo conectar a la base de datos. Intente nuevamente.';
     } else {
-        $email = $_POST['email'];
-        $password = $_POST['password'];
-        $stmt = $pdo->prepare("SELECT id, nombre, apellido, email, password, activo, banco_id FROM usuarios WHERE email = ?");
-        $stmt->execute([$email]);
-        $user = $stmt->fetch();
-        if ($user && password_verify($password, $user['password']) && $user['activo'] == 1) {
-        $_SESSION['user_id'] = $user['id'];
-        $_SESSION['user_name'] = $user['nombre'] . ' ' . $user['apellido'];
-        $_SESSION['user_email'] = $user['email'];
-        $_SESSION['banco_id'] = !empty($user['banco_id']) ? (int) $user['banco_id'] : null;
-        
-        // Obtener roles del usuario
-        $stmt = $pdo->prepare("SELECT r.nombre FROM roles r 
-                              INNER JOIN usuario_roles ur ON r.id = ur.rol_id 
-                              WHERE ur.usuario_id = ?");
-        $stmt->execute([$user['id']]);
-        $_SESSION['user_roles'] = $stmt->fetchAll(PDO::FETCH_COLUMN);
-        
-        header('Location: dashboard.php');
-        exit();
+        $emailValue = trim((string) ($_POST['email'] ?? ''));
+        $ip = $_SERVER['REMOTE_ADDR'] ?? null;
+        $res = password_reset_solicitar($pdo, $emailValue, is_string($ip) ? $ip : null);
+        if (!empty($res['ok'])) {
+            $success = $res['message'];
+            $emailValue = '';
         } else {
-            $error = 'Credenciales inválidas o usuario inactivo';
+            $error = $res['message'] ?? 'No se pudo procesar la solicitud.';
         }
     }
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Solicitud de Crédito</title>
+    <title>Recuperar contraseña - MOTUS</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -70,7 +57,7 @@ if ($_POST) {
             box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
             overflow: hidden;
             width: 100%;
-            max-width: 400px;
+            max-width: 420px;
         }
         .login-header {
             background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
@@ -78,9 +65,7 @@ if ($_POST) {
             padding: 30px;
             text-align: center;
         }
-        .login-body {
-            padding: 40px;
-        }
+        .login-body { padding: 40px; }
         .form-control {
             border-radius: 10px;
             border: 2px solid #e9ecef;
@@ -97,58 +82,58 @@ if ($_POST) {
             padding: 12px;
             font-weight: 600;
             width: 100%;
+            color: #fff;
         }
         .btn-login:hover {
+            color: #fff;
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(40, 167, 69, 0.4);
         }
+        .link-muted { color: #6c757d; text-decoration: none; }
+        .link-muted:hover { color: #28a745; text-decoration: underline; }
     </style>
 </head>
 <body>
     <div class="login-container">
         <div class="login-header">
-            <h2><i class="fas fa-user-lock me-2"></i>Iniciar Sesión</h2>
-            <p class="mb-0">Solicitud de Crédito - Gestión de Usuarios</p>
+            <h2><i class="fas fa-key me-2"></i>Recuperar contraseña</h2>
+            <p class="mb-0">Le enviaremos un enlace a su correo</p>
         </div>
-        
         <div class="login-body">
             <?php if ($error): ?>
                 <div class="alert alert-danger" role="alert">
                     <i class="fas fa-exclamation-triangle me-2"></i><?php echo htmlspecialchars($error); ?>
                 </div>
             <?php endif; ?>
-            
-            <form method="POST" action="">
-                <div class="mb-3">
-                    <label for="email" class="form-label">
-                        <i class="fas fa-envelope me-2"></i>Email
-                    </label>
-                    <input type="email" class="form-control" id="email" name="email" 
-                           placeholder="Ingrese su email" required>
+            <?php if ($success): ?>
+                <div class="alert alert-success" role="alert">
+                    <i class="fas fa-check-circle me-2"></i><?php echo htmlspecialchars($success); ?>
                 </div>
-                
-                <div class="mb-3">
-                    <label for="password" class="form-label">
-                        <i class="fas fa-lock me-2"></i>Contraseña
-                    </label>
-                    <input type="password" class="form-control" id="password" name="password" 
-                           placeholder="Ingrese su contraseña" required>
-                </div>
+            <?php endif; ?>
 
-                <div class="mb-4 text-end">
-                    <a href="recuperar_password.php" style="color:#6c757d;text-decoration:none;font-size:0.95rem;">
-                        ¿Olvidó su contraseña?
-                    </a>
+            <?php if (!$success): ?>
+            <form method="POST" action="">
+                <div class="mb-4">
+                    <label for="email" class="form-label">
+                        <i class="fas fa-envelope me-2"></i>Email de su cuenta
+                    </label>
+                    <input type="email" class="form-control" id="email" name="email"
+                           value="<?php echo htmlspecialchars($emailValue); ?>"
+                           placeholder="Ingrese su email" required autofocus>
                 </div>
-                
                 <button type="submit" class="btn btn-login btn-primary">
-                    <i class="fas fa-sign-in-alt me-2"></i>Iniciar Sesión
+                    <i class="fas fa-paper-plane me-2"></i>Enviar enlace
                 </button>
             </form>
+            <?php endif; ?>
+
+            <div class="text-center mt-4">
+                <a href="index.php" class="link-muted">
+                    <i class="fas fa-arrow-left me-1"></i>Volver al inicio de sesión
+                </a>
+            </div>
         </div>
     </div>
-
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
-
