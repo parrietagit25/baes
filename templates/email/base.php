@@ -97,7 +97,7 @@
             <?php echo $content ?? ''; ?>
         </div>
         <div class="footer">
-            <p><strong>Por favor responder a todos</strong></p>
+            <p><strong><?php echo htmlspecialchars($footer_aviso ?? 'Por favor responder a todos', ENT_QUOTES, 'UTF-8'); ?></strong></p>
             <p>&copy; <?php echo date('Y'); ?> AutoMarket Seminuevos. Todos los derechos reservados.</p>
         </div>
     </div>

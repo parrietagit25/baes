@@ -125,6 +125,7 @@ if (!function_exists('password_reset_solicitar')) {
 
         $subject = 'Restablecer contraseña - MOTUS';
         $app_name = 'MOTUS - AutoMarket Seminuevos';
+        $footer_aviso = 'No responda a este correo; es un mensaje automático.';
         $content = '<h2>Restablecer contraseña</h2>'
             . '<p>Hola <strong>' . htmlspecialchars($nombre, ENT_QUOTES, 'UTF-8') . '</strong>,</p>'
             . '<p>Recibimos una solicitud para restablecer la contraseña de su cuenta en MOTUS.</p>'
@@ -141,7 +142,8 @@ if (!function_exists('password_reset_solicitar')) {
         $bodyHtml = ob_get_clean();
         $bodyTxt = "Hola {$nombre},\n\n"
             . "Para restablecer su contraseña en MOTUS use este enlace (válido 1 hora, un solo uso):\n{$link}\n\n"
-            . "Si no solicitó este cambio, ignore este mensaje.\n";
+            . "Si no solicitó este cambio, ignore este mensaje.\n"
+            . "No responda a este correo; es un mensaje automático.\n";
 
         require_once __DIR__ . '/EmailService.php';
         $mail = (new EmailService())->sinCcAuditoria();
