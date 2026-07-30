@@ -33,7 +33,7 @@ $isVendedor = in_array('ROLE_VENDEDOR', $userRoles);
 $current_page = basename($_SERVER['PHP_SELF']);
 
 // Definir páginas permitidas por rol
-$paginasAdmin = ['dashboard.php', 'usuarios.php', 'roles.php', 'bancos.php', 'ejecutivos_ventas.php', 'solicitudes.php', 'historico_solicitudes.php', 'sol_financiamiento.php', 'seguimiento_financiamiento.php', 'subir_reporte_reservas.php', 'ferias.php', 'feria_panel.php', 'pipedrive.php', 'configuracion.php', 'reportes.php', 'encuestas_resultados.php'];
+$paginasAdmin = ['dashboard.php', 'usuarios.php', 'roles.php', 'bancos.php', 'ejecutivos_ventas.php', 'solicitudes.php', 'historico_solicitudes.php', 'sol_financiamiento.php', 'seguimiento_financiamiento.php', 'subir_reporte_reservas.php', 'ferias.php', 'feria_panel.php', 'pipedrive.php', 'configuracion.php', 'reportes.php', 'encuestas_resultados.php', 'seguimiento_usuarios.php'];
 $paginasGestor = ['dashboard.php', 'solicitudes.php', 'historico_solicitudes.php', 'sol_financiamiento.php', 'seguimiento_financiamiento.php', 'subir_reporte_reservas.php', 'ferias.php', 'feria_panel.php', 'usuarios_banco.php', 'ejecutivos_ventas.php', 'reportes.php', 'encuestas_resultados.php'];
 $paginasBanco = ['dashboard.php', 'solicitudes.php', 'historico_solicitudes.php', 'mis_propuestas_banco.php', 'usuarios_banco.php', 'reportes_banco.php', 'reportes_banco_fin_enlazada.php', 'seguimiento_banco.php'];
 $paginasVendedor = ['dashboard.php', 'solicitudes.php', 'historico_solicitudes.php'];
@@ -63,9 +63,29 @@ if ($isAdmin) {
     $accesoPermitido = ($current_page === 'dashboard.php');
 }
 
+// Admin principal (id=1): siempre puede ver el seguimiento de usuarios
+if ((int) ($_SESSION['user_id'] ?? 0) === 1 && $current_page === 'seguimiento_usuarios.php') {
+    $accesoPermitido = true;
+}
+
 // Si no tiene acceso, redirigir al dashboard (solo si no estamos ya en el dashboard)
 if (!$accesoPermitido && $current_page !== 'dashboard.php') {
     header('Location: dashboard.php');
     exit();
+}
+
+// Telemetría interna: pantalla visitada (usuarios autenticados con acceso OK).
+try {
+    if ($accesoPermitido || $current_page === 'dashboard.php') {
+        if (!isset($pdo) || !($pdo instanceof PDO)) {
+            require_once __DIR__ . '/../config/database.php';
+        }
+        if (isset($pdo) && $pdo instanceof PDO) {
+            require_once __DIR__ . '/usuario_actividad_helper.php';
+            motus_actividad_registrar_page_view($pdo, $current_page);
+        }
+    }
+} catch (Throwable $e) {
+    error_log('validar_acceso actividad: ' . $e->getMessage());
 }
 ?>

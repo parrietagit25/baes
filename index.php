@@ -38,11 +38,36 @@ if ($_POST) {
                               WHERE ur.usuario_id = ?");
         $stmt->execute([$user['id']]);
         $_SESSION['user_roles'] = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+        try {
+            require_once __DIR__ . '/includes/usuario_actividad_helper.php';
+            motus_actividad_session_key();
+            motus_actividad_registrar($pdo, 'login', [
+                'usuario_id' => (int) $user['id'],
+                'pagina' => 'index.php',
+                'detalle' => 'Inicio de sesión OK',
+                'url_path' => '/index.php',
+            ]);
+        } catch (Throwable $e) {
+            error_log('login actividad: ' . $e->getMessage());
+        }
         
         header('Location: dashboard.php');
         exit();
         } else {
             $error = 'Credenciales inválidas o usuario inactivo';
+            try {
+                require_once __DIR__ . '/includes/usuario_actividad_helper.php';
+                motus_actividad_registrar($pdo, 'login_failed', [
+                    'usuario_id' => $user ? (int) $user['id'] : null,
+                    'pagina' => 'index.php',
+                    'detalle' => 'Intento fallido: ' . substr((string) $email, 0, 120),
+                    'url_path' => '/index.php',
+                    'session_key' => null,
+                ]);
+            } catch (Throwable $e) {
+                error_log('login_failed actividad: ' . $e->getMessage());
+            }
         }
     }
 }

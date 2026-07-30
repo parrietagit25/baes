@@ -30,7 +30,7 @@ $paginasAdministracionMenu = [
     'configuracion.php',
 ];
 $paginasFeriaMenu = ['ferias.php', 'feria_panel.php'];
-$paginasReportesMenu = ['reportes.php', 'reportes_banco.php', 'reportes_banco_fin_enlazada.php', 'seguimiento_banco.php', 'seguimiento_financiamiento.php', 'encuestas_resultados.php'];
+$paginasReportesMenu = ['reportes.php', 'reportes_banco.php', 'reportes_banco_fin_enlazada.php', 'seguimiento_banco.php', 'seguimiento_financiamiento.php', 'encuestas_resultados.php', 'seguimiento_usuarios.php'];
 
 $menuSolicitudesActivo = in_array($current_page, $paginasSolicitudesMenu, true);
 $menuAdministracionActivo = in_array($current_page, $paginasAdministracionMenu, true);
@@ -39,6 +39,7 @@ $menuReportesActivo = in_array($current_page, $paginasReportesMenu, true);
 
 $enReportes = ($current_page === 'reportes.php');
 $reportSubmenu = $enReportes ? ($_GET['submenu'] ?? 'usuarios') : '';
+$esAdminPrincipal = ((int) ($_SESSION['user_id'] ?? 0) === 1);
 ?>
 
 <!-- Sidebar -->
@@ -137,7 +138,7 @@ $reportSubmenu = $enReportes ? ($_GET['submenu'] ?? 'usuarios') : '';
         <?php endif; ?>
 
         <!-- Reportes -->
-        <?php if ($isAdmin || $isGestor || $isAdminBanco): ?>
+        <?php if ($isAdmin || $isGestor || $isAdminBanco || $esAdminPrincipal): ?>
         <button class="nav-link w-100 border-0 text-start d-flex align-items-center <?php echo $menuReportesActivo ? 'active' : ''; ?>"
                 type="button" data-bs-toggle="collapse" data-bs-target="#menuReportes"
                 aria-expanded="<?php echo $menuReportesActivo ? 'true' : 'false'; ?>" aria-controls="menuReportes">
@@ -146,6 +147,11 @@ $reportSubmenu = $enReportes ? ($_GET['submenu'] ?? 'usuarios') : '';
             <i class="fas fa-chevron-down ms-auto small"></i>
         </button>
         <div class="collapse <?php echo $menuReportesActivo ? 'show' : ''; ?>" id="menuReportes" data-bs-parent="#sidebarAccordion">
+            <?php if ($esAdminPrincipal): ?>
+            <a class="nav-link ps-4 py-2 small <?php echo ($current_page === 'seguimiento_usuarios.php') ? 'active' : ''; ?>" href="seguimiento_usuarios.php">
+                <i class="fas fa-user-secret me-2"></i>Seguimiento Usuarios
+            </a>
+            <?php endif; ?>
             <?php if ($isAdmin || $isGestor): ?>
             <a class="nav-link ps-4 py-2 small <?php echo ($current_page === 'seguimiento_financiamiento.php') ? 'active' : ''; ?>" href="seguimiento_financiamiento.php">
                 <i class="fas fa-chart-line me-2"></i>Seguimiento
@@ -206,3 +212,4 @@ $reportSubmenu = $enReportes ? ($_GET['submenu'] ?? 'usuarios') : '';
         </a>
     </nav>
 </div>
+<script src="js/motus_actividad.js" defer></script>
