@@ -10,6 +10,7 @@ if (!isset($_SESSION['user_id'])) {
 require_once 'config/database.php';
 require_once 'includes/validar_acceso.php';
 require_once 'includes/banco_scope_helper.php';
+require_once 'includes/sp_scope_helper.php';
 
 // Verificar roles del usuario
 $userRoles = $_SESSION['user_roles'] ?? [];
@@ -18,6 +19,7 @@ $isBanco = motus_es_vista_banco($userRoles);
 $isAdminBanco = motus_es_admin_banco($userRoles);
 $isGestor = in_array('ROLE_GESTOR', $userRoles);
 $isVendedor = in_array('ROLE_VENDEDOR', $userRoles);
+$isSp = motus_es_vista_sp($userRoles);
 $usuarioId = (int) $_SESSION['user_id'];
 
 // Filtro del dashboard: administrador ve todas las solicitudes; gestor solo las suyas (gestor_id);
@@ -78,6 +80,17 @@ if ($isAdmin) {
     $dashboardFiltroSqlAliasS = ' AND s.vendedor_id = ? ';
     $dashboardFiltroParams[] = $usuarioId;
     $dashboardAlcanceEtiqueta = 'Vista personal: solo solicitudes donde usted figura como vendedor.';
+} elseif ($isSp) {
+    [$spSqlTabla, $spParams] = motus_sql_filtro_alcance_sp($pdo, $userRoles, 'solicitudes_credito.id');
+    [$spSqlAlias, $spParamsAlias] = motus_sql_filtro_alcance_sp_sobre_solicitud('s', $userRoles);
+    $dashboardFiltroSqlTabla = $spSqlTabla;
+    $dashboardFiltroSqlAliasS = $spSqlAlias;
+    $dashboardFiltroParams = $spParams;
+    // Ambos helpers usan los mismos params; priorizar los del alias helper si difieren en forma.
+    if ($spParamsAlias !== []) {
+        $dashboardFiltroParams = $spParamsAlias;
+    }
+    $dashboardAlcanceEtiqueta = 'Vista supervisor: ' . motus_sp_etiqueta_alcance($userRoles) . '.';
 }
 
 // ========================================
