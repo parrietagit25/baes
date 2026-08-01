@@ -93,6 +93,9 @@ switch ($action) {
     case 'reporte_sucursales':
         reporteSucursales();
         break;
+    case 'reporte_predicciones':
+        reportePredicciones();
+        break;
     case 'exportar_todos_excel':
         // Ya atendido al inicio.
         echo json_encode(['success' => false, 'message' => 'Acción ya ejecutada']);
@@ -1725,6 +1728,19 @@ function reporteSucursales(): void
         error_log('reporte_sucursales: ' . $e->getMessage());
         http_response_code(500);
         echo json_encode(['success' => false, 'message' => 'Error al generar el reporte de sucursales']);
+    }
+}
+
+function reportePredicciones(): void
+{
+    global $pdo;
+    require_once __DIR__ . '/../includes/reportes_predicciones_data.php';
+    try {
+        echo json_encode(rep_pred_build_reporte($pdo), JSON_UNESCAPED_UNICODE);
+    } catch (Throwable $e) {
+        error_log('reporte_predicciones: ' . $e->getMessage());
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Error al generar predicciones']);
     }
 }
 

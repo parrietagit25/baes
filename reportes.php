@@ -18,7 +18,7 @@ if (!in_array('ROLE_ADMIN', $_SESSION['user_roles'] ?? [], true)
 }
 
 $submenu = $_GET['submenu'] ?? 'usuarios';
-if (!in_array($submenu, ['usuarios', 'vendedores', 'sucursales', 'tiempo', 'banco', 'emails', 'encuestas', 'telemetria', 'fin_publica', 'fin_enlazada', 'vehiculos'], true)) {
+if (!in_array($submenu, ['usuarios', 'vendedores', 'sucursales', 'tiempo', 'banco', 'emails', 'encuestas', 'telemetria', 'fin_publica', 'fin_enlazada', 'vehiculos', 'predicciones'], true)) {
     $submenu = 'usuarios';
 }
 $finRepDesde = (new DateTimeImmutable('-365 days'))->format('Y-m-d');
@@ -36,6 +36,7 @@ $titulosReporte = [
     'fin_publica' => 'Sol. Financiamiento (público)',
     'fin_enlazada' => 'Sol. Pública + Motus enlazada',
     'vehiculos' => 'Rep. Vehículo (crédito)',
+    'predicciones' => 'Predicciones',
 ];
 $exportActionPorSubmenu = [
     'usuarios' => ['action' => 'exportar_excel_usuarios', 'label' => 'Descargar Rep. Usuarios'],
@@ -108,6 +109,7 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
                             elseif ($submenu === 'fin_publica') echo 'Demografía y perfiles inferidos desde el formulario público de financiamiento (sin solicitud Motus obligatoria)';
                             elseif ($submenu === 'fin_enlazada') echo 'Mismo análisis del formulario público, limitado a envíos que ya tienen solicitud de crédito Motus vinculada';
                             elseif ($submenu === 'vehiculos') echo 'Marcas, precios, modelo, antigüedad, kilometraje, abono e ingresos según solicitudes de crédito';
+                            elseif ($submenu === 'predicciones') echo 'Riesgo de estancamiento, probabilidad de cierre y tiempo esperado de respuesta por banco (scoring estadístico)';
                             else echo 'Cantidad de correos enviados/fallidos y detalle de destinatarios';
                         ?></p>
                     </div>
@@ -672,6 +674,134 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
                         </div>
                     </div>
 
+                    <!-- Predicciones -->
+                    <div id="panel-predicciones" class="report-panel" style="display: <?php echo $submenu === 'predicciones' ? 'block' : 'none'; ?>">
+                        <div class="alert alert-secondary small mb-3">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Scoring heurístico + tasas históricas (sin machine learning). Usa historial de estados, evaluaciones bancarias y tiempos de respuesta.
+                            <span id="predNotaMeta" class="d-block mt-1 text-muted"></span>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2 mb-3">
+                            <button type="button" class="btn btn-primary btn-sm" id="btnPredActualizar">
+                                <i class="fas fa-sync me-1"></i>Actualizar
+                            </button>
+                        </div>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-3"><div class="card"><div class="card-body text-center"><div class="text-muted small">Abiertas analizadas</div><div class="h4 mb-0" id="predKpiAbiertas">0</div></div></div></div>
+                            <div class="col-md-3"><div class="card"><div class="card-body text-center"><div class="text-muted small">Riesgo alto</div><div class="h4 mb-0 text-danger" id="predKpiAlto">0</div></div></div></div>
+                            <div class="col-md-3"><div class="card"><div class="card-body text-center"><div class="text-muted small">Prob. cierre prom.</div><div class="h4 mb-0 text-success" id="predKpiProb">—</div></div></div></div>
+                            <div class="col-md-3"><div class="card"><div class="card-body text-center"><div class="text-muted small">Alertas SLA banco</div><div class="h4 mb-0 text-warning" id="predKpiSla">0</div></div></div></div>
+                        </div>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-3"><div class="card"><div class="card-body text-center"><div class="text-muted small">Riesgo medio</div><div class="h5 mb-0 text-warning" id="predKpiMedio">0</div></div></div></div>
+                            <div class="col-md-3"><div class="card"><div class="card-body text-center"><div class="text-muted small">Riesgo bajo</div><div class="h5 mb-0 text-secondary" id="predKpiBajo">0</div></div></div></div>
+                            <div class="col-md-3"><div class="card"><div class="card-body text-center"><div class="text-muted small">Tasa cierre histórica</div><div class="h5 mb-0" id="predKpiHist">—</div></div></div></div>
+                            <div class="col-md-3"><div class="card"><div class="card-body text-center"><div class="text-muted small">Muestra histórica</div><div class="h5 mb-0" id="predKpiMuestra">0</div></div></div></div>
+                        </div>
+
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                                    <h5 class="card-title mb-0"><i class="fas fa-exclamation-triangle text-danger me-1"></i>Riesgo de estancamiento</h5>
+                                    <input type="search" id="predFiltroEst" class="form-control form-control-sm" style="max-width:220px" placeholder="Filtrar cliente / estado…">
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-bordered table-reportes" id="tabla-pred-estancamiento">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Id</th>
+                                                <th>Cliente</th>
+                                                <th>Estado</th>
+                                                <th>Sucursal</th>
+                                                <th>Gestor</th>
+                                                <th class="text-end">Horas sin avance</th>
+                                                <th class="text-end">Días abierta</th>
+                                                <th class="text-end">Score</th>
+                                                <th>Nivel</th>
+                                                <th>Factores</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                                    <h5 class="card-title mb-0"><i class="fas fa-percentage text-success me-1"></i>Probabilidad de cierre</h5>
+                                    <input type="search" id="predFiltroProb" class="form-control form-control-sm" style="max-width:220px" placeholder="Filtrar…">
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-bordered table-reportes" id="tabla-pred-cierre">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Id</th>
+                                                <th>Cliente</th>
+                                                <th>Estado</th>
+                                                <th>Sucursal</th>
+                                                <th class="text-end">Prob. cierre</th>
+                                                <th>Abono bucket</th>
+                                                <th>Eval. positiva</th>
+                                                <th class="text-end">Score estanc.</th>
+                                                <th>Nivel estanc.</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-lg-6">
+                                <div class="card h-100">
+                                    <div class="card-body">
+                                        <h5 class="card-title mb-2"><i class="fas fa-university me-1"></i>SLA esperado por banco (90 días)</h5>
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-bordered table-reportes" id="tabla-pred-sla-bancos">
+                                                <thead class="table-light">
+                                                    <tr>
+                                                        <th>Banco</th>
+                                                        <th class="text-end">Muestra</th>
+                                                        <th class="text-end">Mediana h</th>
+                                                        <th class="text-end">Prom. h</th>
+                                                        <th class="text-end">Días med.</th>
+                                                        <th class="text-end">Pendientes</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody></tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-lg-6">
+                                <div class="card h-100">
+                                    <div class="card-body">
+                                        <h5 class="card-title mb-2"><i class="fas fa-bell text-warning me-1"></i>Alertas SLA (pendientes sobre mediana)</h5>
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-bordered table-reportes" id="tabla-pred-sla-alertas">
+                                                <thead class="table-light">
+                                                    <tr>
+                                                        <th>Solicitud</th>
+                                                        <th>Banco</th>
+                                                        <th class="text-end">Horas trans.</th>
+                                                        <th class="text-end">Esperado</th>
+                                                        <th class="text-end">Ratio</th>
+                                                        <th>Nivel</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody></tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Rep. Correos -->
                     <div id="panel-emails" class="report-panel" style="display: <?php echo $submenu === 'emails' ? 'block' : 'none'; ?>">
                         <div class="row g-3 mb-3">
@@ -788,6 +918,9 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
     <?php if ($submenu === 'sucursales'): ?>
     <script src="js/reportes_sucursales.js?v=<?php echo file_exists(__DIR__ . '/js/reportes_sucursales.js') ? filemtime(__DIR__ . '/js/reportes_sucursales.js') : time(); ?>"></script>
     <?php endif; ?>
+    <?php if ($submenu === 'predicciones'): ?>
+    <script src="js/reportes_predicciones.js?v=<?php echo file_exists(__DIR__ . '/js/reportes_predicciones.js') ? filemtime(__DIR__ . '/js/reportes_predicciones.js') : time(); ?>"></script>
+    <?php endif; ?>
     <script>
 (function() {
     const submenu = '<?php echo $submenu; ?>';
@@ -821,6 +954,8 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
         loadFinEnlazadaDemografia();
     } else if (submenu === 'vehiculos') {
         loadReporteVehiculos();
+    } else if (submenu === 'predicciones' && typeof loadReportePredicciones === 'function') {
+        loadReportePredicciones();
     }
 
     function loadReporteUsuarios() {

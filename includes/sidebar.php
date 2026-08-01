@@ -205,6 +205,9 @@ $esAdminPrincipal = ((int) ($_SESSION['user_id'] ?? 0) === 1);
             <a class="nav-link ps-4 py-1 small <?php echo ($reportSubmenu === 'vehiculos') ? 'active' : ''; ?>" href="reportes.php?submenu=vehiculos">
                 <i class="fas fa-car me-1"></i> Rep. Vehículo
             </a>
+            <a class="nav-link ps-4 py-1 small <?php echo ($reportSubmenu === 'predicciones') ? 'active' : ''; ?>" href="reportes.php?submenu=predicciones">
+                <i class="fas fa-bullseye me-1"></i> Predicciones
+            </a>
             <?php endif; ?>
         </div>
         <?php endif; ?>
