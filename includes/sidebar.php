@@ -8,11 +8,14 @@ if (!isset($_SESSION['user_id'])) {
 // Obtener la página actual para marcar el menú activo
 $current_page = basename($_SERVER['PHP_SELF']);
 require_once __DIR__ . '/banco_scope_helper.php';
+require_once __DIR__ . '/sp_scope_helper.php';
 $isAdmin = in_array('ROLE_ADMIN', $_SESSION['user_roles']);
 $isGestor = in_array('ROLE_GESTOR', $_SESSION['user_roles']);
 $isBanco = motus_es_vista_banco($_SESSION['user_roles'] ?? []);
 $isAdminBanco = motus_es_admin_banco($_SESSION['user_roles'] ?? []);
 $isVendedor = in_array('ROLE_VENDEDOR', $_SESSION['user_roles']);
+$isSp = motus_es_vista_sp($_SESSION['user_roles'] ?? []);
+$spEtiquetaAlcance = $isSp ? motus_sp_etiqueta_alcance() : '';
 
 $paginasSolicitudesMenu = [
     'solicitudes.php',
@@ -54,7 +57,7 @@ $esAdminPrincipal = ((int) ($_SESSION['user_id'] ?? 0) === 1);
         </a>
         
         <!-- Solicitudes -->
-        <?php if ($isAdmin || $isGestor || $isBanco || $isVendedor): ?>
+        <?php if ($isAdmin || $isGestor || $isBanco || $isVendedor || $isSp): ?>
         <button class="nav-link w-100 border-0 text-start d-flex align-items-center <?php echo $menuSolicitudesActivo ? 'active' : ''; ?>"
                 type="button" data-bs-toggle="collapse" data-bs-target="#menuSolicitudes"
                 aria-expanded="<?php echo $menuSolicitudesActivo ? 'true' : 'false'; ?>" aria-controls="menuSolicitudes">
@@ -138,7 +141,7 @@ $esAdminPrincipal = ((int) ($_SESSION['user_id'] ?? 0) === 1);
         <?php endif; ?>
 
         <!-- Reportes -->
-        <?php if ($isAdmin || $isGestor || $isAdminBanco || $esAdminPrincipal): ?>
+        <?php if ($isAdmin || $isGestor || $isAdminBanco || $esAdminPrincipal || $isSp): ?>
         <button class="nav-link w-100 border-0 text-start d-flex align-items-center <?php echo $menuReportesActivo ? 'active' : ''; ?>"
                 type="button" data-bs-toggle="collapse" data-bs-target="#menuReportes"
                 aria-expanded="<?php echo $menuReportesActivo ? 'true' : 'false'; ?>" aria-controls="menuReportes">
@@ -152,7 +155,7 @@ $esAdminPrincipal = ((int) ($_SESSION['user_id'] ?? 0) === 1);
                 <i class="fas fa-user-secret me-2"></i>Seguimiento Usuarios
             </a>
             <?php endif; ?>
-            <?php if ($isAdmin || $isGestor): ?>
+            <?php if ($isAdmin || $isGestor || $isSp): ?>
             <a class="nav-link ps-4 py-2 small <?php echo ($current_page === 'seguimiento_financiamiento.php') ? 'active' : ''; ?>" href="seguimiento_financiamiento.php">
                 <i class="fas fa-chart-line me-2"></i>Seguimiento
             </a>
@@ -168,7 +171,7 @@ $esAdminPrincipal = ((int) ($_SESSION['user_id'] ?? 0) === 1);
                 <i class="fas fa-link me-1"></i> Sol. Fin. + Motus
             </a>
             <?php endif; ?>
-            <?php if ($isAdmin || $isGestor): ?>
+            <?php if ($isAdmin || $isGestor || $isSp): ?>
             <a class="nav-link ps-4 py-1 small <?php echo ($reportSubmenu === 'usuarios') ? 'active' : ''; ?>" href="reportes.php?submenu=usuarios">
                 <i class="fas fa-users me-1"></i> Rep. Usuarios
             </a>

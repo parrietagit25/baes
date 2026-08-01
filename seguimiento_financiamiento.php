@@ -8,7 +8,7 @@ if (!isset($_SESSION['user_id'])) {
 require_once 'config/database.php';
 require_once 'includes/validar_acceso.php';
 
-if (!$isAdmin && !$isGestor) {
+if (!$isAdmin && !$isGestor && empty($isSp)) {
     header('Location: dashboard.php');
     exit();
 }

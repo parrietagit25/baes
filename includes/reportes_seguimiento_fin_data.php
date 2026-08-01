@@ -193,6 +193,7 @@ function rep_segfin_fetch_raw(PDO $pdo, string $d1, string $d2): array
             sc.nombre_cliente AS nombre_motus,
             sc.cedula AS cedula_motus,
             ev.nombre AS vendedor_nombre,
+            ev.sucursal AS vendedor_sucursal,
             {$sqlBancoCampos}
             {$sqlCamposReserva}
         FROM financiamiento_registros fr
@@ -496,6 +497,20 @@ function rep_segfin_build_reporte(PDO $pdo, ?array $filtOverride = null): array
         }
         if (!rep_segfin_pasar_filtro_vinculo($e, $filt)) {
             continue;
+        }
+        if (function_exists('motus_es_vista_sp') && motus_es_vista_sp()) {
+            $codigos = motus_sp_codigos_permitidos();
+            if ($codigos !== null) {
+                if ($codigos === []) {
+                    continue;
+                }
+                require_once __DIR__ . '/reportes_sucursales_data.php';
+                $cls = reportes_sucursales_clasificar_sigla($row['vendedor_sucursal'] ?? '');
+                $codigo = (string) ($cls['codigo'] ?? '');
+                if ($codigo === '' || !in_array($codigo, $codigos, true)) {
+                    continue;
+                }
+            }
         }
 
         if ($e['tiene_solicitud_motus']) {

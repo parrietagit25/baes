@@ -5,11 +5,14 @@
 
 session_start();
 
+require_once __DIR__ . '/../includes/sp_scope_helper.php';
+
 $roles = $_SESSION['user_roles'] ?? [];
 $esAdmin = in_array('ROLE_ADMIN', $roles, true);
 $esGestor = in_array('ROLE_GESTOR', $roles, true);
+$esSp = motus_es_vista_sp($roles);
 
-if (!isset($_SESSION['user_id']) || (!$esAdmin && !$esGestor)) {
+if (!isset($_SESSION['user_id']) || (!$esAdmin && !$esGestor && !$esSp)) {
     http_response_code(403);
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode(['success' => false, 'message' => 'Acceso denegado']);

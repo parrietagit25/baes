@@ -18,6 +18,7 @@ require_once '../config/database.php';
 require_once '../includes/historial_helper.php';
 require_once '../includes/solicitud_vehiculo_helper.php';
 require_once '../includes/banco_scope_helper.php';
+require_once '../includes/sp_scope_helper.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 
@@ -275,6 +276,10 @@ function obtenerSolicitudes() {
             $params[] = $usuarioId;
         } elseif (in_array('ROLE_ADMIN', $userRoles)) {
             // Los administradores ven todas las solicitudes
+        } elseif (motus_es_vista_sp($userRoles)) {
+            [$spSql, $spParams] = motus_sql_filtro_alcance_sp_sobre_solicitud('s', $userRoles);
+            $whereClause = ' WHERE 1=1' . $spSql;
+            $params = array_merge($params, $spParams);
         } else {
             http_response_code(403);
             echo json_encode(['success' => false, 'message' => 'Acceso denegado']);
@@ -331,6 +336,12 @@ function obtenerSolicitud($id) {
             $solicitud['año_auto'] = $solicitud['ao_auto'];
         }
         if ($solicitud) {
+            $rolesGet = $_SESSION['user_roles'] ?? [];
+            if (motus_es_vista_sp($rolesGet) && !motus_solicitud_en_alcance_sp($pdo, (int) $id, $rolesGet)) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'No tiene acceso a esta solicitud']);
+                return;
+            }
             // Obtener notas de la solicitud
             $stmt = $pdo->prepare("
                 SELECT n.*, u.nombre, u.apellido

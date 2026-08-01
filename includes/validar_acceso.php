@@ -20,6 +20,7 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 require_once __DIR__ . '/banco_scope_helper.php';
+require_once __DIR__ . '/sp_scope_helper.php';
 
 // Obtener roles del usuario
 $userRoles = $_SESSION['user_roles'] ?? [];
@@ -28,6 +29,7 @@ $isGestor = in_array('ROLE_GESTOR', $userRoles);
 $isBanco = motus_es_vista_banco($userRoles);
 $isAdminBanco = motus_es_admin_banco($userRoles);
 $isVendedor = in_array('ROLE_VENDEDOR', $userRoles);
+$isSp = motus_es_vista_sp($userRoles);
 
 // Obtener la página actual
 $current_page = basename($_SERVER['PHP_SELF']);
@@ -37,6 +39,7 @@ $paginasAdmin = ['dashboard.php', 'usuarios.php', 'roles.php', 'bancos.php', 'ej
 $paginasGestor = ['dashboard.php', 'solicitudes.php', 'historico_solicitudes.php', 'sol_financiamiento.php', 'seguimiento_financiamiento.php', 'subir_reporte_reservas.php', 'ferias.php', 'feria_panel.php', 'usuarios_banco.php', 'ejecutivos_ventas.php', 'reportes.php', 'encuestas_resultados.php'];
 $paginasBanco = ['dashboard.php', 'solicitudes.php', 'historico_solicitudes.php', 'mis_propuestas_banco.php', 'usuarios_banco.php', 'reportes_banco.php', 'reportes_banco_fin_enlazada.php', 'seguimiento_banco.php'];
 $paginasVendedor = ['dashboard.php', 'solicitudes.php', 'historico_solicitudes.php'];
+$paginasSp = ['dashboard.php', 'solicitudes.php', 'historico_solicitudes.php', 'reportes.php', 'seguimiento_financiamiento.php'];
 
 // Función para verificar acceso
 function verificarAcceso($pagina, $roles, $paginasPermitidas) {
@@ -56,6 +59,8 @@ if ($isAdmin) {
 } elseif ($isBanco) {
     // ROLE_BANCO y ROLE_ADMIN_BANCO: mismas páginas de banco
     $accesoPermitido = verificarAcceso($current_page, $userRoles, $paginasBanco);
+} elseif ($isSp) {
+    $accesoPermitido = verificarAcceso($current_page, $userRoles, $paginasSp);
 } elseif ($isVendedor) {
     $accesoPermitido = verificarAcceso($current_page, $userRoles, $paginasVendedor);
 } else {

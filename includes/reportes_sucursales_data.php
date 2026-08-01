@@ -225,13 +225,20 @@ function reportes_sucursales_sumar_estado(array &$bucket, ?string $estado): void
 /**
  * @return array<string, mixed>
  */
-function reportes_sucursales_obtener_datos(PDO $pdo, ?string $desde = null, ?string $hasta = null, string $fuente = 'credito'): array
+function reportes_sucursales_obtener_datos(PDO $pdo, ?string $desde = null, ?string $hasta = null, string $fuente = 'credito', ?array $soloCodigos = null): array
 {
     [$d1, $d2] = reportes_sucursales_rango_fechas($desde, $hasta);
     $fuente = reportes_sucursales_normalizar_fuente($fuente);
     $listaEstados = reportes_sucursales_lista_estados($fuente);
     $estadosVacios = reportes_sucursales_estados_vacios($fuente);
     $mesesKeys = reportes_sucursales_meses_en_rango($d1, $d2);
+
+    if ($soloCodigos !== null) {
+        $soloCodigos = array_values(array_unique(array_map(static function ($c) {
+            return strtoupper(trim((string) $c));
+        }, $soloCodigos)));
+        $soloCodigos = array_values(array_filter($soloCodigos, static fn($c) => $c !== ''));
+    }
 
     $ejecutivos = $pdo->query("
         SELECT id, nombre, email, sucursal
@@ -264,6 +271,9 @@ function reportes_sucursales_obtener_datos(PDO $pdo, ?string $desde = null, ?str
         if ($cod === 'NN') {
             continue;
         }
+        if ($soloCodigos !== null && !in_array($cod, $soloCodigos, true)) {
+            continue;
+        }
         $porSucursal[$cod] = array_merge(
             ['codigo' => $cod, 'nombre' => REPORTES_SUCURSALES_NOMBRES[$cod], 'siglas_agentes' => $cod],
             $estadosVacios
@@ -285,6 +295,9 @@ function reportes_sucursales_obtener_datos(PDO $pdo, ?string $desde = null, ?str
 
         $ev = $mapEjecutivo[$evId];
         $codigo = (string) $ev['codigo'];
+        if ($soloCodigos !== null && ($codigo === '' || !in_array($codigo, $soloCodigos, true))) {
+            continue;
+        }
         $fecha = $s['fecha_creacion'] ?? '';
         $ym = '';
         if ($fecha) {

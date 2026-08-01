@@ -6,9 +6,11 @@
 session_start();
 $action = $_GET['action'] ?? '';
 
+require_once __DIR__ . '/../includes/sp_scope_helper.php';
+
 $roles = $_SESSION['user_roles'] ?? [];
 $puedeReportes = isset($_SESSION['user_id'])
-    && (in_array('ROLE_ADMIN', $roles, true) || in_array('ROLE_GESTOR', $roles, true));
+    && (in_array('ROLE_ADMIN', $roles, true) || in_array('ROLE_GESTOR', $roles, true) || motus_es_vista_sp($roles));
 
 if (!$puedeReportes) {
     http_response_code(403);
@@ -18,6 +20,11 @@ if (!$puedeReportes) {
 }
 
 require_once __DIR__ . '/../config/database.php';
+
+/** Códigos SP del usuario actual (null = sin filtro). */
+function reportes_sp_codigos_sesion(): ?array {
+    return motus_es_vista_sp() ? motus_sp_codigos_permitidos() : null;
+}
 
 if ($action === 'exportar_todos_excel') {
     exportarTodosReportesExcel();
@@ -361,7 +368,7 @@ function exportarReporteCsv(string $action): void {
         $desdeExp = isset($_GET['desde']) ? trim((string) $_GET['desde']) : '';
         $hastaExp = isset($_GET['hasta']) ? trim((string) $_GET['hasta']) : '';
         $fuenteExp = reportes_sucursales_normalizar_fuente($_GET['fuente'] ?? 'credito');
-        $pack = reportes_sucursales_obtener_datos($pdo, $desdeExp, $hastaExp, $fuenteExp);
+        $pack = reportes_sucursales_obtener_datos($pdo, $desdeExp, $hastaExp, $fuenteExp, reportes_sp_codigos_sesion());
         $est = reportes_sucursales_lista_estados($fuenteExp);
         $hdr = array_merge(['Codigo', 'Sucursal'], $est, ['Total']);
         $rows = [];
@@ -785,20 +792,30 @@ function _dataReporteUsuarios(PDO $pdo): array {
 }
 
 function _dataReporteVendedores(PDO $pdo): array {
+    $spCodigos = reportes_sp_codigos_sesion();
+    [$spSql, $spParams] = motus_sql_condicion_sucursal_codigos('ev.sucursal', $spCodigos);
     $sql = "
         SELECT
             ev.id AS vendedor_id,
             ev.nombre,
             ev.email,
+            ev.sucursal,
             s.estado,
             COUNT(s.id) AS total
         FROM ejecutivos_ventas ev
         LEFT JOIN solicitudes_credito s ON s.ejecutivo_ventas_id = ev.id
         WHERE COALESCE(ev.activo, 1) = 1
-        GROUP BY ev.id, ev.nombre, ev.email, s.estado
+        {$spSql}
+        GROUP BY ev.id, ev.nombre, ev.email, ev.sucursal, s.estado
         ORDER BY ev.nombre, s.estado
     ";
-    $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+    if ($spParams !== []) {
+        $st = $pdo->prepare($sql);
+        $st->execute($spParams);
+        $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+    } else {
+        $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+    }
     $porVendedor = [];
     foreach ($rows as $r) {
         $id = $r['vendedor_id'];
@@ -807,6 +824,7 @@ function _dataReporteVendedores(PDO $pdo): array {
                 'vendedor_id' => $id,
                 'nombre' => trim((string)($r['nombre'] ?? '')),
                 'email' => $r['email'] ?? '',
+                'sucursal' => $r['sucursal'] ?? '',
                 'Nueva' => 0,
                 'En Revisión Banco' => 0,
                 'Aprobada' => 0,
@@ -825,11 +843,21 @@ function _dataReporteVendedores(PDO $pdo): array {
 }
 
 function _dataReporteTiempo(PDO $pdo): array {
-    $rows = $pdo->query("
+    [$spSql, $spParams] = motus_sql_filtro_alcance_sp_sobre_solicitud('s');
+    $sql = "
         SELECT s.id, s.nombre_cliente, s.cedula, s.estado, s.fecha_creacion, s.fecha_actualizacion
         FROM solicitudes_credito s
+        WHERE 1=1
+        {$spSql}
         ORDER BY s.fecha_actualizacion DESC
-    ")->fetchAll(PDO::FETCH_ASSOC);
+    ";
+    if ($spParams !== []) {
+        $st = $pdo->prepare($sql);
+        $st->execute($spParams);
+        $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+    } else {
+        $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+    }
     foreach ($rows as &$r) {
         $r['dias_en_estado_actual'] = null;
         $r['horas_en_estado_actual'] = null;
@@ -846,6 +874,7 @@ function _dataReporteTiempo(PDO $pdo): array {
 }
 
 function _dataReporteBanco(PDO $pdo): array {
+    [$spSql, $spParams] = motus_sql_filtro_alcance_sp_sobre_solicitud('s');
     $sql = "
         SELECT 
             s.id AS solicitud_id,
@@ -868,11 +897,19 @@ function _dataReporteBanco(PDO $pdo): array {
         INNER JOIN usuarios u ON u.id = ubs.usuario_banco_id
         LEFT JOIN bancos b ON b.id = u.banco_id
         LEFT JOIN evaluaciones_banco eb ON eb.solicitud_id = s.id AND eb.usuario_banco_id = ubs.id
+        WHERE 1=1
+        {$spSql}
         GROUP BY s.id, s.nombre_cliente, s.cedula, s.estado, b.id, b.nombre, ubs.id, ubs.fecha_asignacion,
                  s.fecha_aprobacion_propuesta, s.fecha_envio_proforma, s.fecha_carta_promesa
         ORDER BY ubs.fecha_asignacion DESC
     ";
-    $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+    if ($spParams !== []) {
+        $st = $pdo->prepare($sql);
+        $st->execute($spParams);
+        $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+    } else {
+        $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+    }
     foreach ($rows as &$r) {
         $r['dias_respuesta'] = null;
         $r['horas_respuesta'] = null;
@@ -1170,6 +1207,23 @@ function _telemetriaDeviceInfoFromUa(string $ua): array {
 function reporteUsuarios() {
     global $pdo;
     try {
+        $spCodigos = reportes_sp_codigos_sesion();
+        $joinSp = '';
+        $params = [];
+        if ($spCodigos !== null) {
+            if ($spCodigos === []) {
+                echo json_encode(['success' => true, 'data' => []]);
+                return;
+            }
+            $vals = motus_sp_valores_sucursal_sql($spCodigos);
+            $ph = implode(',', array_fill(0, count($vals), '?'));
+            $joinSp = " AND EXISTS (
+                SELECT 1 FROM ejecutivos_ventas ev_sp
+                WHERE ev_sp.id = s.ejecutivo_ventas_id
+                  AND UPPER(TRIM(ev_sp.sucursal)) IN ({$ph})
+            )";
+            $params = $vals;
+        }
         $sql = "
             SELECT 
                 u.id as usuario_id,
@@ -1179,7 +1233,7 @@ function reporteUsuarios() {
                 s.estado,
                 COUNT(s.id) as total
             FROM usuarios u
-            LEFT JOIN solicitudes_credito s ON s.gestor_id = u.id
+            LEFT JOIN solicitudes_credito s ON s.gestor_id = u.id {$joinSp}
             WHERE u.activo = 1
             AND EXISTS (
                 SELECT 1 FROM usuario_roles ur 
@@ -1189,8 +1243,13 @@ function reporteUsuarios() {
             GROUP BY u.id, u.nombre, u.apellido, u.email, s.estado
             ORDER BY u.apellido, u.nombre, s.estado
         ";
-        $stmt = $pdo->query($sql);
-        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        if ($params !== []) {
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } else {
+            $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+        }
         
         // Agrupar por usuario con totales por estado
         $porUsuario = [];
@@ -1678,7 +1737,7 @@ function reporteSucursales(): void
     $hasta = isset($_GET['hasta']) ? trim((string) $_GET['hasta']) : '';
     $fuente = reportes_sucursales_normalizar_fuente($_GET['fuente'] ?? 'credito');
     try {
-        $data = reportes_sucursales_obtener_datos($pdo, $desde, $hasta, $fuente);
+        $data = reportes_sucursales_obtener_datos($pdo, $desde, $hasta, $fuente, reportes_sp_codigos_sesion());
         echo json_encode(['success' => true, 'data' => $data], JSON_UNESCAPED_UNICODE);
     } catch (Throwable $e) {
         error_log('reporte_sucursales: ' . $e->getMessage());
