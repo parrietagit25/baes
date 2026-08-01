@@ -17,7 +17,6 @@ if (!in_array('ROLE_ADMIN', $_SESSION['user_roles'] ?? [], true)
     exit();
 }
 
-$spAlcanceLabel = motus_es_vista_sp() ? motus_sp_etiqueta_alcance() : '';
 $submenu = $_GET['submenu'] ?? 'usuarios';
 if (!in_array($submenu, ['usuarios', 'vendedores', 'sucursales', 'tiempo', 'banco', 'emails', 'encuestas', 'telemetria', 'fin_publica', 'fin_enlazada', 'vehiculos'], true)) {
     $submenu = 'usuarios';
@@ -112,12 +111,6 @@ $exportActual = $exportActionPorSubmenu[$submenu] ?? null;
                             else echo 'Cantidad de correos enviados/fallidos y detalle de destinatarios';
                         ?></p>
                     </div>
-
-                    <?php if (!empty($spAlcanceLabel)): ?>
-                    <div class="alert alert-info small">
-                        <i class="fas fa-filter me-1"></i>Alcance supervisor: <strong><?php echo htmlspecialchars($spAlcanceLabel); ?></strong>
-                    </div>
-                    <?php endif; ?>
 
                     <!-- Rep. Usuarios -->
                     <div id="panel-usuarios" class="report-panel" style="display: <?php echo $submenu === 'usuarios' ? 'block' : 'none'; ?>">

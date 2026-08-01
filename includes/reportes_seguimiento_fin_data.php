@@ -498,21 +498,6 @@ function rep_segfin_build_reporte(PDO $pdo, ?array $filtOverride = null): array
         if (!rep_segfin_pasar_filtro_vinculo($e, $filt)) {
             continue;
         }
-        if (function_exists('motus_es_vista_sp') && motus_es_vista_sp()) {
-            $codigos = motus_sp_codigos_permitidos();
-            if ($codigos !== null) {
-                if ($codigos === []) {
-                    continue;
-                }
-                require_once __DIR__ . '/reportes_sucursales_data.php';
-                $cls = reportes_sucursales_clasificar_sigla($row['vendedor_sucursal'] ?? '');
-                $codigo = (string) ($cls['codigo'] ?? '');
-                if ($codigo === '' || !in_array($codigo, $codigos, true)) {
-                    continue;
-                }
-            }
-        }
-
         if ($e['tiene_solicitud_motus']) {
             $conMotus++;
         } else {

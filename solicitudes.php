@@ -10,6 +10,7 @@ require_once 'config/database.php';
 require_once 'includes/validar_acceso.php';
 require_once 'includes/solicitud_vehiculo_helper.php';
 require_once 'includes/banco_scope_helper.php';
+require_once 'includes/sp_scope_helper.php';
 
 // Vista histórica: Completada, Rechazada, Desistimiento
 $esHistorico = defined('MOTUS_VISTA_HISTORICO') && MOTUS_VISTA_HISTORICO;
@@ -22,6 +23,7 @@ $isGestor = in_array('ROLE_GESTOR', $userRoles);
 $isAdminBanco = motus_es_admin_banco($userRoles);
 $isBancoAnalista = motus_es_analista_banco($userRoles);
 $isBanco = motus_es_vista_banco($userRoles);
+$isSp = motus_es_vista_sp($userRoles);
 $esUsuarioBancoLista = $isBanco && !$isAdmin; // Vista lista tipo banco (sin columna «todos los bancos» de admin)
 $bancoIdSesion = motus_obtener_banco_id_usuario($pdo);
 
@@ -86,6 +88,7 @@ $statsGradientes = [
 
 // Alcance por rol (banco / gestor / admin)
 $filtroAlcanceStats = '';
+$filtroAlcanceStatsParams = [];
 if ($isBanco && !$isAdmin) {
     if ($isAdminBanco) {
         $bancoIdFiltro = (int) ($bancoIdSesion ?? 0);
@@ -110,15 +113,22 @@ if ($isBanco && !$isAdmin) {
     }
 } elseif ($isGestor && !$isAdmin) {
     $filtroAlcanceStats = "AND gestor_id = " . (int) $_SESSION['user_id'];
+} elseif ($isSp && !$isAdmin) {
+    [$filtroAlcanceStats, $filtroAlcanceStatsParams] = motus_sql_filtro_alcance_sp(
+        $pdo,
+        $userRoles,
+        'solicitudes_credito.id'
+    );
 }
 
 $conteoPorEstado = [];
-$stmt = $pdo->query("
+$stmt = $pdo->prepare("
     SELECT estado, COUNT(*) AS total
     FROM solicitudes_credito
     WHERE $filtroEstadoLista $filtroAlcanceStats
     GROUP BY estado
 ");
+$stmt->execute($filtroAlcanceStatsParams);
 foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $fila) {
     $conteoPorEstado[$fila['estado']] = (int) $fila['total'];
 }
@@ -519,6 +529,7 @@ if ($isBanco && !$isAdmin) {
                                         
                                           // Aplicar filtro según el rol del usuario
                                           $whereParts = [];
+                                          $whereParams = [];
                                           if ($isAdminBanco && !$isAdmin) {
                                               $bancoIdFiltroLista = (int) ($bancoIdSesion ?? 0);
                                               if ($bancoIdFiltroLista > 0) {
@@ -543,6 +554,13 @@ if ($isBanco && !$isAdmin) {
                                           } elseif (in_array('ROLE_GESTOR', $userRoles) && !in_array('ROLE_ADMIN', $userRoles)) {
                                               // Gestor solo ve sus solicitudes asignadas
                                               $whereParts[] = "s.gestor_id = " . (int) $_SESSION['user_id'];
+                                          } elseif ($isSp && !$isAdmin) {
+                                              [$spSqlLista, $spParamsLista] = motus_sql_filtro_alcance_sp_sobre_solicitud('s', $userRoles);
+                                              $spCondLista = preg_replace('/^\s*AND\s+/i', '', trim($spSqlLista));
+                                              if ($spCondLista !== '') {
+                                                  $whereParts[] = $spCondLista;
+                                                  $whereParams = array_merge($whereParams, $spParamsLista);
+                                              }
                                           }
 
                                           if ($esHistorico) {
@@ -557,7 +575,8 @@ if ($isBanco && !$isAdmin) {
                                         
                                         $sql .= " ORDER BY (s.estado = 'Nueva') DESC, s.id DESC";
                                         
-                                        $stmt = $pdo->query($sql);
+                                        $stmt = $pdo->prepare($sql);
+                                        $stmt->execute($whereParams);
                                         $solicitudes = $stmt->fetchAll();
                                         
                                         foreach ($solicitudes as $solicitud):

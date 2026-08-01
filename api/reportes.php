@@ -21,9 +21,9 @@ if (!$puedeReportes) {
 
 require_once __DIR__ . '/../config/database.php';
 
-/** Códigos SP del usuario actual (null = sin filtro). */
+/** Los ROLE_SP tienen acceso global a reportes; no se filtran por sucursal. */
 function reportes_sp_codigos_sesion(): ?array {
-    return motus_es_vista_sp() ? motus_sp_codigos_permitidos() : null;
+    return null;
 }
 
 if ($action === 'exportar_todos_excel') {
@@ -843,21 +843,12 @@ function _dataReporteVendedores(PDO $pdo): array {
 }
 
 function _dataReporteTiempo(PDO $pdo): array {
-    [$spSql, $spParams] = motus_sql_filtro_alcance_sp_sobre_solicitud('s');
     $sql = "
         SELECT s.id, s.nombre_cliente, s.cedula, s.estado, s.fecha_creacion, s.fecha_actualizacion
         FROM solicitudes_credito s
-        WHERE 1=1
-        {$spSql}
         ORDER BY s.fecha_actualizacion DESC
     ";
-    if ($spParams !== []) {
-        $st = $pdo->prepare($sql);
-        $st->execute($spParams);
-        $rows = $st->fetchAll(PDO::FETCH_ASSOC);
-    } else {
-        $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
-    }
+    $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
     foreach ($rows as &$r) {
         $r['dias_en_estado_actual'] = null;
         $r['horas_en_estado_actual'] = null;
@@ -874,7 +865,6 @@ function _dataReporteTiempo(PDO $pdo): array {
 }
 
 function _dataReporteBanco(PDO $pdo): array {
-    [$spSql, $spParams] = motus_sql_filtro_alcance_sp_sobre_solicitud('s');
     $sql = "
         SELECT 
             s.id AS solicitud_id,
@@ -897,19 +887,11 @@ function _dataReporteBanco(PDO $pdo): array {
         INNER JOIN usuarios u ON u.id = ubs.usuario_banco_id
         LEFT JOIN bancos b ON b.id = u.banco_id
         LEFT JOIN evaluaciones_banco eb ON eb.solicitud_id = s.id AND eb.usuario_banco_id = ubs.id
-        WHERE 1=1
-        {$spSql}
         GROUP BY s.id, s.nombre_cliente, s.cedula, s.estado, b.id, b.nombre, ubs.id, ubs.fecha_asignacion,
                  s.fecha_aprobacion_propuesta, s.fecha_envio_proforma, s.fecha_carta_promesa
         ORDER BY ubs.fecha_asignacion DESC
     ";
-    if ($spParams !== []) {
-        $st = $pdo->prepare($sql);
-        $st->execute($spParams);
-        $rows = $st->fetchAll(PDO::FETCH_ASSOC);
-    } else {
-        $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
-    }
+    $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
     foreach ($rows as &$r) {
         $r['dias_respuesta'] = null;
         $r['horas_respuesta'] = null;
