@@ -1734,6 +1734,11 @@ function reporteSucursales(): void
 function reportePredicciones(): void
 {
     global $pdo;
+    if (!in_array('ROLE_ADMIN', $_SESSION['user_roles'] ?? [], true)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Acceso denegado']);
+        return;
+    }
     require_once __DIR__ . '/../includes/reportes_predicciones_data.php';
     try {
         echo json_encode(rep_pred_build_reporte($pdo), JSON_UNESCAPED_UNICODE);

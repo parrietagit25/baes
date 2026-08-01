@@ -17,9 +17,16 @@ if (!in_array('ROLE_ADMIN', $_SESSION['user_roles'] ?? [], true)
     exit();
 }
 
+$esAdminReportes = in_array('ROLE_ADMIN', $_SESSION['user_roles'] ?? [], true);
+
 $submenu = $_GET['submenu'] ?? 'usuarios';
 if (!in_array($submenu, ['usuarios', 'vendedores', 'sucursales', 'tiempo', 'banco', 'emails', 'encuestas', 'telemetria', 'fin_publica', 'fin_enlazada', 'vehiculos', 'predicciones'], true)) {
     $submenu = 'usuarios';
+}
+// Predicciones es exclusivo de administradores
+if ($submenu === 'predicciones' && !$esAdminReportes) {
+    header('Location: reportes.php?submenu=usuarios');
+    exit();
 }
 $finRepDesde = (new DateTimeImmutable('-365 days'))->format('Y-m-d');
 $finRepHasta = (new DateTimeImmutable('today'))->format('Y-m-d');
