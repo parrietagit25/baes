@@ -64,6 +64,8 @@ $content = '
             . nl2br($h($evaluacion['comentarios'] ?? '—')) . '</p>
     </div>
 
+    <p><strong>Criterio de aceptación:</strong> ' . $h(($criterio ?? '') !== '' ? $criterio : '—') . '</p>
+
     <p><strong>Comentario del gestor:</strong></p>
     <div class="info-box">
         <p>' . nl2br($h($comentario ?? '')) . '</p>

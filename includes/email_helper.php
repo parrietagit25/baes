@@ -608,7 +608,7 @@ function notificarReevaluacion($solicitudId, $evaluacionId, $comentario) {
  * Notifica al usuario banco dueño de la evaluación cuando gestor/admin selecciona su propuesta.
  * Para: usuario banco. CC: F&I + Pipedrive (EmailService).
  */
-function notificarPropuestaSeleccionada($solicitudId, $evaluacionId, $comentario) {
+function notificarPropuestaSeleccionada($solicitudId, $evaluacionId, $comentario, $criterio = '') {
     global $pdo;
 
     try {
@@ -709,7 +709,8 @@ function notificarPropuestaSeleccionada($solicitudId, $evaluacionId, $comentario
             $solicitud,
             $comentario,
             $gestorNombre,
-            $evaluacion
+            $evaluacion,
+            (string) $criterio
         );
         if (!empty($resultado['success']) && !empty($row['asignacion_ubs_id'])) {
             incrementarCorreosEnviadosPorAsignacion($pdo, (int) $row['asignacion_ubs_id']);

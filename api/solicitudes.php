@@ -1162,12 +1162,23 @@ function cambiarEstadoSolicitud() {
 
             // Igual que enviar a bancos: liberar propuesta seleccionada para que puedan volver a evaluar
             if ($nuevo_estado === 'Reevaluación por los Bancos') {
+                $colsClear = "
+                    evaluacion_seleccionada = NULL,
+                    fecha_aprobacion_propuesta = NULL,
+                    comentario_seleccion_propuesta = NULL,
+                    evaluacion_en_reevaluacion = NULL
+                ";
+                try {
+                    $chk = $pdo->query("SHOW COLUMNS FROM solicitudes_credito LIKE 'criterio_seleccion_propuesta'");
+                    if ($chk && $chk->fetch()) {
+                        $colsClear .= ",\n                    criterio_seleccion_propuesta = NULL";
+                    }
+                } catch (Throwable $e) {
+                    // Columna opcional
+                }
                 $stmt = $pdo->prepare("
                     UPDATE solicitudes_credito
-                    SET evaluacion_seleccionada = NULL,
-                        fecha_aprobacion_propuesta = NULL,
-                        comentario_seleccion_propuesta = NULL,
-                        evaluacion_en_reevaluacion = NULL
+                    SET {$colsClear}
                     WHERE id = ?
                 ");
                 $stmt->execute([$solicitud_id]);

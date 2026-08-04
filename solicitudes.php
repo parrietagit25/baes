@@ -2956,6 +2956,7 @@ if ($isBanco && !$isAdmin) {
                     var headerHtml = bloqueEncabezadoClienteRespuestas(solicitudId, response.solicitud_cliente);
                     var evaluacionSeleccionada = response.evaluacion_seleccionada;
                     var comentarioSeleccionGlobal = response.comentario_seleccion_propuesta || '';
+                    var criterioSeleccionGlobal = response.criterio_seleccion_propuesta || '';
                     destruirDataTableRespuestas('#tablaRespuestasBanco');
                     if (response.data.length > 0) {
                         let html = '<div class="respuestas-banco-wrap"><table id="tablaRespuestasBanco" class="table table-striped table-hover table-bordered table-respuestas-banco">';
@@ -2978,7 +2979,10 @@ if ($isBanco && !$isAdmin) {
                             html += '<td>' + celdaRespSimple(evaluacion.promocion || '-') + '</td>';
                             html += '<td>' + celdaRespSimple(evaluacion.cuantia != null && evaluacion.cuantia !== '' ? '$' + parseFloat(evaluacion.cuantia).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
                             html += tdComentario(celdaComentarioGestor(evaluacion.comentarios));
-                            var textoSeleccionFila = (evaluacionSeleccionada && String(evaluacion.id) === String(evaluacionSeleccionada)) ? comentarioSeleccionGlobal : '';
+                            var textoSeleccionFila = '';
+                            if (evaluacionSeleccionada && String(evaluacion.id) === String(evaluacionSeleccionada)) {
+                                textoSeleccionFila = [criterioSeleccionGlobal, comentarioSeleccionGlobal].filter(Boolean).join('\n');
+                            }
                             html += tdComentario(celdaComentarioGestor(textoSeleccionFila));
                             html += tdComentario(celdaComentarioGestor(evaluacion.comentario_reevaluacion_solicitada));
                             html += '<td>';
@@ -3038,6 +3042,7 @@ if ($isBanco && !$isAdmin) {
                     if (response.data.length > 0) {
                           const evaluacionSeleccionada = response.evaluacion_seleccionada;
                           const comentarioSeleccionGlobal = response.comentario_seleccion_propuesta || '';
+                          const criterioSeleccionGlobal = response.criterio_seleccion_propuesta || '';
                           const mostrarAcciones = !evaluacionSeleccionada; // No mostrar acciones si hay una evaluación seleccionada
                           
                           let html = '';
@@ -3074,7 +3079,10 @@ if ($isBanco && !$isAdmin) {
                               html += '<td>' + celdaRespSimple(evaluacion.promocion || '-') + '</td>';
                               html += '<td>' + celdaRespSimple(evaluacion.cuantia != null && evaluacion.cuantia !== '' ? '$' + parseFloat(evaluacion.cuantia).toLocaleString('es-PA', {minimumFractionDigits: 2}) : '-') + '</td>';
                               html += tdComentario(celdaComentarioGestor(evaluacion.comentarios));
-                              var textoSel = (evaluacionSeleccionada && String(evaluacion.id) === String(evaluacionSeleccionada)) ? comentarioSeleccionGlobal : '';
+                              var textoSel = '';
+                              if (evaluacionSeleccionada && String(evaluacion.id) === String(evaluacionSeleccionada)) {
+                                  textoSel = [criterioSeleccionGlobal, comentarioSeleccionGlobal].filter(Boolean).join('\n');
+                              }
                               html += tdComentario(celdaComentarioGestor(textoSel));
                               html += tdComentario(celdaComentarioGestor(evaluacion.comentario_reevaluacion_solicitada));
                               if (mostrarAcciones) {
@@ -3116,6 +3124,7 @@ if ($isBanco && !$isAdmin) {
             $('#seleccionPropuesta_id').val(evaluacionId);
             $('#seleccionPropuesta_solicitud_id').val(solicitudId);
             $('#seleccionPropuesta_usuario_banco_id').val(usuarioBancoId);
+            $('#criterioSeleccion').val('');
             $('#comentarioSeleccion').val('');
             $('#modalSeleccionPropuesta').modal('show');
         }
@@ -3161,7 +3170,13 @@ if ($isBanco && !$isAdmin) {
         function procesarSeleccionPropuesta() {
             const evaluacionId = $('#seleccionPropuesta_id').val();
             const solicitudId = $('#seleccionPropuesta_solicitud_id').val();
+            const criterio = ($('#criterioSeleccion').val() || '').trim();
             const comentario = $('#comentarioSeleccion').val();
+
+            if (!criterio) {
+                alert('Por favor seleccione el criterio de aceptación');
+                return;
+            }
 
             if (!comentario.trim()) {
                 alert('Por favor ingrese un comentario');
@@ -3175,6 +3190,7 @@ if ($isBanco && !$isAdmin) {
                     action: 'seleccionar_propuesta',
                     evaluacion_id: evaluacionId,
                     solicitud_id: solicitudId,
+                    criterio: criterio,
                     comentario: comentario
                 },
                 dataType: 'json',
@@ -3351,6 +3367,27 @@ if ($isBanco && !$isAdmin) {
                     <input type="hidden" id="seleccionPropuesta_id">
                     <input type="hidden" id="seleccionPropuesta_solicitud_id">
                     <input type="hidden" id="seleccionPropuesta_usuario_banco_id">
+
+                    <div class="mb-3">
+                        <label for="criterioSeleccion" class="form-label">Criterio de aceptación *</label>
+                        <select class="form-select" id="criterioSeleccion" required>
+                            <option value="">Seleccione un criterio…</option>
+                            <option value="ABONO MINIMO">ABONO MINIMO</option>
+                            <option value="TASAS">TASAS</option>
+                            <option value="PLAZOS">PLAZOS</option>
+                            <option value="PRECIO DE VENTA">PRECIO DE VENTA</option>
+                            <option value="Monto Mínimo a Financiar">Monto Mínimo a Financiar</option>
+                            <option value="APLICAN AUTOS DESDE (Año)">APLICAN AUTOS DESDE (Año)</option>
+                            <option value="SALARIO">SALARIO</option>
+                            <option value="SCORE">SCORE</option>
+                            <option value="NIVEL DE ENDEUDAMIENTO (%)">NIVEL DE ENDEUDAMIENTO (%)</option>
+                            <option value="Estabilidad laboral">Estabilidad laboral</option>
+                            <option value="Edad mínima">Edad mínima</option>
+                            <option value="Kilometraje">Kilometraje</option>
+                            <option value="AVALUO">AVALUO</option>
+                            <option value="BONO PROMOCION">BONO PROMOCION</option>
+                        </select>
+                    </div>
                     
                     <div class="mb-3">
                         <label for="comentarioSeleccion" class="form-label">Comentario *</label>

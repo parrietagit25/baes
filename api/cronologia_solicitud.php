@@ -254,18 +254,39 @@ try {
     }
 
     // --- Propuesta seleccionada (no siempre en historial) ---
-    $stmt = $pdo->prepare(
-        'SELECT fecha_aprobacion_propuesta, comentario_seleccion_propuesta, evaluacion_seleccionada, fecha_creacion
-         FROM solicitudes_credito WHERE id = ?'
-    );
-    $stmt->execute([$solicitudId]);
-    $sol = $stmt->fetch(PDO::FETCH_ASSOC);
+    $sol = null;
+    try {
+        $stmt = $pdo->prepare(
+            'SELECT fecha_aprobacion_propuesta, comentario_seleccion_propuesta, criterio_seleccion_propuesta, evaluacion_seleccionada, fecha_creacion
+             FROM solicitudes_credito WHERE id = ?'
+        );
+        $stmt->execute([$solicitudId]);
+        $sol = $stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        $stmt = $pdo->prepare(
+            'SELECT fecha_aprobacion_propuesta, comentario_seleccion_propuesta, evaluacion_seleccionada, fecha_creacion
+             FROM solicitudes_credito WHERE id = ?'
+        );
+        $stmt->execute([$solicitudId]);
+        $sol = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (is_array($sol)) {
+            $sol['criterio_seleccion_propuesta'] = null;
+        }
+    }
     if ($sol && !empty($sol['fecha_aprobacion_propuesta']) && !empty($sol['evaluacion_seleccionada'])) {
+        $parts = [];
+        $criterio = trim((string) ($sol['criterio_seleccion_propuesta'] ?? ''));
+        if ($criterio !== '') {
+            $parts[] = 'Criterio: ' . $criterio;
+        }
         $det = trim((string) ($sol['comentario_seleccion_propuesta'] ?? ''));
-        if ($det === '') {
-            $det = 'Propuesta #' . (int) $sol['evaluacion_seleccionada'] . ' marcada como seleccionada.';
+        if ($det !== '') {
+            $parts[] = $det;
+        }
+        if ($parts === []) {
+            $detOut = 'Propuesta #' . (int) $sol['evaluacion_seleccionada'] . ' marcada como seleccionada.';
         } else {
-            $det = 'Propuesta #' . (int) $sol['evaluacion_seleccionada'] . ".\n" . $det;
+            $detOut = 'Propuesta #' . (int) $sol['evaluacion_seleccionada'] . ".\n" . implode("\n", $parts);
         }
         pushEvent(
             $events,
@@ -273,7 +294,7 @@ try {
             'propuesta_seleccionada',
             'Propuesta seleccionada',
             'Selección de propuesta bancaria',
-            $det,
+            $detOut,
             'Gestor / administrador'
         );
     }

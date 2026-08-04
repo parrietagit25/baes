@@ -432,7 +432,7 @@ class EmailService {
         );
     }
 
-    public function notificarPropuestaSeleccionada($bancoEmail, $bancoNombre, $solicitud, $comentario, $gestorNombre = '', array $evaluacion = []) {
+    public function notificarPropuestaSeleccionada($bancoEmail, $bancoNombre, $solicitud, $comentario, $gestorNombre = '', array $evaluacion = [], $criterio = '') {
         $sid = (int) ($solicitud['id'] ?? 0);
         $cliente = trim((string) ($solicitud['nombre_cliente'] ?? ''));
         $subject = 'Propuesta seleccionada — Solicitud #' . $sid;
@@ -452,6 +452,7 @@ class EmailService {
                 'solicitud' => $solicitud,
                 'evaluacion' => $evaluacion,
                 'comentario' => $comentario,
+                'criterio' => $criterio,
                 'app_url' => $this->config['app_url'],
             ]
         );

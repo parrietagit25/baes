@@ -330,12 +330,14 @@ function obtenerEvaluaciones($solicitudId, $usuarioBancoId = null) {
       global $pdo;
       
       try {
+          asegurarColumnaCriterioSeleccionPropuesta($pdo);
           // Primero obtener información sobre la evaluación seleccionada
           $stmt = $pdo->prepare("
               SELECT s.evaluacion_seleccionada,
                      s.nombre_cliente,
                      s.cedula,
                      s.comentario_seleccion_propuesta,
+                     s.criterio_seleccion_propuesta,
                      (SELECT ubs_sel.usuario_banco_id
                         FROM evaluaciones_banco eb2
                         INNER JOIN usuarios_banco_solicitudes ubs_sel ON ubs_sel.id = eb2.usuario_banco_id
@@ -385,6 +387,7 @@ function obtenerEvaluaciones($solicitudId, $usuarioBancoId = null) {
               'evaluacion_seleccionada' => $evaluacionSeleccionada,
               'usuario_banco_id_seleccionado' => $usuarioBancoIdSeleccionado,
               'comentario_seleccion_propuesta' => $solicitud['comentario_seleccion_propuesta'] ?? '',
+              'criterio_seleccion_propuesta' => $solicitud['criterio_seleccion_propuesta'] ?? '',
               'solicitud_cliente' => [
                   'nombre_cliente' => $solicitud['nombre_cliente'] ?? '',
                   'cedula' => $solicitud['cedula'] ?? '',
@@ -695,16 +698,39 @@ function seleccionarPropuesta() {
             echo json_encode(['success' => false, 'message' => 'Solo los administradores y gestores pueden seleccionar propuestas']);
             return;
         }
+
+        $criteriosValidos = [
+            'ABONO MINIMO',
+            'TASAS',
+            'PLAZOS',
+            'PRECIO DE VENTA',
+            'Monto Mínimo a Financiar',
+            'APLICAN AUTOS DESDE (Año)',
+            'SALARIO',
+            'SCORE',
+            'NIVEL DE ENDEUDAMIENTO (%)',
+            'Estabilidad laboral',
+            'Edad mínima',
+            'Kilometraje',
+            'AVALUO',
+            'BONO PROMOCION',
+        ];
         
         // Validar campos
-        if (empty($_POST['evaluacion_id']) || empty($_POST['solicitud_id']) || empty($_POST['comentario'])) {
+        if (empty($_POST['evaluacion_id']) || empty($_POST['solicitud_id']) || empty($_POST['comentario']) || empty($_POST['criterio'])) {
             echo json_encode(['success' => false, 'message' => 'Todos los campos son requeridos']);
             return;
         }
         
         $evaluacionId = $_POST['evaluacion_id'];
         $solicitudId = $_POST['solicitud_id'];
-        $comentario = $_POST['comentario'];
+        $comentario = trim((string) $_POST['comentario']);
+        $criterio = trim((string) $_POST['criterio']);
+
+        if (!in_array($criterio, $criteriosValidos, true)) {
+            echo json_encode(['success' => false, 'message' => 'Criterio de aceptación no válido']);
+            return;
+        }
         
         // Obtener la evaluación seleccionada
         $stmt = $pdo->prepare("SELECT * FROM evaluaciones_banco WHERE id = ?");
@@ -715,22 +741,25 @@ function seleccionarPropuesta() {
             echo json_encode(['success' => false, 'message' => 'Evaluación no encontrada']);
             return;
         }
+
+        asegurarColumnaCriterioSeleccionPropuesta($pdo);
         
                   // Actualizar la solicitud con la evaluación seleccionada
           $stmt = $pdo->prepare("
               UPDATE solicitudes_credito 
               SET evaluacion_seleccionada = ?,
                   fecha_aprobacion_propuesta = NOW(),
-                  comentario_seleccion_propuesta = ?
+                  comentario_seleccion_propuesta = ?,
+                  criterio_seleccion_propuesta = ?
               WHERE id = ?
           ");
-          $stmt->execute([$evaluacionId, $comentario, $solicitudId]);
+          $stmt->execute([$evaluacionId, $comentario, $criterio, $solicitudId]);
 
         // Notificar al usuario banco dueño de la propuesta (CC: F&I + Pipe)
         $mensajeEmail = '';
         try {
             require_once __DIR__ . '/../includes/email_helper.php';
-            $resultadoEmail = notificarPropuestaSeleccionada((int) $solicitudId, (int) $evaluacionId, (string) $comentario);
+            $resultadoEmail = notificarPropuestaSeleccionada((int) $solicitudId, (int) $evaluacionId, (string) $comentario, (string) $criterio);
             if (!empty($resultadoEmail['success'])) {
                 $mensajeEmail = ' Se notificó por correo al usuario banco.';
             } else {
@@ -750,6 +779,28 @@ function seleccionarPropuesta() {
     } catch (PDOException $e) {
         http_response_code(500);
         echo json_encode(['success' => false, 'message' => 'Error al seleccionar propuesta: ' . $e->getMessage()]);
+    }
+}
+
+function asegurarColumnaCriterioSeleccionPropuesta(PDO $pdo): void
+{
+    static $ok = false;
+    if ($ok) {
+        return;
+    }
+    try {
+        $st = $pdo->query("SHOW COLUMNS FROM solicitudes_credito LIKE 'criterio_seleccion_propuesta'");
+        if ($st && !$st->fetch()) {
+            $pdo->exec("
+                ALTER TABLE solicitudes_credito
+                ADD COLUMN criterio_seleccion_propuesta varchar(120) DEFAULT NULL
+                COMMENT 'Motivo de aceptación de la propuesta (select obligatorio)'
+                AFTER comentario_seleccion_propuesta
+            ");
+        }
+        $ok = true;
+    } catch (Throwable $e) {
+        error_log('asegurarColumnaCriterioSeleccionPropuesta: ' . $e->getMessage());
     }
 }
 
@@ -791,11 +842,14 @@ function activarNuevamentePropuestas() {
             return;
         }
 
+        asegurarColumnaCriterioSeleccionPropuesta($pdo);
+
         $stmt = $pdo->prepare("
             UPDATE solicitudes_credito
             SET evaluacion_seleccionada = NULL,
                 fecha_aprobacion_propuesta = NULL,
                 comentario_seleccion_propuesta = NULL,
+                criterio_seleccion_propuesta = NULL,
                 evaluacion_en_reevaluacion = NULL
             WHERE id = ?
         ");
