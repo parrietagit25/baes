@@ -237,26 +237,59 @@ function adjuntosArchivosParaCorreoResumen(array $filas): array {
 /**
  * Envía notificación al vendedor cuando el banco responde
  */
-function enviarNotificacionVendedor($solicitudId) {
+function enviarNotificacionVendedor($solicitudId, $evaluacionId = null) {
     global $pdo;
     
     try {
         // El "vendedor" operativo es ejecutivo_ventas (email en ejecutivos_ventas).
         // vendedor_id (usuarios ROLE_VENDEDOR) casi no se usa; se deja como fallback.
+        $params = [(int) $solicitudId];
+        $joinEval = '';
+        $selectBanco = '
+            b_sol.nombre AS banco_nombre_solicitud,
+            NULL AS banco_nombre_evaluacion,
+            NULL AS banco_usuario_nombre,
+            NULL AS banco_usuario_apellido,
+            NULL AS evaluacion_decision
+        ';
+
+        if ($evaluacionId !== null && (int) $evaluacionId > 0) {
+            $joinEval = '
+                LEFT JOIN evaluaciones_banco e ON e.id = ? AND e.solicitud_id = s.id
+                LEFT JOIN usuarios_banco_solicitudes ubs ON ubs.id = e.usuario_banco_id
+                LEFT JOIN usuarios ub ON ub.id = ubs.usuario_banco_id
+                LEFT JOIN bancos b_eval ON b_eval.id = ub.banco_id
+            ';
+            $selectBanco = '
+                b_sol.nombre AS banco_nombre_solicitud,
+                b_eval.nombre AS banco_nombre_evaluacion,
+                ub.nombre AS banco_usuario_nombre,
+                ub.apellido AS banco_usuario_apellido,
+                e.decision AS evaluacion_decision,
+                e.razon AS evaluacion_razon,
+                e.comentarios AS evaluacion_comentarios
+            ';
+            // evaluación primero en params del JOIN, luego solicitud
+            $params = [(int) $evaluacionId, (int) $solicitudId];
+        }
+
         $stmt = $pdo->prepare("
             SELECT s.*,
                    uv.email AS usuario_vendedor_email,
                    uv.nombre AS usuario_vendedor_nombre,
                    uv.apellido AS usuario_vendedor_apellido,
                    ev.email AS ejecutivo_email,
-                   ev.nombre AS ejecutivo_nombre
+                   ev.nombre AS ejecutivo_nombre,
+                   {$selectBanco}
             FROM solicitudes_credito s
             LEFT JOIN usuarios uv ON s.vendedor_id = uv.id
             LEFT JOIN ejecutivos_ventas ev ON s.ejecutivo_ventas_id = ev.id
+            LEFT JOIN bancos b_sol ON b_sol.id = s.banco_id
+            {$joinEval}
             WHERE s.id = ?
             LIMIT 1
         ");
-        $stmt->execute([$solicitudId]);
+        $stmt->execute($params);
         $solicitud = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if (!$solicitud) {
@@ -274,6 +307,19 @@ function enviarNotificacionVendedor($solicitudId) {
 
         if ($vendedorEmail === '' || !filter_var($vendedorEmail, FILTER_VALIDATE_EMAIL)) {
             return ['success' => false, 'message' => 'Vendedor/ejecutivo no encontrado o sin email'];
+        }
+
+        $bancoNombre = trim((string) ($solicitud['banco_nombre_evaluacion'] ?? ''));
+        if ($bancoNombre === '') {
+            $bancoNombre = trim((string) ($solicitud['banco_nombre_solicitud'] ?? ''));
+        }
+        $bancoUsuario = trim(
+            ($solicitud['banco_usuario_nombre'] ?? '') . ' ' . ($solicitud['banco_usuario_apellido'] ?? '')
+        );
+        $solicitud['banco_nombre'] = $bancoNombre !== '' ? $bancoNombre : 'Banco';
+        $solicitud['banco_usuario'] = $bancoUsuario;
+        if (!empty($solicitud['evaluacion_comentarios']) && empty($solicitud['comentarios_ejecutivo_banco'])) {
+            $solicitud['comentarios_ejecutivo_banco'] = $solicitud['evaluacion_comentarios'];
         }
         
         $emailService = (new EmailService())->paraSolicitud((int) $solicitudId);

@@ -333,12 +333,24 @@ class EmailService {
     }
 
     public function notificarVendedorBancoResponde($vendedorEmail, $vendedorNombre, $solicitud) {
+        $sid = (int) ($solicitud['id'] ?? 0);
+        $banco = trim((string) ($solicitud['banco_nombre'] ?? ''));
+        $respuesta = trim((string) ($solicitud['respuesta_banco'] ?? ''));
+        $subject = 'Respuesta del Banco';
+        if ($banco !== '') {
+            $subject .= ' (' . $banco . ')';
+        }
+        if ($respuesta !== '') {
+            $subject .= ' — ' . $respuesta;
+        }
+        $subject .= ' — Solicitud #' . $sid . ' — MOTUS';
+
         return $this->enviarTemplate(
             $vendedorEmail,
             $vendedorNombre,
             'notificacion_banco_responde',
             [
-                'subject' => 'Respuesta del Banco - Solicitud #' . $solicitud['id'],
+                'subject' => $subject,
                 'vendedor_nombre' => $vendedorNombre,
                 'solicitud' => $solicitud,
                 'app_url' => $this->config['app_url'],

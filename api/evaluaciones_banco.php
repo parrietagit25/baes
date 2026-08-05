@@ -659,7 +659,7 @@ function guardarEvaluacion() {
             require_once '../includes/email_helper.php';
             
             if (in_array($respuestaBancoEnum, ['Aprobado', 'Pre Aprobado', 'Rechazado', 'Aprobado Condicional'], true)) {
-                $resultadoEmail = enviarNotificacionVendedor($solicitudId);
+                $resultadoEmail = enviarNotificacionVendedor($solicitudId, $evaluacionId);
                 if (!$resultadoEmail['success']) {
                     error_log("No se pudo enviar correo al vendedor: " . $resultadoEmail['message']);
                 }
