@@ -241,26 +241,46 @@ function enviarNotificacionVendedor($solicitudId) {
     global $pdo;
     
     try {
-        // Obtener información completa de la solicitud
+        // El "vendedor" operativo es ejecutivo_ventas (email en ejecutivos_ventas).
+        // vendedor_id (usuarios ROLE_VENDEDOR) casi no se usa; se deja como fallback.
         $stmt = $pdo->prepare("
-            SELECT s.*, u.email as vendedor_email, u.nombre as vendedor_nombre, u.apellido as vendedor_apellido
+            SELECT s.*,
+                   uv.email AS usuario_vendedor_email,
+                   uv.nombre AS usuario_vendedor_nombre,
+                   uv.apellido AS usuario_vendedor_apellido,
+                   ev.email AS ejecutivo_email,
+                   ev.nombre AS ejecutivo_nombre
             FROM solicitudes_credito s
-            LEFT JOIN usuarios u ON s.vendedor_id = u.id
+            LEFT JOIN usuarios uv ON s.vendedor_id = uv.id
+            LEFT JOIN ejecutivos_ventas ev ON s.ejecutivo_ventas_id = ev.id
             WHERE s.id = ?
+            LIMIT 1
         ");
         $stmt->execute([$solicitudId]);
-        $solicitud = $stmt->fetch();
+        $solicitud = $stmt->fetch(PDO::FETCH_ASSOC);
         
-        if (!$solicitud || empty($solicitud['vendedor_email'])) {
-            return ['success' => false, 'message' => 'Vendedor no encontrado o sin email'];
+        if (!$solicitud) {
+            return ['success' => false, 'message' => 'Solicitud no encontrada'];
+        }
+
+        $vendedorEmail = trim((string) ($solicitud['ejecutivo_email'] ?? ''));
+        $vendedorNombre = trim((string) ($solicitud['ejecutivo_nombre'] ?? ''));
+        if ($vendedorEmail === '' || !filter_var($vendedorEmail, FILTER_VALIDATE_EMAIL)) {
+            $vendedorEmail = trim((string) ($solicitud['usuario_vendedor_email'] ?? ''));
+            $vendedorNombre = trim(
+                ($solicitud['usuario_vendedor_nombre'] ?? '') . ' ' . ($solicitud['usuario_vendedor_apellido'] ?? '')
+            );
+        }
+
+        if ($vendedorEmail === '' || !filter_var($vendedorEmail, FILTER_VALIDATE_EMAIL)) {
+            return ['success' => false, 'message' => 'Vendedor/ejecutivo no encontrado o sin email'];
         }
         
         $emailService = (new EmailService())->paraSolicitud((int) $solicitudId);
-        $vendedorNombre = trim(($solicitud['vendedor_nombre'] ?? '') . ' ' . ($solicitud['vendedor_apellido'] ?? ''));
 
         return $emailService->notificarVendedorBancoResponde(
-            $solicitud['vendedor_email'],
-            $vendedorNombre ?: 'Vendedor',
+            $vendedorEmail,
+            $vendedorNombre !== '' ? $vendedorNombre : 'Vendedor',
             $solicitud
         );
         
@@ -379,7 +399,8 @@ function notificarClienteAprobacion($solicitudId, $evaluacionId = null) {
                 ub.nombre AS banco_usuario_nombre,
                 ub.apellido AS banco_usuario_apellido,
                 ug.email AS gestor_email,
-                uv.email AS vendedor_email
+                uv.email AS vendedor_email,
+                ev.email AS ejecutivo_ventas_email
             FROM solicitudes_credito s
             INNER JOIN evaluaciones_banco e ON e.solicitud_id = s.id
             INNER JOIN usuarios_banco_solicitudes ubs ON ubs.id = e.usuario_banco_id
@@ -388,6 +409,7 @@ function notificarClienteAprobacion($solicitudId, $evaluacionId = null) {
             LEFT JOIN vehiculos_solicitud v ON v.id = e.vehiculo_id
             LEFT JOIN usuarios ug ON ug.id = s.gestor_id
             LEFT JOIN usuarios uv ON uv.id = s.vendedor_id
+            LEFT JOIN ejecutivos_ventas ev ON ev.id = s.ejecutivo_ventas_id
             WHERE s.id = ?
               AND e.decision IN ('aprobado', 'preaprobado')
         ";
@@ -423,10 +445,10 @@ function notificarClienteAprobacion($solicitudId, $evaluacionId = null) {
             : 0.0;
         $solicitud['total_abono_calculo'] = $abonoInicial + (float) $solicitud['bono_banco_abono'];
 
-        // Gestor y vendedor en CC del correo de aprobación al cliente.
+        // Gestor + ejecutivo de ventas (o vendedor_id legacy) en CC del correo de felicitaciones.
         // fyi@automarketpan.com ya se agrega automáticamente en EmailService.
         $cc = [];
-        foreach (['gestor_email', 'vendedor_email'] as $campoCc) {
+        foreach (['gestor_email', 'ejecutivo_ventas_email', 'vendedor_email'] as $campoCc) {
             $emailCc = trim((string) ($solicitud[$campoCc] ?? ''));
             if ($emailCc !== '' && filter_var($emailCc, FILTER_VALIDATE_EMAIL)) {
                 $cc[] = $emailCc;
