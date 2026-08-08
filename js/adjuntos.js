@@ -447,6 +447,69 @@ window.cargarEnviosCorredor = function(solicitudId) {
     });
 };
 
+window.generarResumenSolicitudPdf = function() {
+    const solicitudId = $('#adjunto_solicitud_id').val() || $('#corredor_solicitud_id').val();
+    if (!solicitudId) {
+        mostrarAlerta('No hay solicitud seleccionada', 'warning');
+        return;
+    }
+
+    const $btn = $('#btnGenerarResumenPdf');
+    const htmlOriginal = $btn.html();
+    $btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Generando…');
+
+    const url = (window.location.origin || '') + '/api/adjuntos.php?action=generar_resumen_pdf&solicitud_id='
+        + encodeURIComponent(solicitudId);
+
+    fetch(url, { credentials: 'same-origin' })
+        .then(async function(resp) {
+            const ctype = (resp.headers.get('Content-Type') || '').toLowerCase();
+            if (!resp.ok) {
+                let msg = 'No se pudo generar el PDF';
+                if (ctype.includes('application/json')) {
+                    try {
+                        const j = await resp.json();
+                        if (j && j.message) msg = j.message;
+                    } catch (e) {}
+                }
+                throw new Error(msg);
+            }
+            if (!ctype.includes('application/pdf')) {
+                // Posible JSON de error con status 200 (no esperado)
+                const text = await resp.text();
+                try {
+                    const j = JSON.parse(text);
+                    throw new Error(j.message || 'Respuesta inesperada del servidor');
+                } catch (e) {
+                    if (e.message && e.message !== 'Unexpected end of JSON input') throw e;
+                    throw new Error('El servidor no devolvió un PDF');
+                }
+            }
+            const blob = await resp.blob();
+            let filename = 'Resumen_Solicitud_' + solicitudId + '.pdf';
+            const cd = resp.headers.get('Content-Disposition') || '';
+            const m = /filename=\"?([^\";]+)\"?/i.exec(cd);
+            if (m && m[1]) {
+                filename = m[1];
+            }
+            const a = document.createElement('a');
+            const objUrl = URL.createObjectURL(blob);
+            a.href = objUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(function() { URL.revokeObjectURL(objUrl); }, 1500);
+            mostrarAlerta('Resumen PDF generado correctamente', 'success');
+        })
+        .catch(function(err) {
+            mostrarAlerta(err.message || 'Error al generar el resumen PDF', 'danger');
+        })
+        .finally(function() {
+            $btn.prop('disabled', false).html(htmlOriginal);
+        });
+};
+
 window.enviarResumenCorredor = function() {
     const solicitudId = $('#corredor_solicitud_id').val() || $('#adjunto_solicitud_id').val();
     const email = ($('#corredor_email').val() || '').trim();

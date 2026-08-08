@@ -1497,6 +1497,11 @@ if ($isBanco && !$isAdmin) {
                                 <i class="fas fa-upload me-2"></i>Subir Adjunto
                             </button>
                         </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="tab-resumen-adjunto" data-bs-toggle="tab" data-bs-target="#pane-resumen-adjunto" type="button" role="tab">
+                                <i class="fas fa-file-pdf me-2"></i>Resumen
+                            </button>
+                        </li>
                         <?php if ($isAdmin || $isGestor): ?>
                         <li class="nav-item" role="presentation">
                             <button class="nav-link" id="tab-corredor" data-bs-toggle="tab" data-bs-target="#pane-corredor" type="button" role="tab">
@@ -1563,6 +1568,22 @@ if ($isBanco && !$isAdmin) {
                                             <i class="fas fa-spinner fa-spin me-2"></i>Cargando adjuntos...
                                         </div>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="tab-pane fade" id="pane-resumen-adjunto" role="tabpanel">
+                            <div class="card">
+                                <div class="card-body text-center py-5">
+                                    <i class="fas fa-file-alt fa-3x text-primary mb-3"></i>
+                                    <h5 class="mb-2">Resumen de la solicitud</h5>
+                                    <p class="text-muted mb-4">
+                                        Genera en PDF el mismo resumen que se envía al banco por correo
+                                        (datos generales, perfil financiero, análisis, vehículo, evaluaciones y listado de adjuntos).
+                                    </p>
+                                    <button type="button" class="btn btn-primary btn-lg" id="btnGenerarResumenPdf" onclick="generarResumenSolicitudPdf()">
+                                        <i class="fas fa-file-pdf me-2"></i>Generar Resumen
+                                    </button>
                                 </div>
                             </div>
                         </div>

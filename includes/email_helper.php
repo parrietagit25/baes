@@ -1268,6 +1268,83 @@ function enviarNotificacionComentarioMuro(int $solicitudId, string $contenido, ?
 }
 
 /**
+ * Carga los mismos datos que usa el correo de resumen al banco.
+ *
+ * @return array{solicitud: array, vehiculos: array, evaluaciones: array, adjuntos: array}|null
+ */
+function obtenerDatosResumenSolicitudBanco(PDO $pdo, int $solicitudId): ?array
+{
+    $stmt = $pdo->prepare('SELECT * FROM solicitudes_credito WHERE id = ?');
+    $stmt->execute([$solicitudId]);
+    $solicitud = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$solicitud) {
+        return null;
+    }
+    if (isset($solicitud['ao_auto'])) {
+        $solicitud['año_auto'] = $solicitud['ao_auto'];
+    }
+
+    $stmt = $pdo->prepare('SELECT * FROM vehiculos_solicitud WHERE solicitud_id = ? ORDER BY id');
+    $stmt->execute([$solicitudId]);
+    $vehiculos = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+    $stmt = $pdo->prepare("
+        SELECT e.*, u.nombre as banco_nombre, u.apellido as banco_apellido
+        FROM evaluaciones_banco e
+        INNER JOIN usuarios_banco_solicitudes ubs ON e.usuario_banco_id = ubs.id
+        INNER JOIN usuarios u ON ubs.usuario_banco_id = u.id
+        WHERE e.solicitud_id = ?
+        ORDER BY e.fecha_evaluacion DESC
+    ");
+    $stmt->execute([$solicitudId]);
+    $evaluaciones = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+    $stmt = $pdo->prepare("
+        SELECT nombre_original, tipo_archivo, ruta_archivo
+        FROM adjuntos_solicitud
+        WHERE solicitud_id = ?
+        ORDER BY fecha_subida DESC
+    ");
+    $stmt->execute([$solicitudId]);
+    $adjuntos = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+    return [
+        'solicitud' => $solicitud,
+        'vehiculos' => $vehiculos,
+        'evaluaciones' => $evaluaciones,
+        'adjuntos' => $adjuntos,
+    ];
+}
+
+/**
+ * HTML del resumen (mismo cuerpo que el correo al banco), listo para PDF/Dompdf.
+ */
+function construirHtmlResumenSolicitudPdf(PDO $pdo, int $solicitudId): ?string
+{
+    $datos = obtenerDatosResumenSolicitudBanco($pdo, $solicitudId);
+    if ($datos === null) {
+        return null;
+    }
+
+    $cfg = file_exists(__DIR__ . '/../config/email.php') ? require __DIR__ . '/../config/email.php' : [];
+    $app_url = (function_exists('getenv') && getenv('APP_URL')) ? getenv('APP_URL') : '';
+    if ($app_url === '' || $app_url === false) {
+        $app_url = $cfg['app_url'] ?? '';
+    }
+
+    // Mismo HTML que el correo de resumen al banco (plantilla base incluida).
+    return construirResumenSolicitudHtml(
+        $datos['solicitud'],
+        $datos['vehiculos'],
+        $datos['evaluaciones'],
+        $datos['adjuntos'],
+        'Resumen',
+        (string) $app_url,
+        false
+    );
+}
+
+/**
  * Envía al usuario banco un resumen completo de la solicitud por correo
  * (datos generales, perfil financiero, datos del auto, análisis, adjuntos).
  */
@@ -1288,37 +1365,14 @@ function enviarResumenSolicitudBanco($solicitudId, $usuarioBancoId) {
             return ['success' => false, 'message' => 'Usuario banco no encontrado o sin email'];
         }
 
-        $stmt = $pdo->prepare("SELECT * FROM solicitudes_credito WHERE id = ?");
-        $stmt->execute([$solicitudId]);
-        $solicitud = $stmt->fetch();
-        if (!$solicitud) {
+        $datos = obtenerDatosResumenSolicitudBanco($pdo, (int) $solicitudId);
+        if ($datos === null) {
             return ['success' => false, 'message' => 'Solicitud no encontrada'];
         }
-        if (isset($solicitud['ao_auto'])) $solicitud['año_auto'] = $solicitud['ao_auto'];
-
-        $stmt = $pdo->prepare("SELECT * FROM vehiculos_solicitud WHERE solicitud_id = ? ORDER BY id");
-        $stmt->execute([$solicitudId]);
-        $vehiculos = $stmt->fetchAll();
-
-        $stmt = $pdo->prepare("
-            SELECT e.*, u.nombre as banco_nombre, u.apellido as banco_apellido
-            FROM evaluaciones_banco e
-            INNER JOIN usuarios_banco_solicitudes ubs ON e.usuario_banco_id = ubs.id
-            INNER JOIN usuarios u ON ubs.usuario_banco_id = u.id
-            WHERE e.solicitud_id = ?
-            ORDER BY e.fecha_evaluacion DESC
-        ");
-        $stmt->execute([$solicitudId]);
-        $evaluaciones = $stmt->fetchAll();
-
-        $stmt = $pdo->prepare("
-            SELECT nombre_original, tipo_archivo, ruta_archivo
-            FROM adjuntos_solicitud
-            WHERE solicitud_id = ?
-            ORDER BY fecha_subida DESC
-        ");
-        $stmt->execute([$solicitudId]);
-        $adjuntos = $stmt->fetchAll();
+        $solicitud = $datos['solicitud'];
+        $vehiculos = $datos['vehiculos'];
+        $evaluaciones = $datos['evaluaciones'];
+        $adjuntos = $datos['adjuntos'];
 
         $cfg = file_exists(__DIR__ . '/../config/email.php') ? require __DIR__ . '/../config/email.php' : [];
         $app_url = (function_exists('getenv') && getenv('APP_URL')) ? getenv('APP_URL') : '';

@@ -8,8 +8,10 @@ session_start();
 // Para descarga de archivo no enviar JSON ni otra salida antes de los headers del archivo
 $actionGet = $_GET['action'] ?? '';
 $esDescarga = ($_SERVER['REQUEST_METHOD'] ?? '') === 'GET'
-    && isset($_GET['id'])
-    && in_array($actionGet, ['descargar', 'corredor_descargar'], true);
+    && (
+        (isset($_GET['id']) && in_array($actionGet, ['descargar', 'corredor_descargar'], true))
+        || ($actionGet === 'generar_resumen_pdf' && isset($_GET['solicitud_id']))
+    );
 if ($esDescarga) {
     ob_start();
 } else {
@@ -31,6 +33,7 @@ require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../includes/historial_helper.php';
 require_once __DIR__ . '/../includes/OcrHelper.php';
 require_once __DIR__ . '/../includes/banco_scope_helper.php';
+require_once __DIR__ . '/../includes/sp_scope_helper.php';
 require_once __DIR__ . '/../includes/email_helper.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
@@ -48,6 +51,10 @@ switch ($method) {
             require_once __DIR__ . '/../includes/corredor_api.php';
             asegurarTablaCorredorEnvios($pdo);
             descargarEnvioCorredor($pdo, (int) $_GET['id']);
+            break;
+        }
+        if ($actionGet === 'generar_resumen_pdf' && isset($_GET['solicitud_id'])) {
+            generarResumenSolicitudPdf((int) $_GET['solicitud_id']);
             break;
         }
         if (isset($_GET['solicitud_id'])) {
@@ -582,5 +589,80 @@ function descargarAdjunto($id) {
         http_response_code(500);
         header('Content-Type: application/json');
         echo json_encode(['success' => false, 'message' => 'Error: ' . $e->getMessage()]);
+    }
+}
+
+/**
+ * Genera y descarga PDF con el mismo resumen que se envía al banco por correo.
+ */
+function generarResumenSolicitudPdf(int $solicitudId): void
+{
+    global $pdo;
+
+    $fail = static function (int $code, string $msg): void {
+        while (ob_get_level()) {
+            ob_end_clean();
+        }
+        http_response_code($code);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => false, 'message' => $msg]);
+        exit();
+    };
+
+    if ($solicitudId <= 0) {
+        $fail(400, 'Solicitud no válida');
+    }
+
+    $roles = $_SESSION['user_roles'] ?? [];
+    if (!is_array($roles)) {
+        $roles = [];
+    }
+    $puede = in_array('ROLE_ADMIN', $roles, true)
+        || in_array('ROLE_GESTOR', $roles, true)
+        || motus_es_vista_banco($roles)
+        || in_array('ROLE_VENDEDOR', $roles, true)
+        || (function_exists('motus_es_vista_sp') && motus_es_vista_sp($roles));
+    if (!$puede) {
+        $fail(403, 'Acceso denegado');
+    }
+
+    try {
+        $html = construirHtmlResumenSolicitudPdf($pdo, $solicitudId);
+        if ($html === null) {
+            $fail(404, 'Solicitud no encontrada');
+        }
+
+        $vendorAutoload = __DIR__ . '/../vendor/autoload.php';
+        if (!file_exists($vendorAutoload)) {
+            $fail(500, 'Falta vendor/autoload.php (composer install)');
+        }
+        require_once $vendorAutoload;
+        if (!class_exists('Dompdf\Dompdf')) {
+            $fail(500, 'Dompdf no está instalado');
+        }
+
+        $dompdf = new \Dompdf\Dompdf(['isRemoteEnabled' => true]);
+        $dompdf->loadHtml($html, 'UTF-8');
+        $dompdf->setPaper('A4', 'portrait');
+        $dompdf->render();
+
+        $st = $pdo->prepare('SELECT nombre_cliente FROM solicitudes_credito WHERE id = ? LIMIT 1');
+        $st->execute([$solicitudId]);
+        $cliente = trim((string) ($st->fetchColumn() ?: 'Solicitud'));
+        $clienteSafe = preg_replace('/[^a-zA-Z0-9_-]+/', '_', $cliente) ?: 'Cliente';
+        $nombreArchivo = 'Resumen_Solicitud_' . $solicitudId . '_' . substr($clienteSafe, 0, 60) . '.pdf';
+
+        while (ob_get_level()) {
+            ob_end_clean();
+        }
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: attachment; filename="' . $nombreArchivo . '"');
+        header('Cache-Control: private, max-age=0, must-revalidate');
+        header('Pragma: public');
+        echo $dompdf->output();
+        exit();
+    } catch (Throwable $e) {
+        error_log('generarResumenSolicitudPdf: ' . $e->getMessage());
+        $fail(500, 'Error al generar el PDF del resumen');
     }
 }
