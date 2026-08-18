@@ -251,6 +251,11 @@ $(document).ready(function() {
     // Limpiar al cerrar el modal de cambio de estado
     $('#cambioEstadoModal').on('hidden.bs.modal', function() {
         $('#nuevo_estado').val('');
+        $('#nota_cambio_estado').val('');
+        $('#notas_cambio_estado_count').text('');
+        $('#tablaNotasCambioEstado tbody').html(
+            '<tr><td colspan="5" class="text-center text-muted">Cargando notas...</td></tr>'
+        );
     });
     
     // Event listener cuando el modal de solicitud se muestra

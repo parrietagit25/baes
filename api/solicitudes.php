@@ -150,7 +150,9 @@ function adjuntarPdfImportadoEnSolicitud(PDO $pdo, int $solicitudId, int $usuari
 
 switch ($method) {
     case 'GET':
-        if (isset($_GET['id'])) {
+        if (isset($_GET['action']) && $_GET['action'] === 'notas_cambio_estado') {
+            obtenerNotasCambioEstado();
+        } elseif (isset($_GET['id'])) {
             obtenerSolicitud($_GET['id']);
         } elseif (isset($_GET['gestores'])) {
             obtenerGestores();
@@ -317,6 +319,66 @@ function obtenerSolicitudes() {
     } catch (PDOException $e) {
         http_response_code(500);
         echo json_encode(['success' => false, 'message' => 'Error de base de datos']);
+    }
+}
+
+function extraerMotivoCambioEstado(?string $descripcion): string {
+    $descripcion = trim((string) $descripcion);
+    if ($descripcion === '') {
+        return '';
+    }
+    if (preg_match('/Motivo:\s*(.*)$/s', $descripcion, $m)) {
+        return trim((string) $m[1]);
+    }
+    return $descripcion;
+}
+
+function obtenerNotasCambioEstado(): void {
+    global $pdo;
+
+    $solicitudId = (int) ($_GET['solicitud_id'] ?? $_GET['id'] ?? 0);
+    if ($solicitudId <= 0) {
+        echo json_encode(['success' => false, 'message' => 'solicitud_id requerido']);
+        return;
+    }
+
+    try {
+        $stmt = $pdo->prepare('SELECT id FROM solicitudes_credito WHERE id = ?');
+        $stmt->execute([$solicitudId]);
+        if (!$stmt->fetch()) {
+            echo json_encode(['success' => false, 'message' => 'Solicitud no encontrada']);
+            return;
+        }
+
+        $stmt = $pdo->prepare("
+            SELECT h.id, h.descripcion, h.estado_anterior, h.estado_nuevo, h.fecha_creacion,
+                   u.nombre, u.apellido
+            FROM historial_solicitud h
+            LEFT JOIN usuarios u ON h.usuario_id = u.id
+            WHERE h.solicitud_id = ?
+              AND h.tipo_accion = 'cambio_estado'
+            ORDER BY h.fecha_creacion DESC
+        ");
+        $stmt->execute([$solicitudId]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $data = [];
+        foreach ($rows as $row) {
+            $data[] = [
+                'id' => (int) $row['id'],
+                'fecha' => $row['fecha_creacion'],
+                'usuario' => trim(($row['nombre'] ?? '') . ' ' . ($row['apellido'] ?? '')),
+                'estado_anterior' => $row['estado_anterior'] ?? '',
+                'estado_nuevo' => $row['estado_nuevo'] ?? '',
+                'nota' => extraerMotivoCambioEstado($row['descripcion'] ?? ''),
+            ];
+        }
+
+        echo json_encode(['success' => true, 'data' => $data]);
+    } catch (PDOException $e) {
+        error_log('obtenerNotasCambioEstado: ' . $e->getMessage());
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Error al cargar las notas de cambio de estado']);
     }
 }
 

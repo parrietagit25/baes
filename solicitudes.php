@@ -1926,6 +1926,31 @@ if ($isBanco && !$isAdmin) {
                             <textarea class="form-control" id="nota_cambio_estado" name="nota_cambio_estado" rows="4" required placeholder="Explique el motivo del cambio de estado..."></textarea>
                             <div class="form-text">Esta nota se agregará automáticamente al muro de la solicitud</div>
                         </div>
+
+                        <div class="mb-3">
+                            <label class="form-label mb-2">
+                                <i class="fas fa-history me-1"></i>Notas de cambio de estado
+                                <span id="notas_cambio_estado_count" class="text-muted small"></span>
+                            </label>
+                            <div class="table-responsive border rounded" style="max-height: 240px;">
+                                <table class="table table-sm table-striped table-hover mb-0 align-middle" id="tablaNotasCambioEstado">
+                                    <thead class="table-light sticky-top">
+                                        <tr>
+                                            <th style="white-space:nowrap;">Fecha</th>
+                                            <th>Usuario</th>
+                                            <th>De</th>
+                                            <th>A</th>
+                                            <th>Nota</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td colspan="5" class="text-center text-muted">Cargando notas...</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                         
                         <!-- Campos adicionales para estados específicos -->
                         <div id="campos_adicionales_estado" style="display: none;">
@@ -2461,12 +2486,76 @@ if ($isBanco && !$isAdmin) {
             });
         }
 
+        function escapeHtmlCambioEstado(str) {
+            if (str == null || str === '') return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        function formatearFechaCambioEstado(fecha) {
+            if (!fecha) return '-';
+            var d = new Date(String(fecha).replace(' ', 'T'));
+            if (isNaN(d.getTime())) return escapeHtmlCambioEstado(fecha);
+            return d.toLocaleString('es-PA', { dateStyle: 'short', timeStyle: 'short' });
+        }
+
+        function renderNotasCambioEstado(rows) {
+            var $tbody = $('#tablaNotasCambioEstado tbody');
+            var $count = $('#notas_cambio_estado_count');
+            if (!rows || !rows.length) {
+                $count.text('');
+                $tbody.html('<tr><td colspan="5" class="text-center text-muted">No hay notas de cambio de estado para esta solicitud.</td></tr>');
+                return;
+            }
+            $count.text('(' + rows.length + ')');
+            var html = '';
+            rows.forEach(function(row) {
+                html += '<tr>'
+                    + '<td class="text-nowrap">' + formatearFechaCambioEstado(row.fecha) + '</td>'
+                    + '<td>' + escapeHtmlCambioEstado(row.usuario || 'Sistema') + '</td>'
+                    + '<td>' + escapeHtmlCambioEstado(row.estado_anterior || '-') + '</td>'
+                    + '<td>' + escapeHtmlCambioEstado(row.estado_nuevo || '-') + '</td>'
+                    + '<td style="white-space:normal;word-break:break-word;">' + escapeHtmlCambioEstado(row.nota || '-') + '</td>'
+                    + '</tr>';
+            });
+            $tbody.html(html);
+        }
+
+        function cargarNotasCambioEstado(solicitudId) {
+            $('#notas_cambio_estado_count').text('');
+            $('#tablaNotasCambioEstado tbody').html('<tr><td colspan="5" class="text-center text-muted"><i class="fas fa-spinner fa-spin me-2"></i>Cargando notas...</td></tr>');
+            $.ajax({
+                url: 'api/solicitudes.php',
+                type: 'GET',
+                data: { action: 'notas_cambio_estado', solicitud_id: solicitudId },
+                dataType: 'json',
+                success: function(response) {
+                    if (response.success) {
+                        renderNotasCambioEstado(response.data || []);
+                    } else {
+                        $('#tablaNotasCambioEstado tbody').html(
+                            '<tr><td colspan="5" class="text-center text-danger">' + escapeHtmlCambioEstado(response.message || 'Error al cargar notas') + '</td></tr>'
+                        );
+                    }
+                },
+                error: function() {
+                    $('#tablaNotasCambioEstado tbody').html(
+                        '<tr><td colspan="5" class="text-center text-danger">Error al cargar las notas de cambio de estado.</td></tr>'
+                    );
+                }
+            });
+        }
+
         // Función para abrir modal de cambio de estado (Admin / Gestor)
         function abrirModalCambioEstado(solicitudId) {
             // Limpiar formulario
             $('#cambioEstadoForm')[0].reset();
             $('#campos_adicionales_estado').hide();
             $('#cambio_estado_solicitud_id').val(solicitudId);
+            cargarNotasCambioEstado(solicitudId);
             
             // Obtener información de la solicitud
             $.ajax({
