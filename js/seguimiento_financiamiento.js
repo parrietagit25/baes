@@ -86,6 +86,15 @@
         });
     }
 
+    function escapeAttr(t) {
+        if (t == null) return '';
+        return String(t)
+            .replace(/&/g, '&amp;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;')
+            .replace(/</g, '&lt;');
+    }
+
     function fmtFechaNotas(fecha) {
         if (!fecha) return '—';
         var d = new Date(String(fecha).replace(' ', 'T'));
@@ -157,10 +166,10 @@
         if (!sid || count <= 0) {
             return '<td class="seg-fin-col-notas text-muted">—</td>';
         }
-        var clienteJs = JSON.stringify(String(r.cliente_nombre || r.nombre_motus || ''));
+        var cliente = escapeAttr(r.cliente_nombre || r.nombre_motus || '');
         return '<td class="seg-fin-col-notas">'
             + '<button type="button" class="btn btn-outline-secondary btn-sm seg-fin-notas-btn" '
-            + 'onclick="abrirNotasCambioEstadoSegFin(' + sid + ', ' + clienteJs + ')" '
+            + 'data-solicitud-id="' + sid + '" data-cliente="' + cliente + '" '
             + 'title="Ver notas de cambio de estado">'
             + '<i class="fas fa-clipboard-list"></i> '
             + '<span class="badge bg-secondary">' + count + '</span>'
@@ -310,6 +319,18 @@
         btn.addEventListener('click', function (e) {
             e.preventDefault();
             window.cargarSeguimientoFin();
+        });
+    }
+
+    var tablaDetalle = document.getElementById('tablaSegFinDetalle');
+    if (tablaDetalle) {
+        tablaDetalle.addEventListener('click', function (e) {
+            var btn = e.target.closest('.seg-fin-notas-btn');
+            if (!btn) return;
+            e.preventDefault();
+            var sid = btn.getAttribute('data-solicitud-id');
+            var cliente = btn.getAttribute('data-cliente') || '';
+            window.abrirNotasCambioEstadoSegFin(sid, cliente);
         });
     }
 
