@@ -7,6 +7,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/reportes_fin_demografia_data.php';
 require_once __DIR__ . '/solicitud_vehiculo_helper.php';
+require_once __DIR__ . '/historial_helper.php';
 
 /**
  * @return array{desde:string,hasta:string,vinculo:string}
@@ -299,7 +300,44 @@ function rep_segfin_enriquecer_fila(array $r): array
         ? ($bancoNombre !== '' ? $bancoNombre . ' — ' . $decisionLabel : $decisionLabel)
         : ($e['enviada_a_banco'] ? 'Enviada (sin propuesta seleccionada)' : '—');
 
+    $e['notas_estado_count'] = 0;
+    $e['notas_estado_ultima_fecha'] = '';
+    $e['notas_estado_ultima_nota'] = '';
+
     return $e;
+}
+
+/**
+ * @param list<array<string,mixed>> $filas
+ * @return list<array<string,mixed>>
+ */
+function rep_segfin_adjuntar_resumen_notas_estado(PDO $pdo, array $filas): array
+{
+    if (!$filas || !rep_fin_tabla_existe($pdo, 'historial_solicitud')) {
+        return $filas;
+    }
+
+    $solicitudIds = [];
+    foreach ($filas as $fila) {
+        $sid = (int) ($fila['id_sol_motus'] ?? 0);
+        if ($sid > 0) {
+            $solicitudIds[] = $sid;
+        }
+    }
+
+    $resumen = historialResumenCambiosEstadoPorSolicitudes($pdo, $solicitudIds);
+    foreach ($filas as &$fila) {
+        $sid = (int) ($fila['id_sol_motus'] ?? 0);
+        if ($sid <= 0 || !isset($resumen[$sid])) {
+            continue;
+        }
+        $fila['notas_estado_count'] = (int) $resumen[$sid]['count'];
+        $fila['notas_estado_ultima_fecha'] = (string) $resumen[$sid]['ultima_fecha'];
+        $fila['notas_estado_ultima_nota'] = (string) $resumen[$sid]['ultima_nota'];
+    }
+    unset($fila);
+
+    return $filas;
 }
 
 /**
@@ -351,6 +389,22 @@ function rep_segfin_pasar_filtro_vinculo(array $e, array $filt): bool
     return true;
 }
 
+function rep_segfin_truncar_nota_export(?string $nota, int $max = 200): string
+{
+    $nota = trim((string) $nota);
+    if ($nota === '') {
+        return '';
+    }
+    if (function_exists('mb_strlen') && mb_strlen($nota) > $max) {
+        return mb_substr($nota, 0, $max) . '…';
+    }
+    if (strlen($nota) > $max) {
+        return substr($nota, 0, $max) . '…';
+    }
+
+    return $nota;
+}
+
 /** @return list<string> */
 function rep_segfin_export_headers(): array
 {
@@ -368,6 +422,9 @@ function rep_segfin_export_headers(): array
         'Perfil estimado',
         'Sector estimado',
         'Estado Motus',
+        '# cambios estado',
+        'Últ. cambio estado',
+        'Última nota cambio',
         'Perfil Motus',
         'Ingreso Motus',
         'Género Motus',
@@ -420,6 +477,9 @@ function rep_segfin_export_row(array $e): array
         $e['perfil_estimado'] ?? '',
         $e['sector_estimado'] ?? '',
         $e['solicitud_estado'] ?? '',
+        $e['notas_estado_count'] ?? 0,
+        $e['notas_estado_ultima_fecha'] ?? '',
+        rep_segfin_truncar_nota_export($e['notas_estado_ultima_nota'] ?? ''),
         $e['perfil_motus'] ?? '',
         $e['ingreso_motus'] ?? '',
         $e['genero_motus'] ?? '',
@@ -510,6 +570,8 @@ function rep_segfin_build_reporte(PDO $pdo, ?array $filtOverride = null): array
         }
         $filas[] = $e;
     }
+
+    $filas = rep_segfin_adjuntar_resumen_notas_estado($pdo, $filas);
 
     return [
         'success' => true,

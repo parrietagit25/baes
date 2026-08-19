@@ -86,13 +86,94 @@
         });
     }
 
+    function fmtFechaNotas(fecha) {
+        if (!fecha) return '—';
+        var d = new Date(String(fecha).replace(' ', 'T'));
+        if (isNaN(d.getTime())) return escapeHtml(fecha);
+        return d.toLocaleString('es-PA', { dateStyle: 'short', timeStyle: 'short' });
+    }
+
+    function renderNotasEstadoModal(rows) {
+        var tbody = document.querySelector('#tablaSegFinNotasEstado tbody');
+        if (!tbody) return;
+        if (!rows || !rows.length) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No hay notas de cambio de estado.</td></tr>';
+            return;
+        }
+        var html = '';
+        rows.forEach(function (row) {
+            html += '<tr>'
+                + '<td class="text-nowrap">' + fmtFechaNotas(row.fecha) + '</td>'
+                + '<td>' + escapeHtml(row.usuario || 'Sistema') + '</td>'
+                + '<td>' + escapeHtml(row.estado_anterior || '—') + '</td>'
+                + '<td>' + escapeHtml(row.estado_nuevo || '—') + '</td>'
+                + '<td style="white-space:normal;word-break:break-word;">' + escapeHtml(row.nota || '—') + '</td>'
+                + '</tr>';
+        });
+        tbody.innerHTML = html;
+    }
+
+    window.abrirNotasCambioEstadoSegFin = function (solicitudId, clienteNombre) {
+        var modalEl = document.getElementById('segFinNotasEstadoModal');
+        var subtitulo = document.getElementById('segFinNotasEstadoSubtitulo');
+        var tbody = document.querySelector('#tablaSegFinNotasEstado tbody');
+        if (!modalEl || !tbody) return;
+
+        var sid = parseInt(solicitudId, 10);
+        if (!sid) return;
+
+        if (subtitulo) {
+            subtitulo.textContent = 'Solicitud Motus #' + sid
+                + (clienteNombre ? ' · ' + clienteNombre : '');
+        }
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted"><i class="fas fa-spinner fa-spin me-2"></i>Cargando…</td></tr>';
+
+        var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        modal.show();
+
+        fetch('api/solicitudes.php?action=notas_cambio_estado&solicitud_id=' + encodeURIComponent(String(sid)), {
+            method: 'GET',
+            credentials: 'same-origin',
+            cache: 'no-store',
+            headers: { Accept: 'application/json' },
+        })
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                if (!data || !data.success) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">'
+                        + escapeHtml((data && data.message) || 'Error al cargar notas') + '</td></tr>';
+                    return;
+                }
+                renderNotasEstadoModal(data.data || []);
+            })
+            .catch(function () {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">Error de conexión al cargar notas.</td></tr>';
+            });
+    };
+
+    function celdaNotasEstado(r) {
+        var sid = r.id_sol_motus ? parseInt(r.id_sol_motus, 10) : 0;
+        var count = parseInt(r.notas_estado_count, 10) || 0;
+        if (!sid || count <= 0) {
+            return '<td class="seg-fin-col-notas text-muted">—</td>';
+        }
+        var clienteJs = JSON.stringify(String(r.cliente_nombre || r.nombre_motus || ''));
+        return '<td class="seg-fin-col-notas">'
+            + '<button type="button" class="btn btn-outline-secondary btn-sm seg-fin-notas-btn" '
+            + 'onclick="abrirNotasCambioEstadoSegFin(' + sid + ', ' + clienteJs + ')" '
+            + 'title="Ver notas de cambio de estado">'
+            + '<i class="fas fa-clipboard-list"></i> '
+            + '<span class="badge bg-secondary">' + count + '</span>'
+            + '</button></td>';
+    }
+
     function renderDetalleTabla(filas) {
         var wrap = document.getElementById('segFinDetalleWrap');
         var tbody = document.querySelector('#tablaSegFinDetalle tbody');
         if (!wrap || !tbody) return;
         wrap.style.display = 'block';
         if (!filas || !filas.length) {
-            tbody.innerHTML = '<tr><td colspan="43" class="text-center text-muted">Sin registros con los filtros aplicados</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="44" class="text-center text-muted">Sin registros con los filtros aplicados</td></tr>';
             return;
         }
         var html = '';
@@ -113,6 +194,7 @@
             html += '<td>' + escapeHtml(r.sector_estimado) + '</td>';
             html += '<td>' + escapeHtml(r.solicitud_id || '—') + '</td>';
             html += '<td>' + escapeHtml(r.solicitud_estado || '—') + '</td>';
+            html += celdaNotasEstado(r);
             html += '<td>' + escapeHtml(r.perfil_motus || '—') + '</td>';
             html += '<td>' + escapeHtml(r.ingreso_motus) + '</td>';
             html += '<td>' + escapeHtml(r.genero_motus || '—') + '</td>';
@@ -162,7 +244,7 @@
         if (elSin) elSin.textContent = '…';
         if (elEnv) elEnv.textContent = '…';
         if (elNoEnv) elNoEnv.textContent = '…';
-        if (tbody) tbody.innerHTML = '<tr><td colspan="43" class="text-center text-muted">Filtrando…</td></tr>';
+        if (tbody) tbody.innerHTML = '<tr><td colspan="44" class="text-center text-muted">Filtrando…</td></tr>';
 
         var query = qs();
         if (elExport) {
@@ -179,7 +261,7 @@
             .then(function (data) {
                 if (!data || !data.success) {
                     if (tbody) {
-                        tbody.innerHTML = '<tr><td colspan="43" class="text-center text-danger">'
+                        tbody.innerHTML = '<tr><td colspan="44" class="text-center text-danger">'
                             + escapeHtml((data && data.message) || 'Error al filtrar') + '</td></tr>';
                     }
                     destroyCharts();
@@ -210,7 +292,7 @@
             })
             .catch(function () {
                 if (tbody) {
-                    tbody.innerHTML = '<tr><td colspan="43" class="text-center text-danger">Error de conexión al filtrar</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="44" class="text-center text-danger">Error de conexión al filtrar</td></tr>';
                 }
                 destroyCharts();
             });

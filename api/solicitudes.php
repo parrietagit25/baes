@@ -322,17 +322,6 @@ function obtenerSolicitudes() {
     }
 }
 
-function extraerMotivoCambioEstado(?string $descripcion): string {
-    $descripcion = trim((string) $descripcion);
-    if ($descripcion === '') {
-        return '';
-    }
-    if (preg_match('/Motivo:\s*(.*)$/s', $descripcion, $m)) {
-        return trim((string) $m[1]);
-    }
-    return $descripcion;
-}
-
 function obtenerNotasCambioEstado(): void {
     global $pdo;
 
@@ -370,7 +359,7 @@ function obtenerNotasCambioEstado(): void {
                 'usuario' => trim(($row['nombre'] ?? '') . ' ' . ($row['apellido'] ?? '')),
                 'estado_anterior' => $row['estado_anterior'] ?? '',
                 'estado_nuevo' => $row['estado_nuevo'] ?? '',
-                'nota' => extraerMotivoCambioEstado($row['descripcion'] ?? ''),
+                'nota' => historialExtraerMotivoCambioEstado($row['descripcion'] ?? ''),
             ];
         }
 

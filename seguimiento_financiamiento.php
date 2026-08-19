@@ -35,6 +35,10 @@ $segHasta = (new DateTimeImmutable('today'))->format('Y-m-d');
         .card { border: none; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.08); }
         .seg-chart-wrap { min-height: 280px; max-width: 420px; margin: 0 auto; }
         .seg-dt-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .seg-fin-notas-btn { white-space: nowrap; line-height: 1.2; font-size: 0.75rem; }
+        .seg-fin-notas-btn .badge { font-size: 0.65rem; vertical-align: middle; }
+        #tablaSegFinDetalle td.seg-fin-col-notas,
+        #tablaSegFinDetalle th.seg-fin-col-notas { width: 1%; white-space: nowrap; text-align: center; }
     </style>
 </head>
 <body>
@@ -186,6 +190,7 @@ $segHasta = (new DateTimeImmutable('today'))->format('Y-m-d');
                                             <th>Sector est.</th>
                                             <th>ID sol.</th>
                                             <th>Estado Motus</th>
+                                            <th class="seg-fin-col-notas">Notas estado</th>
                                             <th>Perfil Motus</th>
                                             <th>Ingreso Motus</th>
                                             <th>Género Motus</th>
@@ -217,12 +222,48 @@ $segHasta = (new DateTimeImmutable('today'))->format('Y-m-d');
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <tr><td colspan="43" class="text-center text-muted">Cargando…</td></tr>
+                                        <tr><td colspan="44" class="text-center text-muted">Cargando…</td></tr>
                                     </tbody>
                                 </table>
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal notas de cambio de estado (solicitud Motus) -->
+    <div class="modal fade" id="segFinNotasEstadoModal" tabindex="-1" aria-labelledby="segFinNotasEstadoModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header bg-light">
+                    <h5 class="modal-title" id="segFinNotasEstadoModalLabel">
+                        <i class="fas fa-clipboard-list me-2"></i>Notas de cambio de estado
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="small text-muted mb-2" id="segFinNotasEstadoSubtitulo">—</p>
+                    <div class="table-responsive border rounded">
+                        <table class="table table-sm table-striped table-hover mb-0 align-middle" id="tablaSegFinNotasEstado">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="white-space:nowrap;">Fecha</th>
+                                    <th>Usuario</th>
+                                    <th>De</th>
+                                    <th>A</th>
+                                    <th>Nota</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td colspan="5" class="text-center text-muted">Cargando…</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
                 </div>
             </div>
         </div>
