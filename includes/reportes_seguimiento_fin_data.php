@@ -301,8 +301,8 @@ function rep_segfin_enriquecer_fila(array $r): array
         : ($e['enviada_a_banco'] ? 'Enviada (sin propuesta seleccionada)' : '—');
 
     $e['notas_estado_count'] = 0;
-    $e['notas_estado_ultima_fecha'] = '';
-    $e['notas_estado_ultima_nota'] = '';
+    $e['notas_estado_historial'] = '';
+    $e['estados_cambio_historial'] = '';
 
     return $e;
 }
@@ -332,8 +332,8 @@ function rep_segfin_adjuntar_resumen_notas_estado(PDO $pdo, array $filas): array
             continue;
         }
         $fila['notas_estado_count'] = (int) $resumen[$sid]['count'];
-        $fila['notas_estado_ultima_fecha'] = (string) $resumen[$sid]['ultima_fecha'];
-        $fila['notas_estado_ultima_nota'] = (string) $resumen[$sid]['ultima_nota'];
+        $fila['notas_estado_historial'] = (string) $resumen[$sid]['notas_txt'];
+        $fila['estados_cambio_historial'] = (string) $resumen[$sid]['estados_txt'];
     }
     unset($fila);
 
@@ -389,22 +389,6 @@ function rep_segfin_pasar_filtro_vinculo(array $e, array $filt): bool
     return true;
 }
 
-function rep_segfin_truncar_nota_export(?string $nota, int $max = 200): string
-{
-    $nota = trim((string) $nota);
-    if ($nota === '') {
-        return '';
-    }
-    if (function_exists('mb_strlen') && mb_strlen($nota) > $max) {
-        return mb_substr($nota, 0, $max) . '…';
-    }
-    if (strlen($nota) > $max) {
-        return substr($nota, 0, $max) . '…';
-    }
-
-    return $nota;
-}
-
 /** @return list<string> */
 function rep_segfin_export_headers(): array
 {
@@ -423,8 +407,8 @@ function rep_segfin_export_headers(): array
         'Sector estimado',
         'Estado Motus',
         '# cambios estado',
-        'Últ. cambio estado',
-        'Última nota cambio',
+        'Historial estados',
+        'Historial notas',
         'Perfil Motus',
         'Ingreso Motus',
         'Género Motus',
@@ -478,8 +462,8 @@ function rep_segfin_export_row(array $e): array
         $e['sector_estimado'] ?? '',
         $e['solicitud_estado'] ?? '',
         $e['notas_estado_count'] ?? 0,
-        $e['notas_estado_ultima_fecha'] ?? '',
-        rep_segfin_truncar_nota_export($e['notas_estado_ultima_nota'] ?? ''),
+        $e['estados_cambio_historial'] ?? '',
+        $e['notas_estado_historial'] ?? '',
         $e['perfil_motus'] ?? '',
         $e['ingreso_motus'] ?? '',
         $e['genero_motus'] ?? '',

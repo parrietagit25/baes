@@ -43,10 +43,16 @@ function historialExtraerMotivoCambioEstado(?string $descripcion): string {
 }
 
 /**
- * Resumen de cambios de estado por solicitud (conteo + último registro).
+ * Historial de cambios de estado por solicitud (conteo + textos concatenados para export).
  *
  * @param list<int> $solicitudIds
- * @return array<int, array{count:int, ultima_fecha:string, ultima_nota:string}>
+ * @return array<int, array{
+ *   count:int,
+ *   ultima_fecha:string,
+ *   ultima_nota:string,
+ *   notas_txt:string,
+ *   estados_txt:string
+ * }>
  */
 function historialResumenCambiosEstadoPorSolicitudes(PDO $pdo, array $solicitudIds): array {
     $ids = array_values(array_unique(array_filter(array_map('intval', $solicitudIds), static function (int $id): bool {
@@ -59,11 +65,11 @@ function historialResumenCambiosEstadoPorSolicitudes(PDO $pdo, array $solicitudI
     try {
         $placeholders = implode(',', array_fill(0, count($ids), '?'));
         $stmt = $pdo->prepare("
-            SELECT solicitud_id, descripcion, fecha_creacion
+            SELECT solicitud_id, descripcion, estado_anterior, estado_nuevo, fecha_creacion
             FROM historial_solicitud
             WHERE solicitud_id IN ($placeholders)
               AND tipo_accion = 'cambio_estado'
-            ORDER BY solicitud_id ASC, fecha_creacion DESC
+            ORDER BY solicitud_id ASC, fecha_creacion ASC
         ");
         $stmt->execute($ids);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
@@ -77,11 +83,33 @@ function historialResumenCambiosEstadoPorSolicitudes(PDO $pdo, array $solicitudI
             if (!isset($out[$sid])) {
                 $out[$sid] = [
                     'count' => 0,
-                    'ultima_fecha' => (string) ($row['fecha_creacion'] ?? ''),
-                    'ultima_nota' => historialExtraerMotivoCambioEstado($row['descripcion'] ?? ''),
+                    'ultima_fecha' => '',
+                    'ultima_nota' => '',
+                    'notas_txt' => '',
+                    'estados_txt' => '',
+                    'notas_partes' => [],
+                    'estados_partes' => [],
                 ];
             }
+
             $out[$sid]['count']++;
+            $fecha = (string) ($row['fecha_creacion'] ?? '');
+            $out[$sid]['ultima_fecha'] = $fecha;
+            $nota = historialExtraerMotivoCambioEstado($row['descripcion'] ?? '');
+            $out[$sid]['ultima_nota'] = $nota;
+
+            $n = $out[$sid]['count'];
+            $de = trim((string) ($row['estado_anterior'] ?? ''));
+            $a = trim((string) ($row['estado_nuevo'] ?? ''));
+            $transicion = ($de !== '' || $a !== '') ? ($de !== '' ? $de : '—') . ' → ' . ($a !== '' ? $a : '—') : '—';
+            $out[$sid]['notas_partes'][] = 'Nota' . $n . ': ' . ($nota !== '' ? $nota : '—');
+            $out[$sid]['estados_partes'][] = 'Estado' . $n . ': ' . $transicion;
+        }
+
+        foreach ($out as $sid => $item) {
+            $out[$sid]['notas_txt'] = implode(', ', $item['notas_partes']);
+            $out[$sid]['estados_txt'] = implode(', ', $item['estados_partes']);
+            unset($out[$sid]['notas_partes'], $out[$sid]['estados_partes']);
         }
 
         return $out;
