@@ -305,6 +305,13 @@ if ($isBanco && !$isAdmin) {
         #solicitudesTable tbody tr.solicitud-sin-respuesta-2h:hover > td {
             background-color: #f1bfc4 !important;
         }
+        /* Solicitud en estado Aprobada */
+        #solicitudesTable tbody tr.solicitud-estado-aprobada > td {
+            background-color: #d1e7dd !important;
+        }
+        #solicitudesTable tbody tr.solicitud-estado-aprobada:hover > td {
+            background-color: #c3e6cb !important;
+        }
 
         /* Respuestas de los Bancos: tabla legible con scroll horizontal (solo DataTables) */
         .modal-respuestas-bancos .modal-dialog {
@@ -611,7 +618,14 @@ if ($isBanco && !$isAdmin) {
                                                 case 'Rechazado': $respuestaClass = 'estado-rechazada'; break;
                                             }
                                             $alertaSinRespuesta2h = !empty($solicitud['alerta_sin_respuesta_2h']);
-                                            $filaClase = $alertaSinRespuesta2h ? 'solicitud-sin-respuesta-2h' : '';
+                                            $filaClases = [];
+                                            if ($alertaSinRespuesta2h) {
+                                                $filaClases[] = 'solicitud-sin-respuesta-2h';
+                                            }
+                                            if (($solicitud['estado'] ?? '') === 'Aprobada') {
+                                                $filaClases[] = 'solicitud-estado-aprobada';
+                                            }
+                                            $filaClase = implode(' ', $filaClases);
                                             $filaTitulo = $alertaSinRespuesta2h
                                                 ? 'Enviada a bancos hace más de 2 horas sin ninguna respuesta'
                                                 : '';
