@@ -36,6 +36,8 @@ $segHasta = (new DateTimeImmutable('today'))->format('Y-m-d');
         .card { border: none; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.08); }
         .page-header { background: linear-gradient(135deg, #111827 0%, #1f2937 100%); color: #fff; border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 1.5rem; }
         .ua-online-dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:#22c55e; margin-right:6px; }
+        .ua-top-medal { display:inline-flex; align-items:center; justify-content:center; min-width:1.5rem; height:1.5rem; border-radius:999px; background:#eef2ff; color:#3730a3; font-size:0.75rem; font-weight:700; margin-right:8px; }
+        .ua-scroll-list { max-height: 320px; overflow-y: auto; }
         .ua-dt-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
         .ua-ua-cell { max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .badge-evento { font-weight: 600; text-transform: uppercase; font-size: 0.7rem; }
@@ -117,15 +119,27 @@ $segHasta = (new DateTimeImmutable('today'))->format('Y-m-d');
                 </div>
 
                 <div class="row g-3 mb-3">
-                    <div class="col-lg-5">
+                    <div class="col-lg-6">
                         <div class="card h-100">
                             <div class="card-body">
                                 <h6 class="mb-3"><span class="ua-online-dot"></span>Usuarios en línea ahora</h6>
-                                <div id="uaOnlineList" class="small text-muted">Cargando…</div>
+                                <div id="uaOnlineList" class="small text-muted ua-scroll-list">Cargando…</div>
                             </div>
                         </div>
                     </div>
-                    <div class="col-lg-3">
+                    <div class="col-lg-6">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h6 class="mb-1"><i class="fas fa-trophy me-2 text-warning"></i>Top de usuarios</h6>
+                                <p class="small text-muted mb-3">Interacciones en el rango filtrado (pantallas, clics, logins, etc.)</p>
+                                <div id="uaTopUsuarios" class="small text-muted ua-scroll-list">Cargando…</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-lg-6">
                         <div class="card h-100">
                             <div class="card-body">
                                 <h6 class="mb-3">Por tipo de evento</h6>
@@ -133,7 +147,7 @@ $segHasta = (new DateTimeImmutable('today'))->format('Y-m-d');
                             </div>
                         </div>
                     </div>
-                    <div class="col-lg-4">
+                    <div class="col-lg-6">
                         <div class="card h-100">
                             <div class="card-body">
                                 <h6 class="mb-3">Pantallas más visitadas</h6>
@@ -173,6 +187,6 @@ $segHasta = (new DateTimeImmutable('today'))->format('Y-m-d');
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
-<script src="js/seguimiento_usuarios.js"></script>
+<script src="js/seguimiento_usuarios.js?v=<?php echo file_exists(__DIR__ . '/js/seguimiento_usuarios.js') ? filemtime(__DIR__ . '/js/seguimiento_usuarios.js') : time(); ?>"></script>
 </body>
 </html>

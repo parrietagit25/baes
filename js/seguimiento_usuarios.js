@@ -83,6 +83,39 @@
         $('#uaOnlineList').html(html);
     }
 
+    function renderTopUsuarios(rows) {
+        if (!rows || !rows.length) {
+            $('#uaTopUsuarios').html('<span class="text-muted">Ningún usuario con actividad en el rango.</span>');
+            return;
+        }
+        var html = '<ul class="list-unstyled mb-0">';
+        rows.forEach(function (r, idx) {
+            var nom = ((r.nombre || '') + ' ' + (r.apellido || '')).trim() || (r.email || ('#' + r.usuario_id));
+            var inactivo = parseInt(r.activo, 10) !== 1
+                ? ' <span class="badge bg-secondary">inactivo</span>'
+                : '';
+            html += '<li class="mb-2 border-bottom pb-2 d-flex justify-content-between align-items-start gap-2">'
+                + '<div class="d-flex align-items-start">'
+                + '<span class="ua-top-medal">' + (idx + 1) + '</span>'
+                + '<div>'
+                + '<strong>' + esc(nom) + '</strong>' + inactivo
+                + (r.email ? ('<div class="text-muted">' + esc(r.email) + '</div>') : '')
+                + '<div class="text-muted">Logins: ' + esc(r.logins || 0)
+                + ' · Pantallas: ' + esc(r.pantallas || 0)
+                + ' · Acciones: ' + esc(r.acciones || 0)
+                + '</div>'
+                + '<div class="text-muted">Última: ' + esc(r.ultima_vez || '—') + '</div>'
+                + '</div></div>'
+                + '<div class="text-end">'
+                + '<div class="fw-bold text-primary">' + esc(r.interacciones || 0) + '</div>'
+                + '<div class="text-muted" style="font-size:0.7rem">interacciones</div>'
+                + '</div>'
+                + '</li>';
+        });
+        html += '</ul>';
+        $('#uaTopUsuarios').html(html);
+    }
+
     function motusMetaPagina(p) {
         return { seccion: p ? String(p).replace(/\.php$/i, '') : '—' };
     }
@@ -125,6 +158,7 @@
 
                 fillUsuarios(d.usuarios || [], d.filtros && d.filtros.usuario_id);
                 renderOnline(d.online || []);
+                renderTopUsuarios(d.top_usuarios || []);
                 renderListaSimple('#uaPorEvento', d.por_evento || [], function (r) { return r.evento; }, function (r) { return r.total; });
                 renderListaSimple('#uaTopPaginas', d.top_paginas || [], function (r) {
                     return (r.seccion ? r.seccion + ' · ' : '') + (r.pagina || '');

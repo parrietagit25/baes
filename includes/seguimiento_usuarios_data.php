@@ -131,6 +131,30 @@ function seguimiento_usuarios_data(PDO $pdo, array $f): array
     $stTop->execute($w['params']);
     $topPaginas = $stTop->fetchAll(PDO::FETCH_ASSOC);
 
+    // Top usuarios: todos los que ingresaron/interactuaron en el rango (excluye login_failed).
+    $sqlTopUsuarios = "
+        SELECT a.usuario_id,
+               u.nombre,
+               u.apellido,
+               u.email,
+               u.activo,
+               COUNT(*) AS interacciones,
+               SUM(CASE WHEN a.evento = 'page_view' THEN 1 ELSE 0 END) AS pantallas,
+               SUM(CASE WHEN a.evento = 'login' THEN 1 ELSE 0 END) AS logins,
+               SUM(CASE WHEN a.evento IN ('click','action') THEN 1 ELSE 0 END) AS acciones,
+               MAX(a.created_at) AS ultima_vez
+        FROM usuario_actividad a
+        INNER JOIN usuarios u ON u.id = a.usuario_id
+        WHERE {$w['where']}
+          AND a.usuario_id IS NOT NULL
+          AND a.evento <> 'login_failed'
+        GROUP BY a.usuario_id, u.nombre, u.apellido, u.email, u.activo
+        ORDER BY interacciones DESC, ultima_vez DESC
+    ";
+    $stTopUsuarios = $pdo->prepare($sqlTopUsuarios);
+    $stTopUsuarios->execute($w['params']);
+    $topUsuarios = $stTopUsuarios->fetchAll(PDO::FETCH_ASSOC);
+
     $sqlEv = "
         SELECT a.evento, COUNT(*) AS total
         FROM usuario_actividad a
@@ -183,6 +207,7 @@ function seguimiento_usuarios_data(PDO $pdo, array $f): array
             'online_ahora' => count($online),
         ],
         'online' => $online,
+        'top_usuarios' => $topUsuarios,
         'top_paginas' => $topPaginas,
         'por_evento' => $porEvento,
         'usuarios' => $usuarios,
