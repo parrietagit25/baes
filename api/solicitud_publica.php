@@ -10,9 +10,28 @@ if (ob_get_level()) ob_end_clean();
 ob_start();
 
 header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');
+$origenPedido = trim((string) ($_SERVER['HTTP_ORIGIN'] ?? ''));
+$hostPedido = trim((string) ($_SERVER['HTTP_HOST'] ?? ''));
+$origenesPropios = [];
+if ($hostPedido !== '') {
+    $origenesPropios[] = 'https://' . $hostPedido;
+    $origenesPropios[] = 'http://' . $hostPedido;
+}
+$origenesExtra = getenv('FINANCIAMIENTO_ORIGENES');
+if (is_string($origenesExtra) && $origenesExtra !== '') {
+    foreach (explode(',', $origenesExtra) as $extra) {
+        $extra = trim($extra);
+        if ($extra !== '') {
+            $origenesPropios[] = $extra;
+        }
+    }
+}
+if ($origenPedido !== '' && in_array($origenPedido, $origenesPropios, true)) {
+    header('Access-Control-Allow-Origin: ' . $origenPedido);
+    header('Vary: Origin');
+}
 
 require_once __DIR__ . '/../includes/configuracion_sistema_helper.php';
 
@@ -30,6 +49,38 @@ if (motus_mantenimiento_activo()) {
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
     exit();
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    try {
+        require_once __DIR__ . '/../config/database.php';
+        require_once __DIR__ . '/../includes/seguridad_acceso_helper.php';
+        if (isset($pdo) && $pdo instanceof PDO) {
+            $ipPublico = seguridad_ip_cliente();
+            $bloqueoPublico = seguridad_rate_bloqueado($pdo, 'form_publico', $ipPublico);
+            if ($bloqueoPublico['bloqueado']) {
+                if (ob_get_level()) ob_end_clean();
+                http_response_code(429);
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Demasiados envíos desde esta red. Espere unos minutos e intente de nuevo.',
+                ]);
+                exit();
+            }
+            $conteoPublico = seguridad_rate_registrar($pdo, 'form_publico', $ipPublico, 11, 900, 900);
+            if ($conteoPublico['bloqueado']) {
+                if (ob_get_level()) ob_end_clean();
+                http_response_code(429);
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Demasiados envíos desde esta red. Espere unos minutos e intente de nuevo.',
+                ]);
+                exit();
+            }
+        }
+    } catch (Throwable $e) {
+        error_log('solicitud_publica rate: ' . $e->getMessage());
+    }
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -61,10 +112,11 @@ function sendError500($message, $detail = null) {
 
 set_exception_handler(function (Throwable $e) {
     logSolPub('UNCAUGHT: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
-    sendError500(
-        'Error inesperado en el servidor.',
-        $e->getMessage() . ' en ' . basename($e->getFile()) . ':' . $e->getLine()
-    );
+    $detalle = null;
+    if (defined('APP_DEBUG') && APP_DEBUG) {
+        $detalle = $e->getMessage() . ' en ' . basename($e->getFile()) . ':' . $e->getLine();
+    }
+    sendError500('Error inesperado en el servidor.', $detalle);
 });
 
 set_error_handler(function ($severity, $message, $file, $line) {

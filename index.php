@@ -23,10 +23,21 @@ if ($_POST) {
     } else {
         $email = $_POST['email'];
         $password = $_POST['password'];
+        require_once __DIR__ . '/includes/seguridad_acceso_helper.php';
+        $ipLogin = seguridad_ip_cliente();
+        $emailClave = strtolower(trim((string) $email));
+        $clavePar = $ipLogin . '|' . $emailClave;
+        $bloqueoPar = seguridad_rate_bloqueado($pdo, 'login_par', $clavePar);
+        $bloqueoIp = seguridad_rate_bloqueado($pdo, 'login_ip', $ipLogin);
+        if ($bloqueoPar['bloqueado'] || $bloqueoIp['bloqueado']) {
+            $error = 'Demasiados intentos. Espere unos minutos e intente de nuevo.';
+        } else {
         $stmt = $pdo->prepare("SELECT id, nombre, apellido, email, password, activo, banco_id FROM usuarios WHERE email = ?");
         $stmt->execute([$email]);
         $user = $stmt->fetch();
         if ($user && password_verify($password, $user['password']) && $user['activo'] == 1) {
+        session_regenerate_id(true);
+        seguridad_rate_limpiar($pdo, 'login_par', $clavePar);
         $_SESSION['user_id'] = $user['id'];
         $_SESSION['user_name'] = $user['nombre'] . ' ' . $user['apellido'];
         $_SESSION['user_email'] = $user['email'];
@@ -56,6 +67,8 @@ if ($_POST) {
         exit();
         } else {
             $error = 'Credenciales inválidas o usuario inactivo';
+            seguridad_rate_registrar($pdo, 'login_par', $clavePar, 5, 900, 900);
+            seguridad_rate_registrar($pdo, 'login_ip', $ipLogin, 20, 900, 900);
             try {
                 require_once __DIR__ . '/includes/usuario_actividad_helper.php';
                 motus_actividad_registrar($pdo, 'login_failed', [
@@ -68,6 +81,7 @@ if ($_POST) {
             } catch (Throwable $e) {
                 error_log('login_failed actividad: ' . $e->getMessage());
             }
+        }
         }
     }
 }

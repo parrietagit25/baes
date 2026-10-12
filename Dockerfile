@@ -19,11 +19,13 @@ RUN apt-get update && apt-get install -y \
         gd \
         mbstring
 
-# Habilitar mod_rewrite para Apache
-RUN a2enmod rewrite
+# Habilitar mod_rewrite y encabezados de seguridad
+RUN a2enmod rewrite headers expires deflate
 
 # Permitir subida de archivos grandes (evitar 403 por límite de Apache)
 COPY docker/apache-uploads.conf /etc/apache2/conf-enabled/uploads.conf
+COPY docker/apache-seguridad.conf /etc/apache2/conf-enabled/seguridad.conf
+COPY docker/php-seguridad.ini /usr/local/etc/php/conf.d/zz-seguridad.ini
 
 # Entrypoint: composer en bind mount (ver docker/apache-entrypoint.sh)
 COPY docker/apache-entrypoint.sh /usr/local/bin/apache-entrypoint.sh

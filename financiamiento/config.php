@@ -3,8 +3,12 @@
  * Configuración del módulo financiamiento (acceso a ver registros y formulario).
  */
 
-// Contraseña para acceder a ver_registros.php. Cámbiela por una segura.
-define('FINANCIAMIENTO_ADMIN_PASSWORD', 'admin123');
+// El formulario que llena el cliente (index.php) es público y no usa esta clave.
+// El acceso interno a registros, si se habilita, debe salir del entorno.
+$finAdminPass = getenv('FINANCIAMIENTO_ADMIN_PASSWORD');
+if (!defined('FINANCIAMIENTO_ADMIN_PASSWORD') && is_string($finAdminPass) && $finAdminPass !== '') {
+    define('FINANCIAMIENTO_ADMIN_PASSWORD', $finAdminPass);
+}
 
 /**
  * URL de la API donde el formulario envía los datos (solicitud_publica.php).

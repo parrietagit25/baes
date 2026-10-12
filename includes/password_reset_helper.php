@@ -80,9 +80,21 @@ if (!function_exists('password_reset_solicitar')) {
 
         password_reset_asegurar_tabla($pdo);
 
+        require_once __DIR__ . '/seguridad_acceso_helper.php';
+        $ipLimite = ($ip !== null && $ip !== '') ? $ip : seguridad_ip_cliente();
+        $bloqueoReset = seguridad_rate_bloqueado($pdo, 'reset', $ipLimite);
+        if ($bloqueoReset['bloqueado']) {
+            return ['ok' => false, 'message' => 'Demasiados intentos. Espere unos minutos e intente de nuevo.'];
+        }
+        seguridad_rate_registrar($pdo, 'reset', $ipLimite, 5, 900, 900);
+
         $stmt = $pdo->prepare('SELECT id, nombre, apellido, email, activo FROM usuarios WHERE LOWER(email) = LOWER(?) LIMIT 1');
         $stmt->execute([$email]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$user || (int) ($user['activo'] ?? 0) !== 1) {
+            return ['ok' => true, 'message' => $msgOk];
+        }
 
         $usuarioId = (int) $user['id'];
 

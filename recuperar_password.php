@@ -24,8 +24,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'No se pudo conectar a la base de datos. Intente nuevamente.';
     } else {
         $emailValue = trim((string) ($_POST['email'] ?? ''));
-        $ip = $_SERVER['REMOTE_ADDR'] ?? null;
-        $res = password_reset_solicitar($pdo, $emailValue, is_string($ip) ? $ip : null);
+        require_once __DIR__ . '/includes/seguridad_acceso_helper.php';
+        $res = password_reset_solicitar($pdo, $emailValue, seguridad_ip_cliente());
         if (!empty($res['ok'])) {
             $success = $res['message'];
             $emailValue = '';

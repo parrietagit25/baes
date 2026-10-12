@@ -44,9 +44,14 @@ function financiamiento_crear_primer_usuario_si_vacio() {
     financiamiento_crear_tabla_usuarios_si_no_existe();
     $stmt = $pdo->query("SELECT COUNT(*) FROM financiamiento_usuarios");
     if ($stmt && (int)$stmt->fetchColumn() > 0) return;
-    $hash = password_hash('admin123', PASSWORD_DEFAULT);
+    $passInicial = getenv('FINANCIAMIENTO_BOOTSTRAP_PASSWORD');
+    $emailInicial = getenv('FINANCIAMIENTO_BOOTSTRAP_EMAIL');
+    if (!is_string($passInicial) || $passInicial === '' || !is_string($emailInicial) || $emailInicial === '') {
+        return;
+    }
+    $hash = password_hash($passInicial, PASSWORD_DEFAULT);
     $stmt = $pdo->prepare("INSERT INTO financiamiento_usuarios (nombre, email, password_hash, activo) VALUES (?, ?, ?, 1)");
-    $stmt->execute(['Administrador', 'admin@ejemplo.com', $hash]);
+    $stmt->execute(['Administrador', $emailInicial, $hash]);
 }
 
 function financiamiento_usuario_logueado() {
