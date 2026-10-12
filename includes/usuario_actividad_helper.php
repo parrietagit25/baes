@@ -107,6 +107,7 @@ if (!function_exists('motus_actividad_mapa_secciones')) {
             'reportes_banco_fin_enlazada.php' => ['seccion' => 'Reportes', 'etiqueta' => 'Sol. Fin. + Motus'],
             'encuestas_resultados.php' => ['seccion' => 'Reportes', 'etiqueta' => 'Encuestas'],
             'seguimiento_usuarios.php' => ['seccion' => 'Reportes', 'etiqueta' => 'Seguimiento de Usuarios'],
+            'monitoreo_seguridad.php' => ['seccion' => 'Reportes', 'etiqueta' => 'Monitoreo de seguridad'],
             'index.php' => ['seccion' => 'Acceso', 'etiqueta' => 'Login'],
             'logout.php' => ['seccion' => 'Acceso', 'etiqueta' => 'Cerrar sesión'],
             'recuperar_password.php' => ['seccion' => 'Acceso', 'etiqueta' => 'Recuperar contraseña'],

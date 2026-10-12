@@ -35,7 +35,7 @@ $isSp = motus_es_vista_sp($userRoles);
 $current_page = basename($_SERVER['PHP_SELF']);
 
 // Definir páginas permitidas por rol
-$paginasAdmin = ['dashboard.php', 'usuarios.php', 'roles.php', 'bancos.php', 'ejecutivos_ventas.php', 'solicitudes.php', 'historico_solicitudes.php', 'sol_financiamiento.php', 'seguimiento_financiamiento.php', 'subir_reporte_reservas.php', 'ferias.php', 'feria_panel.php', 'pipedrive.php', 'configuracion.php', 'reportes.php', 'encuestas_resultados.php', 'seguimiento_usuarios.php'];
+$paginasAdmin = ['dashboard.php', 'usuarios.php', 'roles.php', 'bancos.php', 'ejecutivos_ventas.php', 'solicitudes.php', 'historico_solicitudes.php', 'sol_financiamiento.php', 'seguimiento_financiamiento.php', 'subir_reporte_reservas.php', 'ferias.php', 'feria_panel.php', 'pipedrive.php', 'configuracion.php', 'reportes.php', 'encuestas_resultados.php', 'seguimiento_usuarios.php', 'monitoreo_seguridad.php'];
 $paginasGestor = ['dashboard.php', 'solicitudes.php', 'historico_solicitudes.php', 'sol_financiamiento.php', 'seguimiento_financiamiento.php', 'subir_reporte_reservas.php', 'ferias.php', 'feria_panel.php', 'usuarios_banco.php', 'ejecutivos_ventas.php', 'reportes.php', 'encuestas_resultados.php'];
 $paginasBanco = ['dashboard.php', 'solicitudes.php', 'historico_solicitudes.php', 'mis_propuestas_banco.php', 'usuarios_banco.php', 'reportes_banco.php', 'reportes_banco_fin_enlazada.php', 'seguimiento_banco.php'];
 $paginasVendedor = ['dashboard.php', 'solicitudes.php', 'historico_solicitudes.php'];
@@ -68,8 +68,11 @@ if ($isAdmin) {
     $accesoPermitido = ($current_page === 'dashboard.php');
 }
 
-// Admin principal (id=1): siempre puede ver el seguimiento de usuarios
-if ((int) ($_SESSION['user_id'] ?? 0) === 1 && $current_page === 'seguimiento_usuarios.php') {
+// Admin principal (id=1): seguimiento de usuarios y monitoreo de seguridad.
+$esAdminPrincipalAcceso = ((int) ($_SESSION['user_id'] ?? 0) === 1);
+if ($current_page === 'monitoreo_seguridad.php') {
+    $accesoPermitido = $esAdminPrincipalAcceso;
+} elseif ($esAdminPrincipalAcceso && $current_page === 'seguimiento_usuarios.php') {
     $accesoPermitido = true;
 }
 

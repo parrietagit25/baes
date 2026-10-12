@@ -157,3 +157,55 @@ if (!function_exists('seguridad_rate_limpiar')) {
         }
     }
 }
+
+if (!function_exists('seguridad_rate_puertas')) {
+    /** @return array<string,string> */
+    function seguridad_rate_puertas(): array
+    {
+        return [
+            'login_ip' => 'Login del panel',
+            'login_par' => 'Login por IP y correo',
+            'reset' => 'Recuperar contraseña',
+            'form_publico' => 'Formulario público',
+        ];
+    }
+}
+
+if (!function_exists('seguridad_rate_listar')) {
+    /** @return list<array<string,mixed>> */
+    function seguridad_rate_listar(PDO $pdo): array
+    {
+        seguridad_rate_asegurar_tabla($pdo);
+        $st = $pdo->query("
+            SELECT bucket, clave, intentos, ventana_inicio, bloqueado_hasta,
+                   CASE WHEN bloqueado_hasta IS NOT NULL AND bloqueado_hasta > NOW() THEN 1 ELSE 0 END AS activo,
+                   GREATEST(0, TIMESTAMPDIFF(SECOND, NOW(), bloqueado_hasta)) AS espera
+            FROM seguridad_rate_limit
+            ORDER BY activo DESC, bloqueado_hasta DESC, ventana_inicio DESC
+            LIMIT 400
+        ");
+        return $st ? ($st->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
+    }
+}
+
+if (!function_exists('seguridad_rate_bloquear_manual')) {
+    function seguridad_rate_bloquear_manual(PDO $pdo, string $bucket, string $clave, int $horas): bool
+    {
+        $puertas = seguridad_rate_puertas();
+        if (!isset($puertas[$bucket]) || $clave === '' || strlen($clave) > 190) {
+            return false;
+        }
+        $horas = max(1, min(168, $horas));
+        seguridad_rate_asegurar_tabla($pdo);
+        $st = $pdo->prepare('
+            INSERT INTO seguridad_rate_limit (bucket, clave, intentos, ventana_inicio, bloqueado_hasta)
+            VALUES (?, ?, 99, NOW(), DATE_ADD(NOW(), INTERVAL ? HOUR))
+            ON DUPLICATE KEY UPDATE
+                intentos = 99,
+                ventana_inicio = NOW(),
+                bloqueado_hasta = DATE_ADD(NOW(), INTERVAL ? HOUR)
+        ');
+        $st->execute([$bucket, $clave, $horas, $horas]);
+        return true;
+    }
+}

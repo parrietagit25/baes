@@ -33,7 +33,7 @@ $paginasAdministracionMenu = [
     'configuracion.php',
 ];
 $paginasFeriaMenu = ['ferias.php', 'feria_panel.php'];
-$paginasReportesMenu = ['reportes.php', 'reportes_banco.php', 'reportes_banco_fin_enlazada.php', 'seguimiento_banco.php', 'seguimiento_financiamiento.php', 'encuestas_resultados.php', 'seguimiento_usuarios.php'];
+$paginasReportesMenu = ['reportes.php', 'reportes_banco.php', 'reportes_banco_fin_enlazada.php', 'seguimiento_banco.php', 'seguimiento_financiamiento.php', 'encuestas_resultados.php', 'seguimiento_usuarios.php', 'monitoreo_seguridad.php'];
 
 $menuSolicitudesActivo = in_array($current_page, $paginasSolicitudesMenu, true);
 $menuAdministracionActivo = in_array($current_page, $paginasAdministracionMenu, true);
@@ -153,6 +153,9 @@ $esAdminPrincipal = ((int) ($_SESSION['user_id'] ?? 0) === 1);
             <?php if ($esAdminPrincipal): ?>
             <a class="nav-link ps-4 py-2 small <?php echo ($current_page === 'seguimiento_usuarios.php') ? 'active' : ''; ?>" href="seguimiento_usuarios.php">
                 <i class="fas fa-user-secret me-2"></i>Seguimiento Usuarios
+            </a>
+            <a class="nav-link ps-4 py-2 small <?php echo ($current_page === 'monitoreo_seguridad.php') ? 'active' : ''; ?>" href="monitoreo_seguridad.php">
+                <i class="fas fa-shield-alt me-2"></i>Monitoreo de seguridad
             </a>
             <?php endif; ?>
             <?php if ($isAdmin || $isGestor || $isSp): ?>
